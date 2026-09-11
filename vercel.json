@@ -3,9 +3,6 @@
   "functions": {
     "api/index.js": {
       "maxDuration": 30,
-      "//": "catalog.js reads data/slate-manifest.csv through a path built at",
-      "// ": "runtime, which the file tracer cannot follow. Without this the",
-      "//  ": "function throws ENOENT on every request.",
       "includeFiles": "data/**"
     }
   },
