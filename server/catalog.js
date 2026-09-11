@@ -75,7 +75,15 @@ function fromManifest(text) {
 }
 
 function bundledManifest() {
-  return fs.readFileSync(path.join(ROOT, 'data', 'slate-manifest.csv'), 'utf8');
+  try {
+    return fs.readFileSync(path.join(ROOT, 'data', 'slate-manifest.csv'), 'utf8');
+  } catch (e) {
+    // Only reachable if the file was left out of a deployment bundle. Degrade to
+    // an empty roster with a loud reason rather than throwing on every request.
+    console.error('bundled manifest missing:', e.message,
+      '- on Vercel check includeFiles in vercel.json');
+    return 'County,District,Seats,Slate size,Built?,Nominees,Missing photos\n';
+  }
 }
 
 /* --------------------------------------------------------------------- roster */

@@ -1,8 +1,15 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "functions": { "api/index.js": { "maxDuration": 30 } },
+  "functions": {
+    "api/index.js": {
+      "maxDuration": 30,
+      "//": "catalog.js reads data/slate-manifest.csv through a path built at",
+      "// ": "runtime, which the file tracer cannot follow. Without this the",
+      "//  ": "function throws ENOENT on every request.",
+      "includeFiles": "data/**"
+    }
+  },
   "rewrites": [
-    { "source": "/", "destination": "/api/index" },
     { "source": "/api/(.*)", "destination": "/api/index" },
     { "source": "/auth/(.*)", "destination": "/api/index" },
     { "source": "/login", "destination": "/api/index" }
