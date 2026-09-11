@@ -22,9 +22,13 @@ const MIME = {
   '.ico': 'image/x-icon', '.woff2': 'font/woff2',
 };
 
-const json = (res, code, body) => {
+const json = (res, code, body, extra = {}) => {
   const s = JSON.stringify(body);
-  res.writeHead(code, { 'content-type': 'application/json; charset=utf-8', 'content-length': Buffer.byteLength(s) });
+  res.writeHead(code, {
+    'content-type': 'application/json; charset=utf-8',
+    'content-length': Buffer.byteLength(s),
+    ...extra,
+  });
   res.end(s);
 };
 const text = (res, code, body, extra = {}) => {
@@ -118,9 +122,15 @@ async function api(req, res, url) {
     // Refresh re-crawls Drive. Not something a stranger gets to trigger.
     const refresh = !config.isPublic && url.searchParams.get('refresh') === '1';
     const cat = await catalog.get({ refresh });
-    if (!config.readyOnly) return json(res, 200, cat);
+    // Rebuilding the catalog is several Drive calls, which a serverless host
+    // would otherwise repeat on every cold start. An hour at the CDN keeps that
+    // rare while still picking up a newly added headshot the same morning.
+    const extra = config.isPublic && !cat.driveError
+      ? { 'cache-control': 'public, max-age=300, s-maxage=3600, stale-while-revalidate=86400' }
+      : { 'cache-control': 'no-store' };
+    if (!config.readyOnly) return json(res, 200, cat, extra);
     const districts = cat.districts.filter((d) => d.ready);
-    return json(res, 200, { ...cat, districts, counts: { ...cat.counts, districts: districts.length } });
+    return json(res, 200, { ...cat, districts, counts: { ...cat.counts, districts: districts.length } }, extra);
   }
 
   // /api/portrait/<slug>.png -- cutout for one candidate
@@ -174,10 +184,19 @@ async function api(req, res, url) {
   return json(res, 404, { error: 'no such endpoint' });
 }
 
-/** Serve a Drive file id or a local path, cached on disk after the first fetch. */
+/** Serve a Drive file id or a local path, cached on disk after the first fetch.
+ *
+ *  The `s-maxage` matters on a serverless host, where there is no disk to cache
+ *  to: the CDN holds the portrait instead, so Drive is hit about once per
+ *  portrait per region per day rather than on every cold start. A day, not a
+ *  week, because the whole point of the PHOTO NEEDED tiles is that new
+ *  headshots keep arriving and should appear without a redeploy. */
 async function sendAsset(res, key, ref) {
   const cacheFile = path.join(paths.cache, key.replace(/[^A-Za-z0-9._-]/g, '_') + '.png');
-  const headers = { 'content-type': 'image/png', 'cache-control': 'public, max-age=86400' };
+  const headers = {
+    'content-type': 'image/png',
+    'cache-control': 'public, max-age=3600, s-maxage=86400, stale-while-revalidate=604800',
+  };
   if (fs.existsSync(cacheFile)) {
     res.writeHead(200, headers);
     return fs.createReadStream(cacheFile).pipe(res);

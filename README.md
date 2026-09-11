@@ -168,6 +168,25 @@ given. Set `SLATE_PUBLIC=1` on any deployment that is not behind a password.
 GitHub Pages cannot run it. Pages serves static files only, and this app needs a
 server to hold the Drive credential and to pass the portraits to the browser.
 
+### One tap, from a phone
+
+[**Deploy on Vercel**](https://vercel.com/new/import?s=https://github.com/josephfsweeney-oss/slate-studio)
+· [**Deploy on Render**](https://render.com/deploy?repo=https://github.com/josephfsweeney-oss/slate-studio)
+
+Both read the config in this repo and ask for one value: the service-account
+key. Get that first, below.
+
+Vercel is the easier of the two and fine for this app: the portrait and catalog
+responses carry `s-maxage`, so its CDN holds them and Drive is reached about
+once per portrait per region per day rather than on every cold start. It has no
+disk, so the on-disk cache and the in-memory rate limit are per instance. Render
+has a disk and one process, which makes both of those hold properly, but it
+costs a little and the free tier sleeps.
+
+Vercel deploys by pulling from GitHub, so once the project exists every push to
+`main` redeploys on its own. There is no `git push vercel`; Vercel is not a git
+host.
+
 ### The short path: a service account
 
 A service account is the right credential for a server that reads one fixed
