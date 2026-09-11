@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Slate Studio</title>
+<link rel="stylesheet" href="fonts.css">
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+
+<header class="bar">
+  <div class="brand"><span class="mark"></span> Slate Studio</div>
+  <div id="source" class="source"></div>
+  <div class="bar-actions">
+    <button id="btn-batch" class="ghost">Batch build</button>
+    <button id="btn-refresh" class="ghost" title="Re-read the Drive folder">Refresh Drive</button>
+    <a id="btn-connect" class="ghost" href="/auth/google" hidden>Connect Drive</a>
+  </div>
+</header>
+
+<div id="notice" class="notice" hidden></div>
+
+<main>
+  <!-- districts -->
+  <aside class="rail" id="rail-left">
+    <div class="rail-head">
+      <input id="search" type="search" placeholder="Search district, town or name" autocomplete="off">
+      <div class="chips">
+        <button class="chip on" data-filter="all">All</button>
+        <button class="chip" data-filter="ready">Portraits ready</button>
+        <button class="chip" data-filter="multi">Multi-member</button>
+        <button class="chip" data-filter="gap">Photo gap</button>
+      </div>
+    </div>
+    <div id="districts" class="districts"></div>
+  </aside>
+
+  <!-- stage -->
+  <section class="stage">
+    <div class="stage-head">
+      <div>
+        <h1 id="stage-title">Pick a district</h1>
+        <div id="stage-sub" class="sub"></div>
+      </div>
+      <div class="stage-size" id="stage-size"></div>
+    </div>
+
+    <div class="canvas-wrap"><canvas id="preview"></canvas></div>
+
+    <div id="warnings" class="warnings"></div>
+
+    <div class="actions">
+      <button id="btn-png" class="primary">Download PNG</button>
+      <button id="btn-2x" class="ghost">Download @2x</button>
+      <button id="btn-drive" class="ghost">Save to Drive</button>
+      <button id="btn-copy" class="ghost">Copy image</button>
+      <button id="btn-cycle" class="ghost" title="Cycle the colour combinations (press C)">Colors: Granite Guarantee</button>
+      <span class="spacer"></span>
+      <label class="inline"><input type="checkbox" id="disc-waive"> Asset layer, no disclaimer</label>
+    </div>
+  </section>
+
+  <!-- controls -->
+  <aside class="rail" id="rail-right">
+    <div class="tabs">
+      <button class="tab on" data-tab="content">Content</button>
+      <button class="tab" data-tab="design">Design</button>
+      <button class="tab" data-tab="slate">Slate</button>
+    </div>
+
+    <div class="panel on" data-panel="content">
+      <label class="f">Template
+        <select id="template"></select>
+      </label>
+      <label class="f">Canvas
+        <select id="canvas"></select>
+      </label>
+      <div class="row" id="custom-size" hidden>
+        <label class="f">Width <input id="cw" type="number" min="200" max="8000" step="10"></label>
+        <label class="f">Height <input id="ch" type="number" min="200" max="8000" step="10"></label>
+      </div>
+
+      <label class="f">Kicker <input id="c-kicker" placeholder="Rockingham District 25"></label>
+      <label class="f">Headline <textarea id="c-headline" rows="2" placeholder="Vote Republican"></textarea></label>
+      <label class="f">Subhead <textarea id="c-subhead" rows="2"></textarea></label>
+      <label class="f">Details <textarea id="c-details" rows="3" placeholder="One line per line break"></textarea></label>
+      <label class="f">Call to action <input id="c-cta" placeholder="Vote Tuesday, November 3"></label>
+      <label class="f">Footer <input id="c-footer" placeholder="Website or handle"></label>
+      <label class="f req">Disclaimer <span class="hint">required on a finished ad, RSA 664:14</span>
+        <textarea id="c-disclaimer" rows="2" placeholder="Paid for by ..., Treasurer, address"></textarea>
+      </label>
+      <div class="tokens" id="tokens"></div>
+    </div>
+
+    <div class="panel" data-panel="design">
+      <div class="f">Palette<div class="swatches" id="palettes"></div></div>
+      <div class="f">Ground<div class="swatches" id="grounds"></div></div>
+      <label class="f" id="bg-upload-wrap" hidden>Background photo <input id="bg-file" type="file" accept="image/*"></label>
+      <label class="f" id="bg-dim-wrap" hidden>Photo dim <input id="bg-dim" type="range" min="0" max="0.85" step="0.05"></label>
+      <div class="row">
+        <label class="f">Accent <input id="accent" type="color"><input id="accent-hex" class="hex" spellcheck="false"></label>
+        <label class="f">Name line <input id="plate-accent" type="color"><input id="plate-accent-hex" class="hex" spellcheck="false"></label>
+      </div>
+      <div class="row">
+        <label class="f">Ground <input id="bg-color" type="color"><input id="bg-color-hex" class="hex" spellcheck="false"></label>
+        <label class="f">Ground 2 <input id="bg-color2" type="color"><input id="bg-color2-hex" class="hex" spellcheck="false"></label>
+      </div>
+      <label class="f">Name plate <input id="plate-color" type="color"><input id="plate-color-hex" class="hex" spellcheck="false"></label>
+      <label class="f">Layout
+        <select id="composition">
+          <option value="auto">Auto, fit to canvas</option>
+          <option value="stack">Copy above the faces</option>
+          <option value="banner">Copy below the faces</option>
+          <option value="split">Copy beside the faces</option>
+          <option value="slateOnly">Faces only</option>
+        </select>
+      </label>
+      <label class="f">Copy alignment
+        <select id="align"><option value="auto">Auto</option><option value="left">Left</option><option value="center">Centered</option></select>
+      </label>
+      <label class="f">Breathing room <input id="density" type="range" min="0.75" max="1.3" step="0.05"></label>
+      <label class="inline"><input type="checkbox" id="plate" checked> Name plates under each portrait</label>
+      <label class="inline"><input type="checkbox" id="flagbar" checked> Flag bar along the bottom</label>
+      <label class="inline"><input type="checkbox" id="twotone" checked> Two-tone headline, first line in the accent</label>
+      <label class="inline"><input type="checkbox" id="hshadow" checked> Headline shadow</label>
+      <label class="f">Logo <input id="logo-file" type="file" accept="image/*"></label>
+      <label class="f">Logo position
+        <select id="logo-pos">
+          <option value="top-right">Top right</option><option value="top-left">Top left</option>
+          <option value="bottom-right">Bottom right</option><option value="bottom-left">Bottom left</option>
+        </select>
+      </label>
+      <button id="logo-clear" class="ghost small">Remove logo</button>
+    </div>
+
+    <div class="panel" data-panel="slate">
+      <label class="f">Faces
+        <select id="face-source">
+          <option value="cutouts">Rebuild from the cutouts</option>
+          <option value="deck">Use the built deck layer</option>
+        </select>
+      </label>
+      <div class="sub" id="face-note"></div>
+      <div class="sub" id="slate-note"></div>
+      <div id="slate-list" class="slate-list"></div>
+    </div>
+  </aside>
+</main>
+
+<!-- batch -->
+<div id="batch" class="modal" hidden>
+  <div class="modal-box">
+    <h2>Batch build</h2>
+    <p class="sub">Build the same copy across many districts. Tokens fill themselves per district.</p>
+    <div class="row">
+      <label class="f">Districts
+        <select id="batch-scope">
+          <option value="ready">Every portrait-ready district</option>
+          <option value="all">Every district</option>
+          <option value="county">One county</option>
+          <option value="selected">Just what I ticked</option>
+        </select>
+      </label>
+      <label class="f" id="batch-county-wrap" hidden>County <select id="batch-county"></select></label>
+    </div>
+    <div class="f">Canvases<div class="swatches" id="batch-canvases"></div></div>
+    <label class="f">Filename tag <input id="batch-tag" value="Build"></label>
+    <label class="inline"><input type="checkbox" id="batch-drive"> Also save each file to Drive</label>
+    <div id="batch-status" class="sub"></div>
+    <div class="actions">
+      <button id="batch-run" class="primary">Build ZIP</button>
+      <button id="batch-close" class="ghost">Close</button>
+    </div>
+  </div>
+</div>
+
+<script type="module" src="app.js"></script>
+</body>
+</html>

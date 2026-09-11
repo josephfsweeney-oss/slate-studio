@@ -1,0 +1,143 @@
+:root{
+  --navy:#012360; --lift:#0A3078; --red:#BF0A30; --sky:#9FC0FF; --cream:#F7F8FB;
+  --ink:#0E1726; --muted:#5A6880; --line:#DFE4EC; --bg:#F2F4F8;
+  --rail:320px;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);
+  font:14px/1.45 "Barlow Condensed",system-ui,-apple-system,Segoe UI,sans-serif;
+  font-size:15px;-webkit-font-smoothing:antialiased;
+  /* A column so the notice bar shortens the stage instead of pushing the
+     action buttons off the bottom of the window. */
+  height:100vh;display:flex;flex-direction:column;overflow:hidden}
+button,input,select,textarea{font:inherit;color:inherit}
+
+/* ------------------------------------------------------------------- top bar */
+.bar{flex:none;display:flex;align-items:center;gap:16px;padding:0 16px;height:52px;
+  background:var(--navy);color:#fff;position:sticky;top:0;z-index:20}
+.brand{font-family:Anton,Impact,sans-serif;font-size:20px;letter-spacing:.02em;
+  display:flex;align-items:center;gap:9px}
+.mark{width:14px;height:14px;border-radius:3px;background:var(--red);
+  box-shadow:0 0 0 3px rgba(159,192,255,.35)}
+.source{font-size:13px;color:var(--sky);letter-spacing:.04em}
+.bar-actions{margin-left:auto;display:flex;gap:8px}
+
+.notice{flex:none;padding:9px 16px;background:#FFF4D6;border-bottom:1px solid #E8D9A8;font-size:14px}
+.notice.bad{background:#FDE8EC;border-color:#F3C3CE}
+
+/* -------------------------------------------------------------------- layout */
+main{flex:1;min-height:0;display:grid;
+  grid-template-columns:var(--rail) minmax(0,1fr) var(--rail);overflow:hidden}
+.rail{background:#fff;border-right:1px solid var(--line);display:flex;flex-direction:column;overflow:hidden}
+#rail-right{border-right:0;border-left:1px solid var(--line)}
+.stage{display:flex;flex-direction:column;min-width:0;padding:16px 20px;overflow:hidden}
+
+/* ----------------------------------------------------------------- districts */
+.rail-head{padding:12px;border-bottom:1px solid var(--line)}
+#search{width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:#fff}
+.chips{display:flex;gap:6px;margin-top:9px;flex-wrap:wrap}
+.chip{border:1px solid var(--line);background:#fff;border-radius:999px;padding:3px 10px;
+  font-size:13px;cursor:pointer;color:var(--muted)}
+.chip.on{background:var(--navy);border-color:var(--navy);color:#fff}
+.districts{overflow:auto;flex:1;padding:6px 0 40px}
+.county{position:sticky;top:0;background:#EEF1F6;padding:4px 12px;font-weight:700;
+  font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);z-index:1}
+.d-row{display:flex;align-items:center;gap:9px;padding:7px 12px;cursor:pointer;border-left:3px solid transparent}
+.d-row:hover{background:#F5F7FB}
+.d-row.on{background:#E8EEFA;border-left-color:var(--red)}
+.d-row .num{font-family:Anton,sans-serif;font-size:16px;min-width:26px}
+.d-row .who{flex:1;min-width:0;color:var(--muted);font-size:13px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dot{width:8px;height:8px;border-radius:50%;background:#D6DCE6;flex:none}
+.dot.ready{background:#1E9E5A}
+.dot.part{background:#E8A33D}
+.d-row input[type=checkbox]{margin:0}
+
+/* --------------------------------------------------------------------- stage */
+.stage-head{display:flex;align-items:flex-end;gap:16px;margin-bottom:12px;flex:none}
+.stage h1{font-family:Anton,sans-serif;font-size:24px;margin:0;letter-spacing:.01em}
+.sub{color:var(--muted);font-size:13.5px}
+.stage-size{margin-left:auto;color:var(--muted);font-size:13px;font-variant-numeric:tabular-nums}
+.canvas-wrap{flex:1 1 auto;min-height:0;display:grid;place-items:center;overflow:hidden;
+  background:
+    linear-gradient(45deg,#E7EAF0 25%,transparent 25%,transparent 75%,#E7EAF0 75%),
+    linear-gradient(45deg,#E7EAF0 25%,#fff 25%,#fff 75%,#E7EAF0 75%);
+  background-size:22px 22px;background-position:0 0,11px 11px;
+  border:1px solid var(--line);border-radius:12px;position:relative}
+#preview{position:absolute;inset:16px;margin:auto;width:auto;height:auto;
+  max-width:calc(100% - 32px);max-height:calc(100% - 32px);
+  box-shadow:0 8px 30px rgba(1,35,96,.18);border-radius:3px}
+.warnings{margin:10px 0 0;flex:none;max-height:22vh;overflow:auto}
+.warn{background:#FFF4D6;border:1px solid #E8D9A8;border-radius:8px;padding:7px 10px;margin-top:6px;font-size:13.5px}
+.warn.bad{background:#FDE8EC;border-color:#F3C3CE}
+.actions{display:flex;align-items:center;gap:8px;margin-top:12px;flex-wrap:wrap;flex:none}
+.spacer{flex:1}
+
+/* ------------------------------------------------------------------- buttons */
+button,.ghost{cursor:pointer;border-radius:8px;padding:8px 13px;border:1px solid var(--line);
+  background:#fff;font-weight:600;text-decoration:none;color:var(--ink);display:inline-block}
+.bar .ghost{background:rgba(255,255,255,.10);border-color:rgba(255,255,255,.28);color:#fff;padding:6px 11px}
+.bar .ghost:hover{background:rgba(255,255,255,.20)}
+.primary{background:var(--red);border-color:var(--red);color:#fff}
+.primary:disabled{opacity:.5;cursor:not-allowed}
+.small{padding:5px 9px;font-size:13px}
+
+/* -------------------------------------------------------------------- panels */
+.tabs{display:flex;border-bottom:1px solid var(--line)}
+.tab{flex:1;border:0;border-radius:0;background:#fff;padding:11px 0;color:var(--muted);
+  border-bottom:2px solid transparent}
+.tab.on{color:var(--navy);border-bottom-color:var(--red)}
+.panel{display:none;padding:14px;overflow:auto}
+.panel.on{display:block}
+.f{display:block;margin-bottom:11px;font-size:13px;color:var(--muted);font-weight:600;
+  letter-spacing:.03em;text-transform:uppercase}
+.f input,.f select,.f textarea{display:block;width:100%;margin-top:4px;padding:8px 9px;
+  border:1px solid var(--line);border-radius:8px;background:#fff;
+  font-size:15px;font-weight:400;text-transform:none;letter-spacing:0;color:var(--ink)}
+.f textarea{resize:vertical;line-height:1.35}
+.f input[type=color]{padding:2px;height:36px}
+.f input.hex{margin-top:4px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:13px;text-transform:uppercase}
+.f input[type=range]{padding:0}
+.f.req{color:var(--red)}
+.hint{font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted);font-size:12px}
+.row{display:flex;gap:9px}
+.row>.f{flex:1}
+.inline{display:flex;align-items:center;gap:7px;margin:9px 0;font-size:14px;color:var(--ink)}
+.inline input{margin:0}
+.swatches{display:flex;flex-wrap:wrap;gap:6px;margin-top:5px}
+.sw{width:auto;padding:5px 10px;border:1px solid var(--line);border-radius:999px;
+  background:#fff;font-size:13px;font-weight:400;text-transform:none;letter-spacing:0}
+.sw.on{background:var(--navy);color:#fff;border-color:var(--navy)}
+.tokens{display:flex;flex-wrap:wrap;gap:5px;margin-top:4px}
+.tok{font-size:12px;padding:3px 7px;border-radius:6px;background:#EEF1F6;color:var(--muted);
+  cursor:pointer;border:0;font-weight:600}
+.tok:hover{background:var(--sky);color:var(--navy)}
+
+/* -------------------------------------------------------------------- slate */
+.slate-list{display:flex;flex-direction:column;gap:5px;margin-top:8px}
+.p-row{display:flex;align-items:center;gap:8px;padding:6px 8px;border:1px solid var(--line);border-radius:8px}
+.p-row.off{opacity:.45}
+.p-row .nm{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.p-row .tag{font-size:11px;padding:2px 6px;border-radius:5px;background:#EEF1F6;color:var(--muted)}
+.p-row .tag.gap{background:#FDE8EC;color:#A3123A}
+.p-row button{padding:2px 7px;font-size:13px}
+
+/* -------------------------------------------------------------------- modal */
+/* `display:grid` would otherwise beat the hidden attribute and leave an
+   invisible sheet over the whole page swallowing clicks. */
+.modal[hidden]{display:none}
+.modal{position:fixed;inset:0;background:rgba(1,35,96,.55);display:grid;place-items:center;z-index:40}
+.modal-box{background:#fff;border-radius:14px;padding:22px;width:min(560px,92vw);max-height:88vh;overflow:auto}
+.modal-box h2{font-family:Anton,sans-serif;margin:0 0 4px;font-size:22px}
+
+@media (max-width:1180px){
+  main{grid-template-columns:260px minmax(0,1fr) 300px}
+  :root{--rail:260px}
+}
+@media (max-width:900px){
+  body{height:auto;display:block;overflow:visible}
+  main{display:block;overflow:visible}
+  .rail{border:0;border-top:1px solid var(--line)}
+  .stage{overflow:visible}
+  .canvas-wrap{height:62vh}
+}

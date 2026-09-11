@@ -1,0 +1,47 @@
+import path from 'node:path';
+import fs from 'node:fs';
+import { fileURLToPath } from 'node:url';
+
+export const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+
+/** .env is read here so nobody has to export variables by hand. */
+function loadDotEnv() {
+  const f = path.join(ROOT, '.env');
+  if (!fs.existsSync(f)) return;
+  for (const line of fs.readFileSync(f, 'utf8').split('\n')) {
+    const m = /^\s*([A-Z0-9_]+)\s*=\s*(.*)\s*$/.exec(line);
+    if (m && !process.env[m[1]]) process.env[m[1]] = m[2].replace(/^["']|["']$/g, '');
+  }
+}
+loadDotEnv();
+
+// Serverless filesystems are read-only apart from /tmp, and nothing written
+// there survives a cold start. That is fine for a cache; it is not fine for the
+// Drive token, which comes from GOOGLE_REFRESH_TOKEN when hosted.
+export const serverless = Boolean(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME);
+
+export const config = {
+  port: Number(process.env.PORT || 5173),
+  host: process.env.HOST || '0.0.0.0',
+  baseUrl: (process.env.BASE_URL || `http://localhost:${process.env.PORT || 5173}`).replace(/\/$/, ''),
+  clientId: process.env.GOOGLE_CLIENT_ID || '',
+  clientSecret: process.env.GOOGLE_CLIENT_SECRET || '',
+  // Name or id of the Drive folder holding Decks/ Cutouts/ build/.
+  driveFolderName: process.env.SLATE_DRIVE_FOLDER || '2026 Slate Decks',
+  // The 2026 Slate Decks folder. Pinned by id so no name lookup can miss it.
+  driveFolderId: process.env.SLATE_DRIVE_FOLDER_ID || '1HYMAdrQ4w5vizodC5ICHYzSM0uRUUdAH',
+  // Point at the same tree on disk to run with no Google account at all.
+  localDir: process.env.SLATE_LOCAL_DIR || '',
+  stateDir: process.env.SLATE_STATE_DIR || (serverless ? '/tmp/slate-studio' : path.join(ROOT, '.slate-studio')),
+  refreshToken: process.env.GOOGLE_REFRESH_TOKEN || '',
+  // Set to lock the app behind a shared password when it is deployed publicly.
+  password: process.env.SLATE_PASSWORD || '',
+};
+
+export const paths = {
+  tokens: path.join(config.stateDir, 'tokens.json'),
+  catalog: path.join(config.stateDir, 'catalog.json'),
+  cache: path.join(config.stateDir, 'cache'),
+};
+
+fs.mkdirSync(paths.cache, { recursive: true });

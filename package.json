@@ -1,0 +1,17 @@
+{
+  "name": "slate-studio",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Build finished NH House slate graphics from the 2026 Slate Decks in Google Drive. The layout fits itself to the slate and to the copy you submit.",
+  "engines": {
+    "node": ">=18.17"
+  },
+  "scripts": {
+    "start": "node server/index.js",
+    "dev": "node --watch server/index.js",
+    "test": "node --test test/*.test.js",
+    "token": "node server/print-token.js"
+  },
+  "dependencies": {}
+}

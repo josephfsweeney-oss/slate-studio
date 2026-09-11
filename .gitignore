@@ -1,0 +1,6 @@
+# Drive OAuth token, catalog cache, portrait cache. Never commit these.
+.slate-studio/
+.env
+
+node_modules/
+.DS_Store

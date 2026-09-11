@@ -1,0 +1,25 @@
+# One-click deploy on Render. A long-running Node process with a disk, so the
+# Drive token and the portrait cache survive restarts.
+services:
+  - type: web
+    name: slate-studio
+    runtime: node
+    plan: starter
+    buildCommand: ""
+    startCommand: npm start
+    healthCheckPath: /api/state
+    disk:
+      name: slate-state
+      mountPath: /var/slate
+      sizeGB: 1
+    envVars:
+      - key: SLATE_STATE_DIR
+        value: /var/slate
+      - key: BASE_URL
+        sync: false          # set to the render.com URL after the first deploy
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: SLATE_PASSWORD
+        sync: false
