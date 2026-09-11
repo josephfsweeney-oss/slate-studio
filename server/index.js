@@ -108,6 +108,7 @@ async function api(req, res, url) {
     return json(res, 200, {
       isPublic: config.isPublic,
       readyOnly: config.readyOnly,
+      disclaimer: config.disclaimer,
       driveConfigured: auth.configured(),
       signedIn: auth.signedIn(),
       localMode: Boolean(config.localDir && fs.existsSync(config.localDir)),

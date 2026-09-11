@@ -48,6 +48,8 @@ export const config = {
   // Open to the internet. Everything that writes, spends Drive quota, or can
   // revoke the app's own access is shut off. See PUBLIC MODE in the README.
   isPublic: process.env.SLATE_PUBLIC === '1',
+  // The committee this deployment builds for. Another committee sets its own.
+  disclaimer: process.env.SLATE_DISCLAIMER || '',
   // Show only districts whose portraits are all present, so the photo gap is
   // not on display. Off by default: it hides 89 of 174 districts.
   readyOnly: process.env.SLATE_PUBLIC_READY_ONLY === '1',

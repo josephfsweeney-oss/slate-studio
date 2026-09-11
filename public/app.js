@@ -7,7 +7,9 @@ import { makeZip } from './zip.js';
 const $ = (s) => document.querySelector(s);
 const $$ = (s) => [...document.querySelectorAll(s)];
 
-const DEFAULT_DISCLAIMER = 'Paid for by [committee name], [treasurer], [address].';
+/* The registered CEHR disclaimer, as it appears on the committee's own site.
+ * A deployment for another committee sets SLATE_DISCLAIMER instead. */
+const DEFAULT_DISCLAIMER = 'Paid for by Committee to Elect House Republicans, 75 S Main Street Unit 7 Box 159, Concord, NH 03301. Jason Osborne, Chairman.';
 
 const COLOR_FIELDS = [
   ['#accent', 'accent'], ['#plate-accent', 'plateAccent'],
@@ -762,7 +764,7 @@ function showSource() {
 
 async function boot() {
   loadLocal();
-  if (!state.copy.disclaimer) state.copy.disclaimer = DEFAULT_DISCLAIMER;
+  if (!state.copy.disclaimer.trim()) state.copy.disclaimer = DEFAULT_DISCLAIMER;
 
   // Measuring before the webfonts land would lay everything out against a
   // fallback face and then not match the export.
@@ -782,6 +784,7 @@ async function boot() {
   state.catalog = cat;
 
   state.server = st;
+  if (st.disclaimer && !state.copy.disclaimer.trim()) state.copy.disclaimer = st.disclaimer;
   fillSelects();
   syncControls();
   bind();

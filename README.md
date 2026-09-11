@@ -89,7 +89,9 @@ county, or whatever you tick, at every canvas you pick, and hands back a ZIP.
 
 **The disclaimer is not optional.** A finished political ad needs one under
 RSA 664:14. Export stays locked until the field is filled, or until you tick
-"asset layer, no disclaimer" for a layer somebody else will finish.
+"asset layer, no disclaimer" for a layer somebody else will finish. It is
+prefilled with the registered Committee to Elect House Republicans line; a
+deployment for another committee sets `SLATE_DISCLAIMER`.
 
 **Missing headshots stay visible.** 143 of 330 nominees still have no usable
 photo. Those tiles render as a marked placeholder rather than dropping the
