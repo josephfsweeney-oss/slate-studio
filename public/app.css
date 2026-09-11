@@ -39,6 +39,9 @@ main{flex:1;min-height:0;display:grid;
 .chip{border:1px solid var(--line);background:#fff;border-radius:999px;padding:3px 10px;
   font-size:13px;cursor:pointer;color:var(--muted)}
 .chip.on{background:var(--navy);border-color:var(--navy);color:#fff}
+.gap-summary{margin-top:9px;padding:8px 10px;border-radius:8px;background:#FFF4D6;
+  border:1px solid #E8D9A8;font-size:13px;line-height:1.35}
+.gap-summary b{font-family:Anton,sans-serif;font-weight:400;font-size:15px}
 .districts{overflow:auto;flex:1;padding:6px 0 40px}
 .county{position:sticky;top:0;background:#EEF1F6;padding:4px 12px;font-weight:700;
   font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);z-index:1}
@@ -46,6 +49,9 @@ main{flex:1;min-height:0;display:grid;
 .d-row:hover{background:#F5F7FB}
 .d-row.on{background:#E8EEFA;border-left-color:var(--red)}
 .d-row .num{font-family:Anton,sans-serif;font-size:16px;min-width:26px}
+/* One headshot from a complete slate: the cheapest ones to unlock. */
+.d-row.one-away{background:#FFFAF0}
+.d-row.one-away .tag{background:#F6C453;color:#5A3B00;font-weight:700}
 .d-row .who{flex:1;min-width:0;color:var(--muted);font-size:13px;
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .dot{width:8px;height:8px;border-radius:50%;background:#D6DCE6;flex:none}
@@ -118,6 +124,7 @@ button,.ghost{cursor:pointer;border-radius:8px;padding:8px 13px;border:1px solid
 .p-row{display:flex;align-items:center;gap:8px;padding:6px 8px;border:1px solid var(--line);border-radius:8px}
 .p-row.off{opacity:.45}
 .p-row .nm{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.d-row .tag{font-size:11px;padding:2px 6px;border-radius:5px;background:#EEF1F6;color:var(--muted)}
 .p-row .tag{font-size:11px;padding:2px 6px;border-radius:5px;background:#EEF1F6;color:var(--muted)}
 .p-row .tag.gap{background:#FDE8EC;color:#A3123A}
 .p-row button{padding:2px 7px;font-size:13px}

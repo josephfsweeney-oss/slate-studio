@@ -140,12 +140,25 @@ The rate limit is held in memory. On a serverless host that means per instance,
 so treat it as a speed bump, not a guarantee. On Render it is one process and
 it holds.
 
-**What a public copy still shows.** Everyone gets the district list, the
-nominee names and the portraits. Candidates with no usable headshot render as a
-tile marked PHOTO NEEDED, so which of your candidates never sent a photo is
-visible to anyone. If that matters, set `SLATE_PUBLIC_READY_ONLY=1` and the app
-offers only districts whose portraits are all present. That is 85 districts
-instead of 174.
+**The photo gap is public on purpose.** Everyone gets the district list, the
+nominee names and the portraits. A candidate with no usable headshot gets a tile
+marked PHOTO NEEDED, with their name plate under it, sitting in the middle of
+their own slate. Eight faces and one hole is a better ask than an eighth email.
+
+Two things make that usable:
+
+- **Copy link** puts `?d=<County>-<District>` on the clipboard. Send a candidate
+  the link and they land on their own slate, with a line telling them how many
+  faces are placeholders and why. `?c=` and `?p=` carry the canvas and the
+  colours if you want to pin those too.
+- **Photo gap**, in the district filters, counts how many nominees still owe a
+  headshot and how many districts are complete, and flags every slate that is
+  **one headshot from done**. Those are the cheap wins: one photo turns a broken
+  slate into a finished one.
+
+If you would rather not show the gap, `SLATE_PUBLIC_READY_ONLY=1` offers only
+districts whose portraits are all present. That is 85 districts instead of 174,
+and it is off by default.
 
 ## Hosting it for colleagues
 

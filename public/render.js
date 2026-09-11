@@ -136,7 +136,7 @@ function paintSilhouette(ctx, r, theme) {
   const cx = r.x + r.w / 2;
   const base = r.y + r.h;
   ctx.save();
-  ctx.fillStyle = theme.light ? 'rgba(1,35,96,.14)' : 'rgba(255,255,255,.16)';
+  ctx.fillStyle = theme.light ? 'rgba(18,49,78,.13)' : 'rgba(255,255,255,.16)';
   const headR = r.w * 0.20;
   ctx.beginPath();
   ctx.arc(cx, base - r.h * 0.62, headR, 0, Math.PI * 2);
@@ -148,17 +148,19 @@ function paintSilhouette(ctx, r, theme) {
   ctx.quadraticCurveTo(cx + bw / 2, base - bh, cx + bw / 2, base);
   ctx.closePath();
   ctx.fill();
-  ctx.strokeStyle = theme.light ? 'rgba(1,35,96,.30)' : 'rgba(255,255,255,.34)';
+  // The empty slot has to read as an absence at feed size, not as a soft grey
+  // box somebody might take for a design choice.
+  ctx.strokeStyle = theme.light ? 'rgba(18,49,78,.52)' : 'rgba(255,255,255,.52)';
   ctx.setLineDash([r.w * 0.05, r.w * 0.04]);
-  ctx.lineWidth = Math.max(1.5, r.w * 0.010);
+  ctx.lineWidth = Math.max(2, r.w * 0.014);
   roundRect(ctx, r.x + r.w * 0.06, r.y + r.h * 0.10, r.w * 0.88, r.h * 0.88, r.w * 0.05);
   ctx.stroke();
   ctx.setLineDash([]);
-  ctx.fillStyle = theme.secondary;
-  setFont(ctx, { family: 'Barlow Condensed', weight: 700 }, r.w * 0.075, 0.08);
+  ctx.fillStyle = theme.light ? 'rgba(18,49,78,.88)' : 'rgba(255,255,255,.92)';
+  setFont(ctx, { family: 'Barlow Condensed', weight: 700 }, r.w * 0.090, 0.06);
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillText('PHOTO NEEDED', cx, r.y + r.h * 0.30);
+  ctx.fillText('PHOTO NEEDED', cx, r.y + r.h * 0.22);
   ctx.restore();
 }
 

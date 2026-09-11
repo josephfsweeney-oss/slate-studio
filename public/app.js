@@ -62,6 +62,17 @@ const assets = { portraits: {}, bgImage: null, logo: null, deck: null };
 let measure = null;
 let plan = null;
 
+/** A link that opens this district, so a candidate can be sent the slate they
+ *  are missing from rather than told about it. */
+function shareLink() {
+  const u = new URL(location.href);
+  u.search = '';
+  u.searchParams.set('d', state.districtId);
+  if (state.canvasId !== '1x1') u.searchParams.set('c', state.canvasId);
+  if (state.style.paletteId) u.searchParams.set('p', state.style.paletteId);
+  return u.toString();
+}
+
 /* ------------------------------------------------------------------ plumbing */
 
 const saveLocal = () => {
@@ -92,6 +103,10 @@ function loadLocal() {
 }
 
 const district = () => state.catalog?.districts.find((d) => d.id === state.districtId) || null;
+
+/** One headshot short of a complete slate. These are the cheapest to unlock,
+ *  so they are worth calling out rather than burying in the list. */
+const oneAway = (d) => d.missing.length === 1 && d.nominees.length >= 2;
 
 /** The candidates actually on the graphic, in the chosen order. */
 function activeSlate(d = district()) {
@@ -265,9 +280,25 @@ async function renderTo(d, size, scale = 1) {
 
 /* ------------------------------------------------------------------ district */
 
+function renderGapSummary(filter) {
+  const el = $('#gap-summary');
+  const all = state.catalog.districts;
+  const noms = all.reduce((a, d) => a + d.nominees.length, 0);
+  const have = all.reduce((a, d) => a + d.nominees.filter((n) => n.cutout).length, 0);
+  if (filter !== 'gap' || !noms) { el.hidden = true; return; }
+  const close = all.filter(oneAway);
+  el.hidden = false;
+  el.innerHTML = `<b>${noms - have}</b> of ${noms} nominees still owe a headshot. `
+    + `<b>${all.filter((d) => d.ready).length}</b> of ${all.length} districts are complete.`
+    + (close.length
+      ? `<br><b>${close.length}</b> slate${close.length > 1 ? 's are' : ' is'} one headshot from done.`
+      : '');
+}
+
 function renderDistrictList() {
   const q = $('#search').value.trim().toLowerCase();
   const filter = $$('.chip').find((c) => c.classList.contains('on'))?.dataset.filter || 'all';
+  renderGapSummary(filter);
   const batching = !$('#batch').hidden;
   const html = [];
   let county = null;
@@ -283,12 +314,13 @@ function renderDistrictList() {
     if (d.county !== county) { county = d.county; html.push(`<div class="county">${esc(county)}</div>`); }
     const have = d.nominees.filter((n) => n.cutout).length;
     const cls = have === d.nominees.length ? 'ready' : have ? 'part' : '';
+    const close = oneAway(d);
     html.push(
-      `<div class="d-row${d.id === state.districtId ? ' on' : ''}" data-id="${d.id}">` +
+      `<div class="d-row${d.id === state.districtId ? ' on' : ''}${close ? ' one-away' : ''}" data-id="${d.id}">` +
       (batching ? `<input type="checkbox" data-tick="${d.id}" ${state.ticked.has(d.id) ? 'checked' : ''}>` : '') +
       `<span class="dot ${cls}"></span><span class="num">${d.district}</span>` +
       `<span class="who">${esc(d.nominees.map((n) => n.last).join(', ').toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase()))}</span>` +
-      `<span class="tag">${d.nominees.length}</span></div>`
+      `<span class="tag">${close ? '1 away' : d.nominees.length}</span></div>`
     );
   }
   $('#districts').innerHTML = html.join('') || '<div class="county">Nothing matches</div>';
@@ -684,6 +716,16 @@ function bind() {
   $('#btn-drive').addEventListener('click', saveToDrive);
   $('#btn-copy').addEventListener('click', copyImage);
   $('#btn-cycle').addEventListener('click', () => cyclePalette(1));
+  $('#btn-link').addEventListener('click', async () => {
+    const link = shareLink();
+    try {
+      await navigator.clipboard.writeText(link);
+      const d = district();
+      notice(d && d.missing.length
+        ? `Link copied. It opens ${d.county} ${d.district} with ${d.missing.length} face${d.missing.length > 1 ? 's' : ''} still missing.`
+        : 'Link copied.');
+    } catch { notice(link, false); }
+  });
   // C steps the colours, Shift+C steps back. Ignored while typing copy.
   document.addEventListener('keydown', (e) => {
     if (e.metaKey || e.ctrlKey || e.altKey) return;
@@ -760,10 +802,28 @@ async function boot() {
       : 'Running on the bundled manifest. Set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET in .env to reach the decks in Drive.');
   }
 
-  const first = state.districtId && cat.districts.some((d) => d.id === state.districtId)
-    ? state.districtId
-    : (cat.districts.find((d) => d.ready && d.nominees.length > 2) || cat.districts[0])?.id;
+  // A shared link wins over whatever was last open in this browser.
+  const q = new URLSearchParams(location.search);
+  const wanted = q.get('d');
+  if (q.get('c') && (CANVASES.some((c) => c.id === q.get('c')) || q.get('c') === 'custom')) {
+    state.canvasId = q.get('c');
+    Object.assign(state, { cw: canvasSize().w, ch: canvasSize().h });
+  }
+  const pal = PALETTES.find((x) => x.id === q.get('p'));
+  if (pal) applyPalette(pal);
+  if (q.get('c') || pal) syncControls();
+
+  const first = (wanted && cat.districts.some((d) => d.id === wanted) && wanted)
+    || (state.districtId && cat.districts.some((d) => d.id === state.districtId) && state.districtId)
+    || (cat.districts.find((d) => d.ready && d.nominees.length > 2) || cat.districts[0])?.id;
   await selectDistrict(first);
+  if (wanted) {
+    const d = district();
+    if (d && d.missing.length) {
+      notice(`${d.county} District ${d.district}: ${d.missing.length} of ${d.nominees.length} `
+        + 'faces are placeholders because no usable headshot was ever sent.');
+    }
+  }
 }
 
 boot();
