@@ -63,17 +63,28 @@ const main = async () => {
     no('public mode is on', 'SLATE_PUBLIC is not set to 1. Everything below is exposed.');
   }
 
-  st.signedIn
-    ? ok('Drive credentials are loaded')
-    : no('Drive credentials are loaded', 'no service account key and no refresh token');
+  // A copy that ships its own portraits needs no Google credential at all.
+  const catPeek = await req('/api/catalog');
+  let peek = {};
+  try { peek = JSON.parse(catPeek.text); } catch { /* reported below */ }
+  if (peek.source === 'bundled') {
+    ok('portraits ship with the app, so no Google credential is needed');
+  } else if (st.signedIn) {
+    ok('Drive credentials are loaded');
+  } else {
+    no('a portrait source is configured',
+       'no bundled cutouts, no service account key and no refresh token');
+  }
 
   /* -------------------------------------------------------- the real data */
   section('Data');
-  const cat = await req('/api/catalog');
-  let c = {};
-  try { c = JSON.parse(cat.text); } catch { /* handled below */ }
+  const cat = catPeek;
+  const c = peek;
   if (cat.status !== 200) {
     no('/api/catalog answers', `got HTTP ${cat.status}`);
+  } else if (c.source === 'bundled') {
+    ok(`${c.counts.withCutouts} portraits shipped, ${c.counts.districts} districts, `
+       + `${c.counts.ready} complete`);
   } else if (c.driveError) {
     no('Drive is reachable', c.driveError);
   } else if (c.source === 'drive') {
@@ -91,13 +102,18 @@ const main = async () => {
   /* a real portrait, end to end */
   const withPhoto = (c.districts || []).flatMap((d) => d.nominees).find((n) => n.cutout);
   if (withPhoto) {
-    const p = await req(`/api/portrait/${encodeURIComponent(withPhoto.slug)}.png`);
+    // Bundled cutouts are public paths the CDN serves; Drive ids go via the proxy.
+    const shipped = String(withPhoto.cutout).startsWith('/');
+    const path = shipped ? withPhoto.cutout : `/api/portrait/${encodeURIComponent(withPhoto.slug)}.png`;
+    const p = await req(path);
     const isPng = p.status === 200 && /image\/png/.test(p.headers.get('content-type') || '');
-    isPng ? ok(`a portrait loads (${withPhoto.name})`)
-          : no('a portrait loads', `HTTP ${p.status}, type ${p.headers.get('content-type')}`);
-    /s-maxage/.test(p.headers.get('cache-control') || '')
-      ? ok('portraits carry CDN cache headers')
-      : hm('portraits have no s-maxage, so every request goes back to Drive');
+    isPng ? ok(`a portrait loads (${withPhoto.name}${shipped ? ', straight off the CDN' : ''})`)
+          : no('a portrait loads', `${path} gave HTTP ${p.status}, type ${p.headers.get('content-type')}`);
+    if (!shipped) {
+      /s-maxage/.test(p.headers.get('cache-control') || '')
+        ? ok('portraits carry CDN cache headers')
+        : hm('portraits have no s-maxage, so every request goes back to Drive');
+    }
   } else if (!c.driveError) {
     hm('no portrait could be tested: none of the districts has a cutout');
   }

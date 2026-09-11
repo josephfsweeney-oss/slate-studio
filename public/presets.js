@@ -11,7 +11,7 @@ export const CANVASES = [
   { id: 'x-post',  label: 'X post',           w: 1600, h: 900,  note: 'X timeline image' },
   { id: 'email',   label: 'Email header',     w: 1200, h: 400,  note: 'Mailchimp header band' },
   { id: 'palm',    label: 'Palm card 5.5x8.5', w: 1650, h: 2550, note: '300 dpi, print' },
-  { id: 'postcard', label: 'Mail 6x9',        w: 2700, h: 1800, note: '300 dpi, print' },
+  { id: 'mail11',  label: 'Mail 11x5.5',      w: 3300, h: 1650, note: '300 dpi, print. Front or mail panel.' },
   { id: 'sign',    label: 'Yard sign 24x18',  w: 3600, h: 2700, note: '150 dpi, large format' },
 ];
 

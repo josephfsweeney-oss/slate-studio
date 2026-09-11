@@ -32,6 +32,10 @@ export const BRAND = {
   deckSky: '#9FC0FF',
 };
 
+/* A mail panel takes 4.25 inches of an 11 inch piece: room for the indicia, the
+ * return address, the address block and the barcode clear zone. */
+export const MAIL_PANEL_FRACTION = 4.25 / 11;
+
 export const PHOTO_AR = 1.25;   // portrait tile is 4:5, height / width
 export const PLATE_AR = 0.34;   // name plate height as a fraction of tile width
 
@@ -112,17 +116,34 @@ function layoutCopy(measure, copy, s, k, maxW) {
     let lines;
     // Hard-wrapped paragraphs (details) keep their own line breaks.
     const paras = text.split('\n').map((t) => (b.upper ? t.toUpperCase() : t));
-    const width = b.key === 'cta' ? maxW - px * CTA_PAD_X * 2 : maxW;
-    for (;;) {
-      lines = [];
-      for (const p of paras) lines.push(...balancedWrap(measure, p, b.font, px, b.ls, width));
-      if (lines.length <= b.maxLines || px <= floor) break;
-      px *= 0.94;
+
+    if (b.maxLines === 1) {
+      // A kicker or a call to action is one phrase. Shrink it until it fits;
+      // never drop words off the end of it, which is what wrapping then
+      // trimming to one line does.
+      const one = paras.join(' ');
+      const fits = (size) => widthAt(measure, one, b.font, size, b.ls)
+        <= (b.key === 'cta' ? maxW - size * CTA_PAD_X * 2 : maxW);
+      const hard = s * b.size * k * 0.34;
+      let guard = 0;
+      while (!fits(px) && px > hard && guard++ < 60) px *= 0.96;
+      lines = [one];
+    } else {
+      const width = maxW;
+      for (;;) {
+        lines = [];
+        for (const p of paras) lines.push(...balancedWrap(measure, p, b.font, px, b.ls, width));
+        if (lines.length <= b.maxLines || px <= floor) break;
+        px *= 0.94;
+      }
     }
     // Past the minimum size the copy no longer fits at all. Trim it, and flag
-    // it, so nobody ships a headline with the end quietly missing.
-    const truncated = lines.length > b.maxLines;
-    if (truncated) lines = lines.slice(0, b.maxLines);
+    // it, so nobody ships a headline with the end quietly missing. A one-line
+    // block was shrunk instead, so it is only over if it is still too wide.
+    const truncated = b.maxLines === 1
+      ? widthAt(measure, lines[0], b.font, px, b.ls) > maxW * 1.02
+      : lines.length > b.maxLines;
+    if (b.maxLines !== 1 && truncated) lines = lines.slice(0, b.maxLines);
 
     const lineH = px * b.lh;
     let h = lineH * lines.length;
@@ -242,7 +263,13 @@ export function solve(spec, measure) {
   const discPx = Math.max(11, s * 0.0165);
   const discH = disc ? discPx * 1.25 + gap * 0.5 : 0;
 
-  const inner = { x: pad, y: pad, w: w - 2 * pad, h: h - 2 * pad - discH };
+  // A mail panel is carrier space, not canvas. Take it out before anything is
+  // laid out, so nothing is ever designed into the address block.
+  const panelW = style.mailPanel === 'right' ? w * MAIL_PANEL_FRACTION : 0;
+  const inner = {
+    x: pad, y: pad,
+    w: w - 2 * pad - panelW, h: h - 2 * pad - discH,
+  };
 
   if (comp === 'slateOnly') {
     const g = gridOf(inner.w, inner.h);
@@ -349,6 +376,9 @@ function finish(spec, r) {
 
   return {
     canvas: { w, h },
+    mailPanel: style.mailPanel === 'right'
+      ? { x: w - w * MAIL_PANEL_FRACTION, y: 0, w: w * MAIL_PANEL_FRACTION, h }
+      : null,
     composition: r.comp,
     pad: r.pad, gap, s,
     scale: r.k,
@@ -359,7 +389,11 @@ function finish(spec, r) {
       ? { x: slateRect.x + (slateRect.w - tileW) / 2, y: gy, w: tileW, h: tileH }
       : null,
     copy,
-    disclaimer: r.disc ? { text: r.disc, px: r.discPx, x: r.pad, y: h - r.pad * 0.55, w: w - 2 * r.pad } : null,
+    disclaimer: r.disc
+      ? { text: r.disc, px: r.discPx, x: r.pad, y: h - r.pad * 0.55,
+          w: w - 2 * r.pad - (style.mailPanel === 'right' ? w * MAIL_PANEL_FRACTION : 0),
+          centreOn: r.pad + (w - 2 * r.pad - (style.mailPanel === 'right' ? w * MAIL_PANEL_FRACTION : 0)) / 2 }
+      : null,
     warnings: [
       ...(r.overflow ? ['Copy is longer than the canvas can hold at a readable size. It was trimmed to fit.'] : []),
       ...trimmed.map((k) => `The ${k} is too long for this canvas and was cut off. Shorten it, or use a taller canvas.`),

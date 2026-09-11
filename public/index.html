@@ -89,6 +89,10 @@
       <label class="f">Details <textarea id="c-details" rows="3" placeholder="One line per line break"></textarea></label>
       <label class="f">Call to action <input id="c-cta" placeholder="Vote Tuesday, November 3"></label>
       <label class="f">Footer <input id="c-footer" placeholder="Website or handle"></label>
+      <div id="mail-fields" hidden>
+        <label class="f">Return address <textarea id="c-returnAddress" rows="3"></textarea></label>
+        <label class="f">Indicia <textarea id="c-indicia" rows="4"></textarea></label>
+      </div>
       <label class="f req">Disclaimer <span class="hint">required on a finished ad, RSA 664:14</span>
         <textarea id="c-disclaimer" rows="2" placeholder="Paid for by ..., Treasurer, address"></textarea>
       </label>
@@ -109,6 +113,12 @@
         <label class="f">Ground 2 <input id="bg-color2" type="color"><input id="bg-color2-hex" class="hex" spellcheck="false"></label>
       </div>
       <label class="f">Name plate <input id="plate-color" type="color"><input id="plate-color-hex" class="hex" spellcheck="false"></label>
+      <label class="f">Mail panel
+        <select id="mailpanel">
+          <option value="none">None, this is the front</option>
+          <option value="right">Right side, this is the mail panel</option>
+        </select>
+      </label>
       <label class="f">Layout
         <select id="composition">
           <option value="auto">Auto, fit to canvas</option>

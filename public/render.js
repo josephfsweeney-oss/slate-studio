@@ -114,16 +114,17 @@ function paintBackground(ctx, plan, style, assets) {
   const m = bandMetrics(plan, style);
   if (m.rule) {
     const [c1, c2] = style.bar || [style.accent || BRAND.green, BRAND.navy];
+    const barW = plan.mailPanel ? plan.mailPanel.x : w;
     if (m.band) {
       ctx.fillStyle = c2;
-      ctx.fillRect(0, h - m.band, w, m.band);
+      ctx.fillRect(0, h - m.band, barW, m.band);
       ctx.fillStyle = c1;
-      ctx.fillRect(0, h - m.band, w, m.rule);
+      ctx.fillRect(0, h - m.band, barW, m.rule);
     } else {
       ctx.fillStyle = c1;
-      ctx.fillRect(0, h - m.rule, w, m.rule);
+      ctx.fillRect(0, h - m.rule, barW, m.rule);
       ctx.fillStyle = c2;
-      ctx.fillRect(0, h - m.rule, w * 0.34, m.rule);
+      ctx.fillRect(0, h - m.rule, barW * 0.34, m.rule);
     }
   }
 }
@@ -260,6 +261,80 @@ function paintDeck(ctx, plan, assets, theme) {
   ctx.drawImage(img, r.x + (r.w - dw) / 2, r.y + (r.h - dh) / 2, dw, dh);
 }
 
+/* ------------------------------------------------------------------ mail panel
+ *
+ * The carrier's half of the piece. Drawn last over a clean ground so nothing in
+ * the design can intrude, with the four things a mail house looks for: indicia,
+ * return address, address block and a clear barcode zone.
+ *
+ * These are conventional placements, not a compliance guarantee. Every mail
+ * house has its own template and the final piece has to clear theirs.
+ */
+function paintMailPanel(ctx, plan, style, copy) {
+  const m = plan.mailPanel;
+  if (!m) return;
+  const dpi = plan.canvas.w / 11;          // the 11 inch dimension sets the scale
+  const inch = (n) => n * dpi;
+  const ink = '#12314E';
+
+  // A plain ground: scanners read badly over artwork.
+  ctx.fillStyle = style.mailPanelGround || '#FFFFFF';
+  ctx.fillRect(m.x, m.y, m.w, m.h);
+  ctx.fillStyle = 'rgba(18,49,78,.12)';
+  ctx.fillRect(m.x, m.y, Math.max(1, inch(0.008)), m.h);
+
+  const L = m.x + inch(0.3);
+  const R = m.x + m.w - inch(0.3);
+
+  // Indicia, top right.
+  const iw = inch(1.6), ih = inch(0.72);
+  const ix = R - iw, iy = m.y + inch(0.3);
+  ctx.strokeStyle = 'rgba(18,49,78,.45)';
+  ctx.lineWidth = Math.max(1, inch(0.006));
+  ctx.setLineDash([inch(0.05), inch(0.04)]);
+  ctx.strokeRect(ix, iy, iw, ih);
+  ctx.setLineDash([]);
+  ctx.fillStyle = ink;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  const indicia = (copy.indicia || 'NONPROFIT ORG\nU.S. POSTAGE\nPAID\nPERMIT NO. ___').split('\n');
+  const ip = ih / (indicia.length + 0.6);
+  setFont(ctx, { family: 'Barlow Condensed', weight: 600 }, ip * 0.78, 0.04);
+  indicia.forEach((line, i) => ctx.fillText(line, ix + iw / 2, iy + ip * (i + 0.8)));
+
+  // Return address, top left.
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'alphabetic';
+  ctx.fillStyle = 'rgba(18,49,78,.85)';
+  const ret = (copy.returnAddress || '').trim().split('\n').filter(Boolean);
+  const rp = inch(0.13);
+  setFont(ctx, { family: 'Barlow Condensed', weight: 500 }, rp, 0.01);
+  ret.slice(0, 4).forEach((line, i) => ctx.fillText(line, L, m.y + inch(0.42) + rp * 1.22 * i));
+
+  // Address block, lower middle, clear of the barcode zone.
+  const clearH = inch(0.625);
+  const ap = inch(0.17);
+  const sample = ['JOHN Q SAMPLE', '123 MAIN STREET', 'SALEM NH 03079-1234'];
+  const blockTop = m.y + m.h - clearH - inch(0.45) - ap * 1.3 * sample.length;
+  ctx.fillStyle = 'rgba(18,49,78,.38)';
+  setFont(ctx, { family: 'Barlow Condensed', weight: 500 }, ap, 0.02);
+  sample.forEach((line, i) => ctx.fillText(line, L, blockTop + ap * 1.3 * i));
+  setFont(ctx, { family: 'Barlow Condensed', weight: 700 }, inch(0.09), 0.12);
+  ctx.fillStyle = 'rgba(18,49,78,.45)';
+  ctx.fillText('ADDRESS BLOCK, MAIL HOUSE FILLS', L, blockTop - ap * 0.9);
+
+  // Barcode clear zone across the bottom.
+  ctx.strokeStyle = 'rgba(191,10,48,.55)';
+  ctx.setLineDash([inch(0.06), inch(0.05)]);
+  ctx.lineWidth = Math.max(1, inch(0.008));
+  ctx.strokeRect(m.x + inch(0.12), m.y + m.h - clearH - inch(0.12), m.w - inch(0.24), clearH);
+  ctx.setLineDash([]);
+  ctx.fillStyle = 'rgba(191,10,48,.6)';
+  setFont(ctx, { family: 'Barlow Condensed', weight: 700 }, inch(0.1), 0.1);
+  ctx.fillText('BARCODE CLEAR ZONE, KEEP EMPTY', m.x + inch(0.2), m.y + m.h - clearH + inch(0.06));
+  if ('letterSpacing' in ctx) ctx.letterSpacing = '0px';
+}
+
 /* ----------------------------------------------------------------------- copy */
 
 function paintCopy(ctx, plan, style, theme) {
@@ -331,6 +406,7 @@ function paintCopy(ctx, plan, style, theme) {
 function paintDisclaimer(ctx, plan, style, theme) {
   const d = plan.disclaimer;
   if (!d) return;
+  const centre = d.centreOn ?? plan.canvas.w / 2;
   const { band } = bandMetrics(plan, style);
   // Inside the navy band the copy has to go light, and it centres in the band.
   const onBand = band > 0 && d.y > plan.canvas.h - band;
@@ -338,7 +414,7 @@ function paintDisclaimer(ctx, plan, style, theme) {
   setFont(ctx, { family: 'Barlow Condensed', weight: 500 }, d.px, 0.02);
   ctx.textAlign = 'center';
   ctx.textBaseline = onBand ? 'middle' : 'alphabetic';
-  ctx.fillText(d.text, plan.canvas.w / 2, onBand ? plan.canvas.h - band / 2 + d.px * 0.06 : d.y);
+  ctx.fillText(d.text, centre, onBand ? plan.canvas.h - band / 2 + d.px * 0.06 : d.y);
   if ('letterSpacing' in ctx) ctx.letterSpacing = '0px';
 }
 
@@ -359,7 +435,7 @@ function paintLogo(ctx, plan, style, assets) {
 /* ---------------------------------------------------------------------- entry */
 
 /** Paint a solved plan. `assets` = { portraits: {name -> Image}, bgImage, logo }. */
-export function paint(ctx, plan, style, assets = {}) {
+export function paint(ctx, plan, style, assets = {}, copy = {}) {
   const theme = themeFor(style);
   ctx.save();
   paintBackground(ctx, plan, style, assets);
@@ -368,6 +444,7 @@ export function paint(ctx, plan, style, assets = {}) {
   paintCopy(ctx, plan, style, theme);
   paintLogo(ctx, plan, style, assets);
   paintDisclaimer(ctx, plan, style, theme);
+  paintMailPanel(ctx, plan, style, copy);
   ctx.restore();
   return theme;
 }

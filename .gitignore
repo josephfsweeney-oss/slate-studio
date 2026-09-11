@@ -2,5 +2,11 @@
 .slate-studio/
 .env
 
+# Service-account keys. One was committed once; never again.
+*.json
+!package.json
+!package-lock.json
+!vercel.json
+
 node_modules/
 .DS_Store

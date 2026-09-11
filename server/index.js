@@ -144,6 +144,11 @@ async function api(req, res, url) {
       if (n?.cutout) { ref = n.cutout; break; }
     }
     if (!ref) return text(res, 404, 'no cutout for ' + slug);
+    // Cutouts shipped with the app are served statically; nothing to proxy.
+    if (String(ref).startsWith('/')) {
+      res.writeHead(302, { location: ref });
+      return res.end();
+    }
     return sendAsset(res, `cutout-${slug}`, ref);
   }
 

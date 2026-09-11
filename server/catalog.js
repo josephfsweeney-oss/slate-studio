@@ -3,7 +3,9 @@
  *
  * Three sources, tried in order, so the app is useful before anybody has set up
  * a Google client:
- *   drive    - the live 2026 Slate Decks folder (full function)
+ *   bundled  - public/cutouts/ shipped in the repo. No Google account at all,
+ *              and the CDN serves the portraits directly.
+ *   drive    - the live 2026 Slate Decks folder
  *   local    - the same tree on disk, for the Mac that builds the decks
  *   manifest - the bundled SLATE-MANIFEST.csv (district list and names only)
  */
@@ -72,6 +74,18 @@ function fromManifest(text) {
     byId.set(d.id, d);
   }
   return byId;
+}
+
+/** Portraits committed to the repo, served straight off the CDN at /cutouts/.
+ *  Returns a slug -> public URL map, or null when the folder is not there. */
+function bundledCutouts() {
+  const dir = path.join(ROOT, 'public', 'cutouts');
+  if (!fs.existsSync(dir)) return null;
+  const map = new Map();
+  for (const f of fs.readdirSync(dir)) {
+    if (/\.png$/i.test(f)) map.set(f.replace(/\.png$/i, ''), `/cutouts/${f}`);
+  }
+  return map.size ? map : null;
 }
 
 function bundledManifest() {
@@ -290,6 +304,19 @@ function buildFromBundle() {
 
 export async function build() {
   let cat;
+  const shipped = bundledCutouts();
+  if (shipped && !config.localDir) {
+    // Everything the app needs is in the repo. No credential, no network.
+    const byId = fromManifest(bundledManifest());
+    attachCutouts(byId, (slug) => shipped.get(slug) || null);
+    cat = finalize(byId, 'bundled', { cutouts: shipped.size });
+    cache = cat;
+    try {
+      fs.mkdirSync(config.stateDir, { recursive: true });
+      fs.writeFileSync(paths.catalog, JSON.stringify(cat));
+    } catch { /* read-only disk is fine, the build is cheap */ }
+    return cat;
+  }
   if (config.localDir && fs.existsSync(config.localDir)) {
     cat = buildFromLocal();
   } else if (signedIn()) {

@@ -139,3 +139,58 @@ test('an overlong headline is trimmed rather than allowed to run off', () => {
   assert.ok(p.copy.height <= p.copy.rect.h + 1);
   assert.ok(p.warnings.length > 0);
 });
+
+test('a one-line block shrinks to fit instead of losing its last words', () => {
+  // "VOTE TUESDAY, NOVEMBER 3" was shipping as "VOTE TUESDAY," on a narrow
+  // column: wrapped to two lines, then trimmed to maxLines of one.
+  const narrow = solve({
+    canvas: { w: 3300, h: 1650 }, slate: slate(9),
+    copy: { headline: 'Your Republican team for Rockingham 25',
+            cta: 'Vote Tuesday, November 3', disclaimer: 'x' },
+    style: { mailPanel: 'right' },
+  }, measure);
+  const cta = narrow.copy.items.find((i) => i.key === 'cta');
+  assert.equal(cta.lines.length, 1);
+  assert.equal(cta.lines[0], 'VOTE TUESDAY, NOVEMBER 3',
+    'the whole phrase must survive');
+  const kicker = solve({
+    canvas: { w: 1200, h: 628 }, slate: slate(2),
+    copy: { kicker: 'Rockingham County District Twenty Five', headline: 'Vote' },
+    style: {},
+  }, measure).copy.items.find((i) => i.key === 'kicker');
+  assert.equal(kicker.lines[0], 'ROCKINGHAM COUNTY DISTRICT TWENTY FIVE');
+});
+
+test('the mail panel is reserved and nothing is laid out inside it', () => {
+  const p = solve({
+    canvas: { w: 3300, h: 1650 }, slate: slate(9),
+    copy: { headline: 'Your Republican team', cta: 'Vote Tuesday, November 3',
+            disclaimer: 'Paid for by the committee.' },
+    style: { mailPanel: 'right' },
+  }, measure);
+  assert.ok(p.mailPanel, 'the plan must describe the panel');
+  const edge = p.mailPanel.x;
+  assert.ok(Math.abs(p.mailPanel.w - 3300 * (4.25 / 11)) < 1, 'panel is 4.25 of 11 inches');
+  for (const t of p.tiles) {
+    assert.ok(t.x + t.w <= edge + 1, `a portrait runs into the address block`);
+  }
+  assert.ok(p.copy.x + p.copy.w <= edge + 1, 'copy runs into the address block');
+  assert.ok(p.disclaimer.x + p.disclaimer.w <= edge + 1, 'disclaimer runs into the address block');
+});
+
+test('with no mail panel the whole canvas is usable', () => {
+  const p = solve({
+    canvas: { w: 3300, h: 1650 }, slate: slate(9),
+    copy: { headline: 'Your Republican team', disclaimer: 'x' }, style: {},
+  }, measure);
+  assert.equal(p.mailPanel, null);
+});
+
+test('the 6x9 postcard is gone and 11x5.5 is there', () => {
+  assert.ok(!CANVASES.some((c) => c.id === 'postcard'), '6x9 should be removed');
+  const mail = CANVASES.find((c) => c.id === 'mail11');
+  assert.ok(mail, '11x5.5 should exist');
+  assert.equal(mail.w, 3300);
+  assert.equal(mail.h, 1650);
+  assert.equal(mail.w / mail.h, 2, '11 by 5.5 is exactly 2:1');
+});

@@ -11,6 +11,9 @@ const $$ = (s) => [...document.querySelectorAll(s)];
  * A deployment for another committee sets SLATE_DISCLAIMER instead. */
 const DEFAULT_DISCLAIMER = 'Paid for by Committee to Elect House Republicans, 75 S Main Street Unit 7 Box 159, Concord, NH 03301. Jason Osborne, Chairman.';
 
+const COPY_FIELDS = ['kicker', 'headline', 'subhead', 'details', 'cta', 'footer',
+  'disclaimer', 'returnAddress', 'indicia'];
+
 const COLOR_FIELDS = [
   ['#accent', 'accent'], ['#plate-accent', 'plateAccent'],
   ['#bg-color', 'bgColor'], ['#bg-color2', 'bgColor2'], ['#plate-color', 'plateColor'],
@@ -44,7 +47,11 @@ const state = {
   order: {},             // districtId -> [names]
   canvasId: '1x1',
   cw: 1080, ch: 1080,
-  copy: { kicker: '', headline: '', subhead: '', details: '', cta: '', footer: '', disclaimer: '' },
+  copy: {
+    kicker: '', headline: '', subhead: '', details: '', cta: '', footer: '', disclaimer: '',
+    returnAddress: 'Committee to Elect House Republicans\n75 S Main Street Unit 7 Box 159\nConcord, NH 03301',
+    indicia: 'NONPROFIT ORG\nU.S. POSTAGE\nPAID\nPERMIT NO. ___',
+  },
   // Defaults are the Granite Guarantee sheet: green and navy on white.
   style: {
     composition: 'auto', align: 'auto', plate: true, density: 1,
@@ -52,7 +59,7 @@ const state = {
     bgType: 'solid', bgColor: '#FFFFFF', bgColor2: '#235E3B', bgDim: 0.45,
     accent: '#2F7C4E', plateColor: '#12314E', plateAccent: '#95DAB1',
     bar: ['#2F7C4E', '#12314E'],
-    faceSource: 'cutouts',
+    faceSource: 'cutouts', mailPanel: 'none',
     flagBar: true, headlineShadow: true, twoTone: true,
     logoPos: 'top-right', logoScale: 0.16,
   },
@@ -173,7 +180,12 @@ async function loadPortraits(d) {
   const out = {};
   await Promise.all((d?.nominees || []).map(async (n) => {
     if (!n.cutout) return;
-    const im = await loadImage(`/api/portrait/${encodeURIComponent(n.slug)}.png`);
+    // A cutout shipped with the app is a public path the CDN serves directly.
+    // Anything else is a Drive id and goes through the proxy.
+    const src = String(n.cutout).startsWith('/')
+      ? n.cutout
+      : `/api/portrait/${encodeURIComponent(n.slug)}.png`;
+    const im = await loadImage(src);
     if (im) out[n.name] = im;
   }));
   return out;
@@ -222,7 +234,7 @@ function draw() {
 
   const slate = activeSlate(d);
   plan = buildPlan(d, size, slate);
-  paint(ctx, plan, state.style, assets);
+  paint(ctx, plan, state.style, assets, resolvedCopy(d));
   paintWarnings(d, slate);
   $('#stage-size').textContent = `${size.w} x ${size.h} px  ·  ${plan.composition}  ·  ${plan.grid.cols}x${plan.grid.rows} grid`;
 }
@@ -276,7 +288,7 @@ async function renderTo(d, size, scale = 1) {
   const ctx = cv.getContext('2d');
   ctx.scale(scale, scale);
   const p = buildPlan(d, size, activeSlate(d));
-  paint(ctx, p, state.style, assets);
+  paint(ctx, p, state.style, assets, resolvedCopy(d));
   return cv;
 }
 
@@ -400,7 +412,9 @@ function download(blob, name) {
 
 const filenameNow = (scale = 1) => {
   const d = district(), size = canvasSize();
-  const base = buildFilename(d, size, $('#template').selectedOptions[0]?.textContent || 'Build');
+  const side = state.style.mailPanel === 'right' ? 'MailPanel' : '';
+  const tag = ($('#template').selectedOptions[0]?.textContent || 'Build') + (side ? '-' + side : '');
+  const base = buildFilename(d, size, tag);
   return scale === 1 ? base : base.replace(/\.png$/, '@2x.png');
 };
 
@@ -535,9 +549,12 @@ function syncControls() {
   $('#canvas').value = state.canvasId;
   $('#custom-size').hidden = state.canvasId !== 'custom';
   $('#cw').value = state.cw; $('#ch').value = state.ch;
-  for (const k of ['kicker', 'headline', 'subhead', 'details', 'cta', 'footer', 'disclaimer']) {
-    $('#c-' + k).value = state.copy[k] || '';
+  for (const k of COPY_FIELDS) {
+    const el = $('#c-' + k);
+    if (el) el.value = state.copy[k] || '';
   }
+  $('#mailpanel').value = state.style.mailPanel;
+  $('#mail-fields').hidden = state.style.mailPanel !== 'right';
   $('#composition').value = state.style.composition;
   $('#align').value = state.style.align;
   $('#density').value = state.style.density;
@@ -585,8 +602,8 @@ function bind() {
     $(`.panel[data-panel="${t.dataset.tab}"]`).classList.add('on');
   }));
 
-  for (const k of ['kicker', 'headline', 'subhead', 'details', 'cta', 'footer', 'disclaimer']) {
-    $('#c-' + k).addEventListener('input', (e) => {
+  for (const k of COPY_FIELDS) {
+    $('#c-' + k)?.addEventListener('input', (e) => {
       state.copy[k] = e.target.value;
       saveLocal(); scheduleDraw();
     });
@@ -669,6 +686,11 @@ function bind() {
   });
   $('#logo-clear').addEventListener('click', () => { assets.logo = null; $('#logo-file').value = ''; draw(); });
 
+  $('#mailpanel').addEventListener('change', (e) => {
+    state.style.mailPanel = e.target.value;
+    $('#mail-fields').hidden = e.target.value !== 'right';
+    saveLocal(); draw();
+  });
   const styleBind = [['#composition', 'composition'], ['#align', 'align'], ['#logo-pos', 'logoPos']];
   for (const [sel, key] of styleBind) {
     $(sel).addEventListener('change', (e) => { state.style[key] = e.target.value; saveLocal(); draw(); });
@@ -756,7 +778,8 @@ function bind() {
 
 function showSource() {
   const c = state.catalog;
-  const label = { drive: 'Google Drive', local: 'local folder', manifest: 'bundled manifest' }[c.source];
+  const label = { bundled: 'bundled with the app', drive: 'Google Drive',
+    local: 'local folder', manifest: 'bundled manifest' }[c.source] || c.source;
   $('#source').textContent = `${label} · ${c.counts.districts} districts · ${c.counts.withCutouts}/${c.counts.nominees} portraits`;
 }
 
