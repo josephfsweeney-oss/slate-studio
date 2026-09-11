@@ -204,7 +204,8 @@ async function sendAsset(res, key, ref) {
   }
   let buf;
   if (config.localDir && !/^[A-Za-z0-9_-]{20,}$/.test(ref)) {
-    buf = fs.readFileSync(path.join(config.localDir, ref));
+    // Cutout paths are absolute; deck paths are relative to the local tree.
+    buf = fs.readFileSync(path.isAbsolute(ref) ? ref : path.join(config.localDir, ref));
   } else {
     buf = await drive.download(ref);
   }
@@ -279,6 +280,13 @@ export function listen() {
       const cat = await catalog.get();
       console.log(`catalog: ${cat.source} - ${cat.counts.districts} districts, `
         + `${cat.counts.nominees} nominees, ${cat.counts.withCutouts} portraits`);
+      if (cat.source === 'local') {
+        console.log(cat.meta.cutoutsDir
+          ? `portraits from ${cat.meta.cutoutsDir}`
+          : 'NO PORTRAITS FOUND. Looked in:\n  '
+            + (cat.meta.lookedIn || []).join('\n  ')
+            + '\nSet SLATE_CUTOUTS_DIR to the folder holding the background-free PNGs.');
+      }
       if (cat.source === 'manifest') {
         console.log(auth.configured()
           ? 'Connect Drive at /auth/google to pull in the portraits.'

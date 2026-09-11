@@ -37,6 +37,10 @@ export const config = {
   driveFolderId: process.env.SLATE_DRIVE_FOLDER_ID || '1HYMAdrQ4w5vizodC5ICHYzSM0uRUUdAH',
   // Point at the same tree on disk to run with no Google account at all.
   localDir: process.env.SLATE_LOCAL_DIR || '',
+  // The cutouts do not always sit beside the decks: the deck build writes
+  // finished decks into the client folder but leaves the background-free
+  // portraits in its own scratch directory. Point straight at them if needed.
+  cutoutsDir: process.env.SLATE_CUTOUTS_DIR || '',
   stateDir: process.env.SLATE_STATE_DIR || (serverless ? '/tmp/slate-studio' : path.join(ROOT, '.slate-studio')),
   refreshToken: process.env.GOOGLE_REFRESH_TOKEN || '',
   // A service-account key is the headless path: no OAuth client, no consent

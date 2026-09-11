@@ -185,13 +185,23 @@ function buildFromLocal() {
     catch (e) { console.warn('roster.json unreadable:', e.message); }
   }
 
+  // Look where the portraits actually end up, not only beside the decks.
+  const candidates = [
+    config.cutoutsDir,
+    path.join(dir, 'Cutouts'),
+    path.join(dir, 'cutouts'),
+    path.join(dir, 'photos', 'cutout'),
+    path.join(dir, 'photos', 'cutouts'),
+    path.join(path.dirname(dir), 'photos', 'cutout'),
+  ].filter(Boolean);
   const cutouts = new Map();
-  const cdir = path.join(dir, 'Cutouts');
-  if (fs.existsSync(cdir)) {
+  let cdir = candidates.find((d) => fs.existsSync(d) && fs.statSync(d).isDirectory());
+  if (cdir) {
     for (const f of fs.readdirSync(cdir)) {
-      if (/\.png$/i.test(f)) cutouts.set(f.replace(/\.png$/i, ''), path.join('Cutouts', f));
+      if (/\.png$/i.test(f)) cutouts.set(f.replace(/\.png$/i, ''), path.resolve(cdir, f));
     }
   }
+  const looked = candidates;
 
   let deckCount = 0;
   const ddir = path.join(dir, 'Decks');
@@ -211,7 +221,11 @@ function buildFromLocal() {
   }
 
   attachCutouts(byId, (slug) => cutouts.get(slug) || null);
-  return finalize(byId, 'local', { dir, cutouts: cutouts.size, decks: deckCount });
+  return finalize(byId, 'local', {
+    dir, cutouts: cutouts.size, decks: deckCount,
+    cutoutsDir: cdir || null,
+    lookedIn: cutouts.size ? undefined : looked,
+  });
 }
 
 /* ------------------------------------------------------------------- assemble */
