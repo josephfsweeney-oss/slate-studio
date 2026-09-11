@@ -189,6 +189,23 @@ Vercel deploys by pulling from GitHub, so once the project exists every push to
 `main` redeploys on its own. There is no `git push vercel`; Vercel is not a git
 host.
 
+### Check it before you share it
+
+```
+npm run verify -- https://your-deployment
+```
+
+It checks the site from the outside: that it answers, that the credentials
+loaded, that it is really reading Drive and not the bundled fallback, that a
+portrait loads with CDN cache headers, and that `POST /api/save`,
+`/auth/signout`, `/auth/google` and `/auth/callback` all refuse. Any failure
+exits non-zero and says "do not share the link yet", with the reason.
+
+Forgetting `SLATE_PUBLIC=1` trips seven checks at once, which is the point: the
+routes that would let a stranger write to your Drive or revoke the site's access
+are exactly the ones it tests. Add `--private` for a password-gated copy, where
+those routes are meant to stay open.
+
 ### The short path: a service account
 
 A service account is the right credential for a server that reads one fixed

@@ -11,7 +11,8 @@
     "start": "node server/index.js",
     "dev": "node --watch server/index.js",
     "test": "node --test test/*.test.js",
-    "token": "node server/print-token.js"
+    "token": "node server/print-token.js",
+    "verify": "node server/verify.js"
   },
   "dependencies": {}
 }
