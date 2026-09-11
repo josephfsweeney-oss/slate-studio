@@ -116,6 +116,37 @@ test/       node --test
 overlapping tiles, copy that shrinks instead of spilling, and the manifest
 totals against the deck build.
 
+## Public mode
+
+Set `SLATE_PUBLIC=1` and the app is safe to put on an open URL. Without it,
+do not: a hosted copy reads Drive with whichever account authorised it, and
+several routes would hand that access to anyone who found the link.
+
+`SLATE_PUBLIC=1` closes them:
+
+| Route | Why it is closed |
+|---|---|
+| `POST /api/save` | otherwise an unauthenticated write into your Drive |
+| `/auth/signout` | otherwise any passer-by can revoke the app's Drive access |
+| `/auth/google`, `/auth/callback` | no stranger starts an OAuth flow against your client |
+| `?refresh=1` | a full Drive re-crawl on demand burns your API quota |
+
+It also rate limits the portrait and deck routes to 600 requests per IP per ten
+minutes, and the browser drops the **Save to Drive**, **Refresh Drive** and
+**Connect Drive** buttons. In public mode the app takes its Drive token from
+`GOOGLE_REFRESH_TOKEN`, so authorise on your own machine and paste it in.
+
+The rate limit is held in memory. On a serverless host that means per instance,
+so treat it as a speed bump, not a guarantee. On Render it is one process and
+it holds.
+
+**What a public copy still shows.** Everyone gets the district list, the
+nominee names and the portraits. Candidates with no usable headshot render as a
+tile marked PHOTO NEEDED, so which of your candidates never sent a photo is
+visible to anyone. If that matters, set `SLATE_PUBLIC_READY_ONLY=1` and the app
+offers only districts whose portraits are all present. That is 85 districts
+instead of 174.
+
 ## Hosting it for colleagues
 
 **Read this first.** A hosted copy reads Drive with whichever account

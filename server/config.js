@@ -36,6 +36,12 @@ export const config = {
   refreshToken: process.env.GOOGLE_REFRESH_TOKEN || '',
   // Set to lock the app behind a shared password when it is deployed publicly.
   password: process.env.SLATE_PASSWORD || '',
+  // Open to the internet. Everything that writes, spends Drive quota, or can
+  // revoke the app's own access is shut off. See PUBLIC MODE in the README.
+  isPublic: process.env.SLATE_PUBLIC === '1',
+  // Show only districts whose portraits are all present, so the photo gap is
+  // not on display. Off by default: it hides 89 of 174 districts.
+  readyOnly: process.env.SLATE_PUBLIC_READY_ONLY === '1',
 };
 
 export const paths = {

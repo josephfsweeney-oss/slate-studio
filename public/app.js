@@ -35,6 +35,7 @@ function applyPalette(pal) {
 }
 
 const state = {
+  server: {},
   catalog: null,
   districtId: null,
   drop: {},              // districtId -> Set of excluded candidate names
@@ -222,7 +223,9 @@ function paintWarnings(d, slate) {
   if (gaps.length) {
     const why = state.catalog.source === 'manifest'
       ? 'Connect Drive to load the portraits.'
-      : `Still needs a headshot: ${gaps.map((n) => n.name).join(', ')}.`;
+      : state.server.isPublic
+        ? 'They render as marked placeholders.'
+        : `Still needs a headshot: ${gaps.map((n) => n.name).join(', ')}.`;
     out.push({ bad: false, text: `${gaps.length} of ${slate.length} portraits are placeholders. ${why}` });
   }
   if (state.style.faceSource === 'deck' && !assets.deck) {
@@ -234,7 +237,11 @@ function paintWarnings(d, slate) {
 
   $('#warnings').innerHTML = out.map((w) => `<div class="warn${w.bad ? ' bad' : ''}">${esc(w.text)}</div>`).join('');
   const blocked = noDisc || (!usingDeck && !slate.length);
-  for (const id of ['#btn-png', '#btn-2x', '#btn-drive', '#btn-copy']) $(id).disabled = blocked;
+  // Public mode removes some of these outright, so guard the lookup.
+  for (const id of ['#btn-png', '#btn-2x', '#btn-drive', '#btn-copy']) {
+    const el = $(id);
+    if (el) el.disabled = blocked;
+  }
 }
 
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -732,11 +739,19 @@ async function boot() {
   ]);
   state.catalog = cat;
 
+  state.server = st;
   fillSelects();
   syncControls();
   bind();
   showSource();
   renderDistrictList();
+
+  // A public copy cannot write to Drive or sign in, so those controls go away
+  // rather than sitting there failing.
+  if (st.isPublic) {
+    for (const id of ['#btn-drive', '#btn-refresh', '#btn-connect']) $(id)?.remove();
+    $('#source').title = 'Read-only. Download the PNG, or copy it straight into a post.';
+  }
 
   if (cat.source === 'manifest') {
     $('#btn-connect').hidden = !st.driveConfigured;

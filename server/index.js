@@ -43,6 +43,29 @@ async function readBody(req, limit = 40 * 1024 * 1024) {
   return Buffer.concat(chunks);
 }
 
+/* --------------------------------------------------------------- public mode */
+
+/* A public deployment reads Drive with the account that authorised it, so the
+ * routes that write, spend quota, or hand that access away are closed. Left
+ * open, /auth/signout alone would let any passer-by revoke the app's Drive
+ * access, and /api/save would be an unauthenticated write into someone's Drive. */
+const CLOSED_WHEN_PUBLIC = new Set(['/auth/google', '/auth/callback', '/auth/signout']);
+
+/** Crude per-IP ceiling on the endpoints that can reach Drive. In-memory, so on
+ *  serverless it is per instance: a speed bump, not a guarantee. */
+const hits = new Map();
+function rateLimited(req, limit = 600, windowMs = 600000) {
+  if (!config.isPublic) return false;
+  const ip = (req.headers['x-forwarded-for'] || '').split(',')[0].trim()
+    || req.socket?.remoteAddress || 'unknown';
+  const now = Date.now();
+  const rec = hits.get(ip);
+  if (!rec || now > rec.resetAt) { hits.set(ip, { n: 1, resetAt: now + windowMs }); return false; }
+  rec.n++;
+  if (hits.size > 5000) for (const [k, v] of hits) if (now > v.resetAt) hits.delete(k);
+  return rec.n > limit;
+}
+
 /* ------------------------------------------------------------- password gate */
 
 const gateToken = config.password
@@ -79,6 +102,8 @@ async function api(req, res, url) {
   if (p === '/api/state') {
     const cat = catalog.peek();
     return json(res, 200, {
+      isPublic: config.isPublic,
+      readyOnly: config.readyOnly,
       driveConfigured: auth.configured(),
       signedIn: auth.signedIn(),
       localMode: Boolean(config.localDir && fs.existsSync(config.localDir)),
@@ -89,8 +114,12 @@ async function api(req, res, url) {
   }
 
   if (p === '/api/catalog') {
-    const cat = await catalog.get({ refresh: url.searchParams.get('refresh') === '1' });
-    return json(res, 200, cat);
+    // Refresh re-crawls Drive. Not something a stranger gets to trigger.
+    const refresh = !config.isPublic && url.searchParams.get('refresh') === '1';
+    const cat = await catalog.get({ refresh });
+    if (!config.readyOnly) return json(res, 200, cat);
+    const districts = cat.districts.filter((d) => d.ready);
+    return json(res, 200, { ...cat, districts, counts: { ...cat.counts, districts: districts.length } });
   }
 
   // /api/portrait/<slug>.png -- cutout for one candidate
@@ -118,6 +147,9 @@ async function api(req, res, url) {
   }
 
   if (p === '/api/save' && req.method === 'POST') {
+    if (config.isPublic) {
+      return json(res, 403, { error: 'This copy is read-only. Use Download PNG instead.' });
+    }
     if (!auth.signedIn()) return json(res, 400, { error: 'Connect Google Drive first.' });
     const png = await readBody(req);
     if (!png.length) return json(res, 400, { error: 'no image' });
@@ -177,6 +209,13 @@ function serveStatic(res, pathname) {
 export async function handler(req, res) {
   const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
   try {
+    if (config.isPublic && CLOSED_WHEN_PUBLIC.has(url.pathname)) {
+      return text(res, 403, 'This deployment is public and read-only. Drive sign-in is disabled.');
+    }
+    if ((url.pathname.startsWith('/api/portrait/') || url.pathname.startsWith('/api/deck/'))
+        && rateLimited(req)) {
+      return text(res, 429, 'Too many requests. Try again shortly.', { 'retry-after': '120' });
+    }
     if (gated(req, res, url)) return;
     if (url.pathname === '/login') { res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' }); return res.end(LOGIN_PAGE); }
 
@@ -211,6 +250,10 @@ export async function handler(req, res) {
 export function listen() {
   http.createServer(handler).listen(config.port, config.host, async () => {
     console.log(`Slate Studio  ${config.baseUrl}`);
+    if (config.isPublic) {
+      console.log('PUBLIC MODE: read-only, no Drive sign-in, no writes, rate limited'
+        + (config.readyOnly ? ', portrait-ready districts only' : ''));
+    }
     try {
       const cat = await catalog.get();
       console.log(`catalog: ${cat.source} - ${cat.counts.districts} districts, `
