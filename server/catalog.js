@@ -77,13 +77,19 @@ function fromManifest(text) {
 }
 
 /** Portraits committed to the repo, served straight off the CDN at /cutouts/.
+ *  WebP where it exists: same pixels, about a tenth of the bytes, and it keeps
+ *  the whole deployment small enough not to fight a host's size limit.
  *  Returns a slug -> public URL map, or null when the folder is not there. */
 function bundledCutouts() {
   const dir = path.join(ROOT, 'public', 'cutouts');
   if (!fs.existsSync(dir)) return null;
   const map = new Map();
   for (const f of fs.readdirSync(dir)) {
-    if (/\.png$/i.test(f)) map.set(f.replace(/\.png$/i, ''), `/cutouts/${f}`);
+    const m = /^(.+)\.(webp|png)$/i.exec(f);
+    if (!m) continue;
+    const [, slug, ext] = m;
+    // A .webp wins over a .png of the same name.
+    if (ext.toLowerCase() === 'webp' || !map.has(slug)) map.set(slug, `/cutouts/${f}`);
   }
   return map.size ? map : null;
 }

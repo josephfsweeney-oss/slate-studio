@@ -106,9 +106,11 @@ const main = async () => {
     const shipped = String(withPhoto.cutout).startsWith('/');
     const path = shipped ? withPhoto.cutout : `/api/portrait/${encodeURIComponent(withPhoto.slug)}.png`;
     const p = await req(path);
-    const isPng = p.status === 200 && /image\/png/.test(p.headers.get('content-type') || '');
-    isPng ? ok(`a portrait loads (${withPhoto.name}${shipped ? ', straight off the CDN' : ''})`)
-          : no('a portrait loads', `${path} gave HTTP ${p.status}, type ${p.headers.get('content-type')}`);
+    const type = p.headers.get('content-type') || '';
+    const isImage = p.status === 200 && /^image\//.test(type);
+    isImage ? ok(`a portrait loads (${withPhoto.name}, ${type.replace('image/', '')}`
+                 + `${shipped ? ', straight off the CDN' : ''})`)
+            : no('a portrait loads', `${path} gave HTTP ${p.status}, type ${type || 'none'}`);
     if (!shipped) {
       /s-maxage/.test(p.headers.get('cache-control') || '')
         ? ok('portraits carry CDN cache headers')
