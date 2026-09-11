@@ -20,6 +20,8 @@ export const TOKENS = [
   ['{{DISTRICT}}', '25'],
   ['{{SEAT}}', 'Rockingham District 25'],
   ['{{TOWNS}}', 'Salem'],
+  ['{{REPUBLICANS}}', '9 Republicans, or 1 Republican'],
+  ['{{TEAM}}', 'team, or candidate'],
   ['{{COUNT}}', '9'],
   ['{{SEATS}}', '9'],
   ['{{NAMES}}', 'Ball, Huminick, Janigian and six more'],
@@ -32,8 +34,8 @@ export const TEMPLATES = [
     label: 'Meet the slate',
     copy: {
       kicker: '{{SEAT}}',
-      headline: 'Your Republican team for {{TOWNS}}',
-      subhead: '{{COUNT}} Republicans on the ballot. One team for lower taxes and safer communities.',
+      headline: 'Your Republican {{TEAM}} for {{TOWNS}}',
+      subhead: '{{REPUBLICANS}} on the ballot for lower taxes and safer communities.',
       cta: '',
       footer: '',
     },
@@ -46,7 +48,7 @@ export const TEMPLATES = [
       headline: 'Vote Republican',
       subhead: 'Polls open Tuesday, November 3.',
       details: 'Bring a photo ID. Same-day registration is available at your polling place.',
-      cta: 'Vote the whole slate',
+      cta: 'Vote Republican on November 3',
       footer: '',
     },
   },
@@ -67,7 +69,7 @@ export const TEMPLATES = [
     label: 'Endorsement',
     copy: {
       kicker: 'Endorsed',
-      headline: 'Proud to support the {{COUNTY}} {{DISTRICT}} Republicans',
+      headline: 'Proud to support the {{SEAT}} Republican {{TEAM}}',
       subhead: '',
       cta: '',
       footer: '',
@@ -79,7 +81,7 @@ export const TEMPLATES = [
     copy: {
       kicker: 'Meet the candidates',
       headline: 'Town hall in {{TOWNS}}',
-      subhead: 'Come meet the Republicans on your ballot.',
+      subhead: 'Come meet the {{REPUBLICANS}} on your ballot.',
       details: 'Thursday, October 16\n6:30 PM\nAmerican Legion Post, Main Street',
       cta: 'All are welcome',
       footer: '',
@@ -91,7 +93,7 @@ export const TEMPLATES = [
     copy: {
       kicker: '{{SEAT}}',
       headline: 'Thank you, {{TOWNS}}',
-      subhead: 'Your Republican team is ready to get to work.',
+      subhead: 'Your Republican {{TEAM}} is ready to get to work.',
       cta: '',
       footer: '',
     },
@@ -149,7 +151,12 @@ export function fillTokens(str, district) {
   const towns = (district.towns && district.towns.length)
     ? [...new Set(district.towns)].join(', ')
     : `${district.county} ${district.district}`;
+  // 93 of 174 districts run a single nominee, so a template that always says
+  // "9 Republicans" and "team" reads wrong on more than half the state.
+  const n = district.nominees.length;
   const map = {
+    '{{REPUBLICANS}}': `${n} Republican${n === 1 ? '' : 's'}`,
+    '{{TEAM}}': n === 1 ? 'candidate' : 'team',
     '{{COUNTY}}': district.county,
     '{{DISTRICT}}': String(district.district),
     '{{SEAT}}': `${district.county} District ${district.district}`,

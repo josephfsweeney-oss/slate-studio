@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { solve, bestGrid, PHOTO_AR, PLATE_AR } from '../public/layout.js';
 import { nameParts, slugify } from '../public/names.js';
-import { fillTokens, CANVASES } from '../public/presets.js';
+import { fillTokens, CANVASES, TEMPLATES } from '../public/presets.js';
 
 /* Stand-in for canvas measureText: width of the string at 100px. Anton is the
  * wider face, so the proportions stay roughly honest. */
@@ -105,6 +105,30 @@ test('tokens fill from the district record', () => {
   assert.equal(fillTokens('{{COUNT}} on the ballot in {{TOWNS}}', d), '3 on the ballot in Salem');
   assert.equal(fillTokens('{{NAMES}}', d), 'Ball, Huminick and Janigian');
   assert.equal(fillTokens('{{UNKNOWN}}', d), '{{UNKNOWN}}');
+});
+
+test('copy agrees with itself on a single-nominee district', () => {
+  // 93 of 174 districts run one nominee. "1 Republicans" and "your Republican
+  // team" for a team of one both shipped before this.
+  const solo = { county: 'Cheshire', district: 4, seats: 1, towns: ['Chesterfield'], nominees: slate(1) };
+  const many = { county: 'Rockingham', district: 25, seats: 9, towns: ['Salem'], nominees: slate(9) };
+  assert.equal(fillTokens('{{REPUBLICANS}}', solo), '1 Republican');
+  assert.equal(fillTokens('{{REPUBLICANS}}', many), '9 Republicans');
+  assert.equal(fillTokens('Your Republican {{TEAM}} for {{TOWNS}}', solo),
+    'Your Republican candidate for Chesterfield');
+  assert.equal(fillTokens('Your Republican {{TEAM}} for {{TOWNS}}', many),
+    'Your Republican team for Salem');
+});
+
+test('no shipped template reads wrong on a one-person slate', () => {
+  const solo = { county: 'Cheshire', district: 4, seats: 1, towns: ['Chesterfield'], nominees: slate(1) };
+  for (const t of TEMPLATES) {
+    for (const [field, text] of Object.entries(t.copy)) {
+      const out = fillTokens(text, solo);
+      assert.ok(!/\b1 Republicans\b/.test(out), `${t.id}.${field}: "${out}"`);
+      assert.ok(!/Republican team|whole slate/i.test(out), `${t.id}.${field}: "${out}"`);
+    }
+  }
 });
 
 test('an overlong headline is trimmed rather than allowed to run off', () => {
