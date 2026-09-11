@@ -160,57 +160,46 @@ If you would rather not show the gap, `SLATE_PUBLIC_READY_ONLY=1` offers only
 districts whose portraits are all present. That is 85 districts instead of 174,
 and it is off by default.
 
-## Hosting it for colleagues
+## Hosting it
 
-**Read this first.** A hosted copy reads Drive with whichever account
-authorised it. Everyone who opens the link gets that access. `SLATE_PASSWORD`
-is not optional once the app is on the internet.
+**Read this first.** A hosted copy reads Drive with whatever credential it is
+given. Set `SLATE_PUBLIC=1` on any deployment that is not behind a password.
 
-GitHub Pages cannot run it. Pages serves static files only, and this app needs
-a server to hold the Drive token and to pass the portraits through to the
-browser.
+GitHub Pages cannot run it. Pages serves static files only, and this app needs a
+server to hold the Drive credential and to pass the portraits to the browser.
 
-### Render, the simple one
+### The short path: a service account
 
-`render.yaml` is in the repo. Point Render at this repo, set the four secrets it
-asks for, and deploy. It runs as a normal Node process with a mounted disk, so
-the Drive token and the portrait cache survive restarts. Nothing to re-fetch on
-every cold start.
+A service account is the right credential for a server that reads one fixed
+folder. There is no OAuth client, no consent screen, no redirect URI and no
+browser round trip, and the key is scoped to `drive.readonly`, so a hosted copy
+cannot write to Drive even if a write route were somehow reachable.
 
-### Vercel
+1. In the Google Cloud console, enable the **Google Drive API**, then
+   **IAM & Admin → Service Accounts → Create**. Add a key, type JSON, and
+   download it.
+2. In Drive, share the `2026 Slate Decks` folder with the service account's
+   email, as **Viewer**. It ends in `.iam.gserviceaccount.com`.
+3. On Render, **New → Blueprint**, point at this repo. `render.yaml` sets
+   everything except one value.
+4. Paste the whole JSON key file into `GOOGLE_SERVICE_ACCOUNT_JSON`. Deploy.
 
-`vercel.json` and `api/index.js` are in the repo. From `slate-studio/`:
+That is the entire setup. `BASE_URL` fills itself in from Render's own
+`RENDER_EXTERNAL_URL` (and from `VERCEL_URL` on Vercel), so it does not need
+setting.
 
-```
-vercel --prod
-```
+If Drive is unreachable, the app does not go down: it falls back to the bundled
+manifest with placeholder portraits and shows the reason, so a key pasted short
+or a folder not yet shared reads as a fixable message rather than an outage.
 
-Then, in the project's environment variables:
+### The other path: your own Google account
 
-| Variable | Value |
-|---|---|
-| `BASE_URL` | the deployed URL, no trailing slash |
-| `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | from the Google client |
-| `GOOGLE_REFRESH_TOKEN` | see below |
-| `SLATE_PASSWORD` | the shared password |
-
-Add `<BASE_URL>/auth/callback` to the Google client's redirect URIs.
-
-Vercel has no persistent disk, so the browser sign-in cannot be stored. Authorise
-once on your own machine instead, then read the token out:
-
-```
-npm start                 # open /auth/google, approve
-npm run token             # prints the refresh token
-```
-
-Paste that into `GOOGLE_REFRESH_TOKEN` and redeploy. Two things to expect on
-serverless: the first request after an idle period rebuilds the catalog, which
-takes a few seconds, and the portrait cache starts empty again.
-
-**Save to Drive** posts the PNG as raw bytes, which keeps it under the
-serverless body limit for every canvas except the yard sign at 2x. Downloads
-happen in the browser and are never affected.
+If you would rather it read Drive as you, create an OAuth client (type **Web
+application**, redirect URI `<BASE_URL>/auth/callback`), set `GOOGLE_CLIENT_ID`
+and `GOOGLE_CLIENT_SECRET`, run `npm start` locally, approve at `/auth/google`,
+then `npm run token` and set the result as `GOOGLE_REFRESH_TOKEN`. This is what
+you want for a private copy that also writes finished graphics back to Drive.
+A public copy cannot write in either case.
 
 ## A note on the Drive folder id
 

@@ -23,7 +23,12 @@ export const serverless = Boolean(process.env.VERCEL || process.env.AWS_LAMBDA_F
 export const config = {
   port: Number(process.env.PORT || 5173),
   host: process.env.HOST || '0.0.0.0',
-  baseUrl: (process.env.BASE_URL || `http://localhost:${process.env.PORT || 5173}`).replace(/\/$/, ''),
+  // Render and Vercel each publish the deployed URL, so BASE_URL is one less
+  // thing to set by hand. An explicit BASE_URL still wins.
+  baseUrl: (process.env.BASE_URL
+    || process.env.RENDER_EXTERNAL_URL
+    || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : '')
+    || `http://localhost:${process.env.PORT || 5173}`).replace(/\/$/, ''),
   clientId: process.env.GOOGLE_CLIENT_ID || '',
   clientSecret: process.env.GOOGLE_CLIENT_SECRET || '',
   // Name or id of the Drive folder holding Decks/ Cutouts/ build/.
@@ -34,6 +39,10 @@ export const config = {
   localDir: process.env.SLATE_LOCAL_DIR || '',
   stateDir: process.env.SLATE_STATE_DIR || (serverless ? '/tmp/slate-studio' : path.join(ROOT, '.slate-studio')),
   refreshToken: process.env.GOOGLE_REFRESH_TOKEN || '',
+  // A service-account key is the headless path: no OAuth client, no consent
+  // screen, no redirect URI, no browser round trip. Share the Drive folder with
+  // the account's email and it can read it. Raw JSON or base64.
+  serviceAccount: process.env.GOOGLE_SERVICE_ACCOUNT_JSON || '',
   // Set to lock the app behind a shared password when it is deployed publicly.
   password: process.env.SLATE_PASSWORD || '',
   // Open to the internet. Everything that writes, spends Drive quota, or can

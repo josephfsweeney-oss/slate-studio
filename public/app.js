@@ -795,11 +795,14 @@ async function boot() {
     $('#source').title = 'Read-only. Download the PNG, or copy it straight into a post.';
   }
 
-  if (cat.source === 'manifest') {
-    $('#btn-connect').hidden = !st.driveConfigured;
+  if (cat.driveError) {
+    notice(`Portraits are unavailable: ${cat.driveError}`, true);
+  } else if (cat.source === 'manifest') {
+    const btn = $('#btn-connect');
+    if (btn) btn.hidden = !st.driveConfigured;
     notice(st.driveConfigured
       ? 'Running on the bundled manifest. Connect Drive to pull in the 187 cutouts.'
-      : 'Running on the bundled manifest. Set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET in .env to reach the decks in Drive.');
+      : 'Running on the bundled manifest. Set a Google service account key to reach the decks in Drive.');
   }
 
   // A shared link wins over whatever was last open in this browser.

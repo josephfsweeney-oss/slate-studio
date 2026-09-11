@@ -2,6 +2,7 @@
  * Read access to the slate folder, plus drive.file so the app can write finished
  * graphics into a folder it owns. It can never touch anything else in Drive. */
 import fs from 'node:fs';
+import crypto from 'node:crypto';
 import { config, paths } from './config.js';
 
 const AUTH = 'https://accounts.google.com/o/oauth2/v2/auth';
@@ -25,6 +26,59 @@ function save() {
     // Read-only disk. The token still works for the life of this instance.
     console.warn('token not persisted:', e.message);
   }
+}
+
+/* ------------------------------------------------------- service account ---
+ * The two-legged flow: sign a JWT with the account's private key and trade it
+ * for an access token. No user, no consent screen, no refresh token to keep.
+ * The key carries drive.readonly only, so a hosted copy cannot write to Drive
+ * even if a write route were somehow reachable. */
+
+let sa = null;
+if (config.serviceAccount) {
+  try {
+    const raw = config.serviceAccount.trim().startsWith('{')
+      ? config.serviceAccount
+      : Buffer.from(config.serviceAccount, 'base64').toString('utf8');
+    const key = JSON.parse(raw);
+    if (!key.client_email || !key.private_key) throw new Error('missing client_email or private_key');
+    sa = { email: key.client_email, privateKey: key.private_key, token: null, expiresAt: 0 };
+  } catch (e) {
+    console.error('GOOGLE_SERVICE_ACCOUNT_JSON could not be read:', e.message);
+  }
+}
+
+export const usingServiceAccount = () => Boolean(sa);
+
+const b64url = (buf) => Buffer.from(buf).toString('base64')
+  .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+
+/** Signed JWT assertion for the jwt-bearer grant. Exported so it can be tested
+ *  without reaching Google. */
+export function buildAssertion(account, now = Math.floor(Date.now() / 1000)) {
+  const header = b64url(JSON.stringify({ alg: 'RS256', typ: 'JWT' }));
+  const claims = b64url(JSON.stringify({
+    iss: account.email,
+    scope: 'https://www.googleapis.com/auth/drive.readonly',
+    aud: TOKEN,
+    iat: now,
+    exp: now + 3600,
+  }));
+  const body = `${header}.${claims}`;
+  const sig = crypto.createSign('RSA-SHA256').update(body).end()
+    .sign(account.privateKey);
+  return `${body}.${b64url(sig)}`;
+}
+
+async function serviceAccountToken() {
+  if (sa.token && Date.now() < sa.expiresAt) return sa.token;
+  const t = await post({
+    grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer',
+    assertion: buildAssertion(sa),
+  });
+  sa.token = t.access_token;
+  sa.expiresAt = Date.now() + (t.expires_in - 60) * 1000;
+  return sa.token;
 }
 
 export const redirectUri = () => `${config.baseUrl}/auth/callback`;
@@ -74,6 +128,7 @@ export async function exchangeCode(code) {
 }
 
 export async function accessToken() {
+  if (sa) return serviceAccountToken();
   if (!tokens?.refresh_token && !tokens?.access_token) return null;
   if (tokens.access_token && Date.now() < (tokens.expires_at || 0)) return tokens.access_token;
   if (!tokens.refresh_token) return null;
@@ -89,7 +144,7 @@ export async function accessToken() {
   return tokens.access_token;
 }
 
-export function signedIn() { return Boolean(tokens?.refresh_token); }
+export function signedIn() { return Boolean(sa || tokens?.refresh_token); }
 
 export function signOut() {
   tokens = null;

@@ -240,6 +240,23 @@ function finalize(byId, source, meta) {
   };
 }
 
+/** Turn a Google error into something a person can act on, without echoing the
+ *  raw API text to whoever happens to be looking at a public page. */
+function driveHint(msg) {
+  const m = String(msg || '');
+  if (/invalid_grant|Invalid grant|account not found|invalid_client/i.test(m)) {
+    return 'Google rejected the credentials. Check GOOGLE_SERVICE_ACCOUNT_JSON was pasted whole.';
+  }
+  if (/not found|404/i.test(m)) {
+    return 'The slate folder was not found. Share it with the service account email, as Viewer.';
+  }
+  if (/403|permission|insufficient/i.test(m)) {
+    return 'Access denied to the slate folder. Share it with the service account email, as Viewer.';
+  }
+  if (/quota|rate|429/i.test(m)) return 'Google API quota reached. It should clear shortly.';
+  return 'Drive could not be reached. Running on the bundled manifest.';
+}
+
 function buildFromBundle() {
   const byId = fromManifest(bundledManifest());
   // No cutouts available: every tile renders as a marked placeholder.
@@ -251,9 +268,21 @@ function buildFromBundle() {
 
 export async function build() {
   let cat;
-  if (config.localDir && fs.existsSync(config.localDir)) cat = buildFromLocal();
-  else if (signedIn()) cat = await buildFromDrive();
-  else cat = buildFromBundle();
+  if (config.localDir && fs.existsSync(config.localDir)) {
+    cat = buildFromLocal();
+  } else if (signedIn()) {
+    try {
+      cat = await buildFromDrive();
+    } catch (e) {
+      // A bad key, or a folder not yet shared with the service account, must not
+      // take the whole site down. Fall back to the bundled manifest and say so.
+      console.error('Drive unreachable, falling back to the bundled manifest:', e.message);
+      cat = buildFromBundle();
+      cat.driveError = driveHint(e.message);
+    }
+  } else {
+    cat = buildFromBundle();
+  }
   cache = cat;
   fs.mkdirSync(config.stateDir, { recursive: true });
   fs.writeFileSync(paths.catalog, JSON.stringify(cat));
@@ -267,6 +296,10 @@ export async function get({ refresh = false } = {}) {
   // Local mode is a filesystem walk, so never serve a stale one. Drive is many
   // API calls, so that cache stands until Refresh asks for a new one.
   if (config.localDir && fs.existsSync(config.localDir)) return build();
+  // A cache left over from a different mode does not describe this one.
+  if (cache.source === 'local' && !config.localDir) return build();
+  // A failed Drive build is worth retrying rather than serving forever.
+  if (cache.driveError && signedIn()) return build();
   return cache;
 }
 

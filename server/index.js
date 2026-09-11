@@ -108,6 +108,7 @@ async function api(req, res, url) {
       signedIn: auth.signedIn(),
       localMode: Boolean(config.localDir && fs.existsSync(config.localDir)),
       source: cat?.source || null,
+      driveError: cat?.driveError || null,
       counts: cat?.counts || null,
       builtAt: cat?.builtAt || null,
     });

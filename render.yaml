@@ -1,5 +1,8 @@
-# One-click deploy on Render. A long-running Node process with a disk, so the
-# Drive token and the portrait cache survive restarts.
+# Deploy on Render. One long-running Node process with a disk, so the portrait
+# cache survives restarts and the rate limit is held in one place.
+#
+# Everything here is set for a public, read-only deployment. The only value you
+# supply is the service-account key.
 services:
   - type: web
     name: slate-studio
@@ -15,11 +18,15 @@ services:
     envVars:
       - key: SLATE_STATE_DIR
         value: /var/slate
-      - key: BASE_URL
-        sync: false          # set to the render.com URL after the first deploy
-      - key: GOOGLE_CLIENT_ID
+      # Public and read-only: no writes, no Drive sign-in, no quota burning,
+      # rate limited. Do not remove this unless the URL is private.
+      - key: SLATE_PUBLIC
+        value: "1"
+      # The one value you paste: the whole service-account JSON key file.
+      # Then share the slate folder with that account's email, as Viewer.
+      - key: GOOGLE_SERVICE_ACCOUNT_JSON
         sync: false
-      - key: GOOGLE_CLIENT_SECRET
-        sync: false
-      - key: SLATE_PASSWORD
-        sync: false
+      # Uncomment to hide districts with a missing headshot. Off means the
+      # PHOTO NEEDED tiles are public, which is usually the point.
+      # - key: SLATE_PUBLIC_READY_ONLY
+      #   value: "1"
