@@ -1,0 +1,13 @@
+{
+  "type": "service_account",
+  "project_id": "slate-studio-508322",
+  "private_key_id": "d72aab04bf72b6175914437ba4dd49348e5ca2e7",
+  "private_key": "-----BEGIN PRIVATE KEY-----\nMIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQCWDxPKbOHjezxX\nP6ds9Bix5/6iOdBwaULDGPcTN5Q7fan58VvKSfRfKnh5MkKWVNl9SRfClfaY3LGl\nm53tp7ANdBx/mJHu9Fut0SBI8ij9nATJfeOrzUPj4aIyQ0+hMIWXmQyvJGuYtKcR\n18T/KF/dDOzec1QYudNmkY6gSAFMTGq/8VXU7E4liCTE5xhsDsbrDNsQ5rc5xQgj\nha2RIDOwujQrC6+4Bv5nIb9GjK31JA7IzfVJbbdcYSSv/84VFEWTsWXkntPjbQqh\nyxDE7MgwAj2cQSIWs7I/hsYw8nym+DplkZJX91j8edKmWQn37ln3rzzdUdPSXpPU\nijec2mT7AgMBAAECggEAFP0F4R3KmIU/otpx4gDgRV30FR+uAlMOtfgTctomvw1s\nDVwPYSNn7TmlARqhCqLSir4C90H/bFEN/eJevANk0fToGYau/rOp8Q1bjShlyFce\nqkoT4o9CzChehdY5WIvPW61aA1M+Q20dIxdBZAjzI5lvtgt+ezjeky2Pu+ZmXBPr\nUxPcwrb+zlgn4teRrgjzTyCwfLjrFvaffnzxWeepRZXy514o9lH1RN3QYbkboUHJ\nsuSsI+kRL0JQrHaiqsEB/uAa9spLaniLa5lltkViq7UZl/tznyNX9tDOOT+hyZXP\njVuER+5EYDRSDCh9e2d67u7QsUKXoEu8nbOM0VCLeQKBgQDGtCC2GmOL8owmYv82\nYOjDFz31JLPNx3PgaW85N8xKMuAIpvlI0oBHnPTVr3JBK3M1wwX3BpRGTRRX6z+u\nYKfQP3iEsPcCdWoKqEl4IqZXsGiFGPhkk230oFp//1c617OjkvDGNzdkEqGGQwYS\nHUtDmVURUb0xOW+oYjZK87kJswKBgQDBVBnMmz95uyW2GvwEr1/JtR2YbO9DGRiE\n0jDvPETBniiT2GJScKaTvsrkmqZ8pAErVawXqLzz4Nsp4s5dBffIdZQ/+kVMDZ6+\nAVTDcUXsphdjKcnOPTBKEO3h51KWhcJfPeWUYrMvZSBqM5Sbx3Okgmn82Q7rjEIF\ncvcs/v+DmQKBgQCDa0UrS97FA6FADj+/Zm7sASZASYsGMcFpDjK6xDXAaU+VSWIc\nkOS4+I1R+xz1D1i+mQML83UD3hzzXSscGN9Es4XxNN3Z6XA+JjmZVElyO8GVLgOy\n+XNC1P+mImo+B8XPDPNkFcbz0AK2uwN73ZYW2oXR057uvI8l7fb8sZ+TUwKBgQCy\n/GziTD1JM2XnojX/FGqncWIUE460XVCg74TUiMTTSN0ie+wTjS37jWGEolVPAfv/\nJdMtGFDPrTbbIZuS7gqIcasuTEPJ9LYqDUtvorhtLxxp929Z3LaPa/sA8cw5hV7+\nFG0vou1oDMUk7dpBGzhKb18287JnizQ4nUaQRwlCyQKBgF4V3TqGGXYs0Cg88jFA\ng/G6mx1lyIkpbWW6zmSludoodOV4SRAK3UvFj5fQONbKdZNEod12yZEJxC1JCDTD\nIyG4LqCaEGvtjGdhXKt9/tjxFuoJe3a8JQZBAzkvCv5et5LYdpSAvTii5K1ZWuYt\nzyTe0O+7gYXwc7sbkd9r1qF7\n-----END PRIVATE KEY-----\n",
+  "client_email": "slate-studio@slate-studio-508322.iam.gserviceaccount.com",
+  "client_id": "111992195722533159834",
+  "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+  "token_uri": "https://oauth2.googleapis.com/token",
+  "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+  "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/slate-studio%40slate-studio-508322.iam.gserviceaccount.com",
+  "universe_domain": "googleapis.com"
+}
