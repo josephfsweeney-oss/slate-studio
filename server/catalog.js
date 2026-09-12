@@ -81,10 +81,21 @@ function fromManifest(text) {
  *  the whole deployment small enough not to fight a host's size limit.
  *  Returns a slug -> public URL map, or null when the folder is not there. */
 function bundledCutouts() {
-  const dir = path.join(ROOT, 'public', 'cutouts');
-  if (!fs.existsSync(dir)) return null;
+  // data/cutouts.json first. On a serverless host the function is bundled with
+  // data/ but not with public/, so listing the folder there finds nothing even
+  // though the CDN is serving every one of those files. build/index-cutouts.mjs
+  // writes the index; a test keeps it honest.
+  let names = null;
+  try {
+    names = JSON.parse(fs.readFileSync(path.join(ROOT, 'data', 'cutouts.json'), 'utf8'));
+  } catch {
+    const dir = path.join(ROOT, 'public', 'cutouts');
+    if (fs.existsSync(dir)) names = fs.readdirSync(dir);
+  }
+  if (!names || !names.length) return null;
+
   const map = new Map();
-  for (const f of fs.readdirSync(dir)) {
+  for (const f of names) {
     const m = /^(.+)\.(webp|png)$/i.exec(f);
     if (!m) continue;
     const [, slug, ext] = m;

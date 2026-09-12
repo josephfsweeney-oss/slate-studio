@@ -13,7 +13,8 @@
     "test": "node --test test/*.test.js",
     "token": "node server/print-token.js",
     "verify": "node server/verify.js",
-    "build:static": "node build/pack-atlas.mjs dist && node build/static-site.mjs dist"
+    "build:static": "node build/pack-atlas.mjs dist && node build/static-site.mjs dist",
+    "index:cutouts": "node build/index-cutouts.mjs"
   },
   "dependencies": {}
 }

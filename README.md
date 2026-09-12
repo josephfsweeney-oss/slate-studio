@@ -264,6 +264,19 @@ npm install --no-save playwright && npx playwright install chromium
 
 `npm start`, `npm test` and `npm run verify` still need nothing.
 
+## After adding or replacing a portrait
+
+```
+npm run index:cutouts
+```
+
+`data/cutouts.json` lists the portrait filenames and the server reads that,
+not the folder. On a serverless host the function is bundled with `data/` and
+not with `public/`, so listing the folder there finds nothing, even while the
+CDN is serving every one of those images perfectly well. The symptom is a site
+that looks fine except every face is a placeholder. A test fails if the index
+drifts from the folder.
+
 ## A note on the Drive folder id
 
 `server/config.js` defaults to the id of the `2026 Slate Decks` folder so the
