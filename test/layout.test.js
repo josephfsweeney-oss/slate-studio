@@ -998,6 +998,38 @@ test('the push token stays in the browser and never reaches this app', () => {
   assert.match(html, /Contents set to\s*\n?\s*read and write/);
 });
 
+test('a round can argue with arrows, and the copy survives the token filler', () => {
+  /* Copy is not all strings. A comparison is a list of lines with a direction on
+   * each, and the filler used to turn it into an empty string, which took the
+   * whole block off the artwork without saying so. */
+  const list = [{ dir: 'down', text: 'one' }, { dir: 'up', text: 'two' }];
+  const d = { id: 'r25', county: 'Rockingham', district: 25, towns: [], nominees: slate(2) };
+  assert.equal(fillTokens(list, d), list, 'a list of lines did not survive the filler');
+  assert.equal(fillTokens(7, d), 7);
+  assert.equal(fillTokens('{{COUNTY}} {{DISTRICT}}', d), 'Rockingham 25');
+
+  const c = CANVASES.find((x) => x.id === 'mail6');
+  const piece = MAIL_PROGRAMS[0].pieces.find((x) => x.contrast && x.contrast.versus);
+  assert.ok(piece, 'no round argues with arrows');
+  const copy = { ...SIDE_COMMON, ...sideCopyFor(piece, 'front', true) };
+  const p = solve({ canvas: { w: c.w, h: c.h }, dpi: c.dpi, slate: slate(4), copy,
+    style: sideStyle(piece, 'front', true) }, measure);
+  const v = p.contrast.versus;
+  assert.ok(v, 'the comparison did not reach the plan');
+  assert.equal(v.rows.length, 2, 'a comparison takes two sides');
+  assert.deepEqual(v.rows.map((r) => r.dir), ['down', 'up'],
+    'ours goes down and theirs goes up, in that order');
+  for (const r of v.rows) assert.ok(r.block.lines.length, 'an arrow with no line beside it');
+
+  // The rows stack without landing on each other, and the block stays in the column.
+  assert.ok(v.rows[1].dy >= v.rows[0].dy + v.rows[0].h, 'the two sides overlap');
+  assert.ok(v.y + v.h <= p.contrast.cta.y + 1, 'the comparison lands on the foot');
+  assert.ok(v.arrowW + v.gap < p.contrast.col.w, 'the arrow leaves no room for the line');
+
+  // With a comparison on it, the big numeral stands down.
+  assert.equal(p.contrast.number, null, 'a numeral and a comparison is two headlines');
+});
+
 test('nothing is set in a colour that cannot be read on the ground under it', async () => {
   const { contrastRatio, readableOn } = await import('../public/render.js');
 

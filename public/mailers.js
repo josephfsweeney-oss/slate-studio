@@ -133,9 +133,12 @@ export const MAIL_PROGRAMS = [{
         mark: 'meter',
         art: 'c-meters',
         kicker: 'What you pay for the same electricity',
-        headline: 'Over The Country. Every Month.',
-        number: '27%',
-        subhead: 'Over the national average. That is a policy choice, not the weather.',
+        headline: 'Two Sides. Two Directions.',
+        versus: [
+          { dir: 'down', text: 'Republicans are fighting to lower your bills' },
+          { dir: 'up', text: 'Democrats are fighting to increase your bills' },
+        ],
+        subhead: 'New Hampshire pays about 27 percent over the country for the same electricity.',
         source: '',
       },
       front: {

@@ -385,6 +385,12 @@ export const topperById = (id) => TOPPERS.find((t) => t.id === id) || null;
  * An unknown token is left standing on purpose, so it shows up on the artwork
  * and in the warnings rather than quietly resolving to nothing. */
 export function fillTokens(str, district, vars = {}) {
+  /* Copy is not all strings. A round's comparison is a list of lines with a
+   * direction on each, and running it through a string replace turned it into
+   * "[object Object]" or, worse, into nothing at all and the block vanished off
+   * the artwork with no warning. Anything that is not a string comes back as it
+   * went in. */
+  if (typeof str !== 'string') return str;
   if (!str || !district) return str || '';
   const surnames = district.nominees.map((n) => n.last.replace(/\b\w+/g, (w) => w[0] + w.slice(1).toLowerCase()));
   /* Towns come off the district record. With none listed the tokens fall back

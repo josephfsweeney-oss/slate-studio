@@ -1757,6 +1757,44 @@ function paintContrast(ctx, plan, style, theme, assets, bleed = 0) {
   line(c.kicker, mark, c.col.x);
   line(c.head, ink, c.col.x);
   line(c.number, mark, c.col.x);
+  /* The comparison: one arrow going down beside what we are doing, one going up
+   * beside what they are doing. The arrow is the argument; the line names it. */
+  if (c.versus) {
+    const v = c.versus;
+    const bad = readableOn(BRAND.deckRed, ground, null, 3);
+    for (const r of v.rows) {
+      const y = v.y + r.dy;
+      const ax = c.col.x;
+      const aw = v.arrowW;
+      const ah = r.h;
+      const down = r.dir !== 'up';
+      const sw = aw * 0.36;
+      ctx.fillStyle = down ? mark : bad;
+      if (down) {
+        ctx.fillRect(ax + (aw - sw) / 2, y + ah * 0.08, sw, ah * 0.52);
+        ctx.beginPath();
+        ctx.moveTo(ax, y + ah * 0.54);
+        ctx.lineTo(ax + aw, y + ah * 0.54);
+        ctx.lineTo(ax + aw / 2, y + ah * 0.96);
+      } else {
+        ctx.fillRect(ax + (aw - sw) / 2, y + ah * 0.40, sw, ah * 0.52);
+        ctx.beginPath();
+        ctx.moveTo(ax, y + ah * 0.46);
+        ctx.lineTo(ax + aw, y + ah * 0.46);
+        ctx.lineTo(ax + aw / 2, y + ah * 0.04);
+      }
+      ctx.closePath();
+      ctx.fill();
+
+      const blk = r.block;
+      ctx.fillStyle = ink;
+      setFont(ctx, blk.font, blk.px, blk.ls);
+      ctx.textAlign = 'left';
+      blk.lines.forEach((l, i) => ctx.fillText(l, ax + aw + v.gap,
+        y + (ah - blk.h) / 2 + blk.lh * (i + 0.84)));
+    }
+  }
+
   line(c.caption, 'rgba(255,255,255,.86)', c.col.x);
   line(c.source, 'rgba(255,255,255,.66)', c.inner.x);
 

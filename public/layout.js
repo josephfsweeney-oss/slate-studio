@@ -1947,8 +1947,8 @@ function solveSlateBand(spec, measure, side) {
     wordsBox = { x: colX, y: inner.y, w: strip.x + strip.w - colX,
       h: rowsOut.laid.bandY - inner.y - box.h * 0.016 };
 
-    ctaBlk = fitBlock(measure, ctaText, ANTON, box.h * 0.058 * density,
-      wordsBox.w * 0.92, 1, 0.005, true);
+    ctaBlk = fitInside(measure, ctaText, ANTON, box.h * 0.082 * density,
+      wordsBox.w * 0.94, 1, 0.005, true);
     ctaH = ctaBlk.h ? ctaBlk.px * 1.58 : 0;
     seatBlk = fitBlock(measure, seatLine, ANTON, box.h * 0.046 * density,
       wordsBox.w, 1, 0.01, true);
@@ -1972,8 +1972,11 @@ function solveSlateBand(spec, measure, side) {
      * one of them anybody reads at arm's length. */
     align = 'center';
     wordsBox = stackBox;
-    ctaBlk = fitBlock(measure, ctaText, ANTON, box.h * (panel ? 0.052 : 0.064) * density,
-      wordsBox.w * 0.92, 1, 0.005, true);
+    /* The call to action is the last thing anybody reads and the only thing on
+     * the piece that tells them what to do, so it takes all the size the column
+     * will give it and stops at the width. */
+    ctaBlk = fitInside(measure, ctaText, ANTON, box.h * (panel ? 0.072 : 0.092) * density,
+      wordsBox.w * 0.94, 1, 0.005, true);
     ctaH = ctaBlk.h ? ctaBlk.px * 1.58 : 0;
     seatBlk = fitBlock(measure, seatLine, ANTON,
       box.h * (panel ? 0.042 : 0.058) * density, wordsBox.w, 1, 0.01, true);
@@ -2230,8 +2233,8 @@ function solveContrast(spec, measure) {
 
   /* The foot, measured first: the call to action is the one line on this side
    * that is not an argument, and it never gives up its height. */
-  const ctaBlk = fitInside(measure, copy.cta, ANTON, box.h * 0.062 * density,
-    inner.w * 0.92, 1, 0.005, true);
+  const ctaBlk = fitInside(measure, copy.cta, ANTON, box.h * 0.090 * density,
+    inner.w * 0.94, 1, 0.005, true);
   const ctaH = ctaBlk.h ? ctaBlk.px * 1.58 : 0;
   const srcBlk = fitInside(measure, copy.source, COND_BOLD, box.h * 0.028 * density,
     inner.w, 2, 0.02, true);
@@ -2266,9 +2269,33 @@ function solveContrast(spec, measure) {
     colW, 3, 0.03, true);
   const capH = cap.h ? cap.h + box.h * 0.018 : 0;
 
+  /* Two lines with an arrow on each, one going down and one going up. Where a
+   * round has this, it is the argument and the big number stands down: a
+   * numeral and a comparison in the same column are two headlines. */
+  const vsIn = Array.isArray(copy.versus) ? copy.versus.filter((v) => v && v.text) : [];
+  let versus = null;
+  if (vsIn.length) {
+    const arrowW = colW * 0.105;
+    const vgap = colW * 0.038;
+    const tw = Math.max(1, colW - arrowW - vgap);
+    const pad = box.h * 0.026;
+    const rows = [];
+    let vy = 0;
+    for (const v of vsIn) {
+      const block = fitInside(measure, v.text, COND_BOLD,
+        Math.min(box.h * 0.060, tw * 0.070) * density, tw, 2, 0.02, true);
+      const rh = Math.max(block.h, arrowW * 1.20);
+      rows.push({ dir: v.dir === 'up' ? 'up' : 'down', block, dy: vy, h: rh });
+      vy += rh + pad;
+    }
+    versus = { arrowW, gap: vgap, rows, h: Math.max(0, vy - pad) };
+  }
+  const versusH = versus ? versus.h + box.h * 0.024 : 0;
+
   /* The headline takes what the rest of the column leaves, and never less than
    * a line it can be read at. */
-  const room = Math.max(box.h * 0.06, footTop - inner.y - kickH - numH - capH - box.h * 0.02);
+  const room = Math.max(box.h * 0.06,
+    footTop - inner.y - kickH - (versus ? 0 : numH) - versusH - capH - box.h * 0.02);
   let headPx = Math.min(box.h * 0.135 * density, Math.max(room, box.h * 0.05));
   let head = fitBlock(measure, copy.headline, ANTON, headPx, colW, 3, -0.012, true);
   let guard = 0;
@@ -2279,12 +2306,17 @@ function solveContrast(spec, measure) {
   const headH = head.h ? head.h + box.h * 0.022 : 0;
 
   // The block sits in the middle of the column it was given.
-  const stackH = kickH + headH + numH + capH;
+  const stackH = kickH + headH + (versus ? 0 : numH) + versusH + capH;
   let y = inner.y + Math.max(0, (footTop - inner.y - stackH) / 2);
   const place = (blk, gapAfter) => {
     if (!blk.h) return null;
     const at = { block: blk, y };
     y += blk.h + gapAfter;
+    return at;
+  };
+  const placeVersus = () => {
+    const at = { ...versus, x: inner.x, y };
+    y += versus.h + box.h * 0.024;
     return at;
   };
 
@@ -2304,7 +2336,8 @@ function solveContrast(spec, measure) {
       box, inner, col: { x: inner.x, w: colW },
       kicker: place(kick, box.h * 0.024),
       head: place(head, box.h * 0.022),
-      number: place(num, box.h * 0.016),
+      number: versus ? null : place(num, box.h * 0.016),
+      versus: versus ? placeVersus() : null,
       caption: place(cap, box.h * 0.018),
       mark: mark.id || mark.art ? mark : null,
       source: srcBlk.lines.length

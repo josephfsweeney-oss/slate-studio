@@ -595,6 +595,13 @@ uses the palette's own light accent, and where a palette has none the accent is
 lifted toward white until it carries. Brand colour that cannot be read is not
 brand colour. A test holds every palette to 4.5 to 1.
 
+A round can argue with arrows instead of a number. The energy round does: one
+arrow down beside what Republicans are doing to your bill, one arrow up beside
+what Democrats are doing to it. Where a round has a comparison the big numeral
+stands down, because a numeral and a comparison in the same column are two
+headlines. `versus` in `public/mailers.js` is a list of `{ dir, text }`, and
+`dir` is `down` for ours and `up` for theirs.
+
 Every contrast side ends on a source line: the bill, the roll call, the date. A
 side that attacks a record and does not cite it is a side you cannot defend.
 Where the record is not in the file the line prints empty and the app says so in
