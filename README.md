@@ -538,9 +538,19 @@ labels them once instead of six times. Everybody fills the same height, and a
 wide crop is trimmed at the sides rather than scaled down, so nobody ends up
 shorter than the row and floating above the band.
 
-The message side gets the whole piece. The address side gets everything to the
-left of the carrier's corner, which on an 11 x 6 is seven inches by six, and
-the headline runs the full width across the top when it clears the panel.
+The message side is a column: headline at the top, the slate under it, the foot
+at the bottom, eleven inches wide.
+
+The address side is an L. The carrier owns the bottom two and a quarter inches
+of the right hand four and nothing else, so the slate takes the width above that
+line and the words go under it on the left. Six or more faces there go in two
+rows: eight across seven inches is a row of thumbnails, four over four is two
+rows of people. **Two rows of faces on the address side** turns that off.
+
+No disclaimer on either side. The print shop sets the paid-for line with the
+indicia, the address block and the barcode, because they are all one job and it
+is theirs. RSA 664:14 still applies to the finished piece, so the handoff note
+says so and the work order has to as well.
 
 The stack is measured from the foot up, so a longer headline costs the faces
 height rather than pushing the paid-for line off the bottom.

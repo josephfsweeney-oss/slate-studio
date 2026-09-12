@@ -868,7 +868,7 @@ test('every mail side puts the slate, a headline and a call to action on the pie
       const d = { id: 'r25', county: 'Rockingham', district: 25, seats: n,
                   towns: ['Salem'], nominees: list };
       for (const side of ['front', 'back']) {
-        const raw = { ...SIDE_COMMON, ...piece[side], disclaimer: COPY.disclaimer };
+        const raw = { ...SIDE_COMMON, ...piece[side] };
         const copy = {};
         for (const [k, v] of Object.entries(raw)) copy[k] = fillTokens(v, d, { typed });
         const p = solve({ canvas: { w: c.w, h: c.h }, dpi: c.dpi, slate: list, copy,
@@ -883,36 +883,59 @@ test('every mail side puts the slate, a headline and a call to action on the pie
           `${where} is not in ballot order`);
         assert.equal(p.tiles.length, 0, `${where} still draws boxed tiles`);
 
-        // The three things every side must carry.
+        // The three things every side must carry. No disclaimer: the print shop
+        // sets it with the carrier's corner, which is theirs.
         assert.ok(b.head, `${where} has no headline`);
         assert.ok(b.cta, `${where} has no call to action`);
-        assert.ok(p.disclaimer, `${where} has no paid-for line`);
+        assert.equal(p.disclaimer, null, `${where} printed a disclaimer the print shop sets`);
         assert.match(b.cta.block.lines[0], /NOVEMBER 3/, `${where} does not say when to vote`);
 
-        // The stack does not run off the piece, or into the next band down.
-        const foot = b.bandRect.y + b.bandRect.h;
+        // Nothing lands on anything else, on either shape.
         assert.ok(b.head.y >= 0, `${where} headline off the top`);
-        assert.ok(b.figures[0].slot.y > b.head.y, `${where} faces above the headline`);
-        assert.ok(b.figures[0].slot.y + b.figures[0].slot.h <= b.bandRect.y + 1,
-          `${where} faces run past the name band`);
-        assert.ok(b.seat.y >= foot, `${where} district line under the band`);
+        for (const row of b.rows) {
+          assert.ok(row.y + row.h <= row.band.y + 1, `${where} faces run past their band`);
+        }
+        for (let i = 1; i < b.rows.length; i++) {
+          assert.ok(b.rows[i - 1].band.y + b.rows[i - 1].band.h <= b.rows[i].y + 1,
+            `${where} row ${i} sits on the band above it`);
+        }
+        const wordsBottom = b.sub ? b.sub.y + b.sub.block.h : b.head.y + b.head.block.h;
+        assert.ok(wordsBottom <= b.seat.y + 1, `${where} the copy lands on the district line`);
         assert.ok(b.cta.y >= b.seat.y, `${where} call to action above the district line`);
-        assert.ok(b.cta.y + b.cta.h <= p.disclaimer.y + 1, `${where} call to action over the disclaimer`);
-        assert.ok(p.disclaimer.y <= c.h, `${where} disclaimer off the foot`);
+        assert.ok(b.cta.y + b.cta.h <= c.h, `${where} call to action off the foot`);
 
-        // And nothing of ours is in the carrier's corner.
+        if (side === 'front') {
+          // A column: headline, then faces, then the foot.
+          assert.ok(b.figures[0].slot.y > b.head.y, `${where} faces above the headline`);
+          assert.ok(b.seat.y >= b.bandRect.y + b.bandRect.h, `${where} district line above the band`);
+        } else {
+          // An L: the slate takes the width above the carrier's line and the
+          // words take the corner the carrier is not standing in.
+          assert.ok(b.bandRect.y + b.bandRect.h <= p.mailPanel.y + 1,
+            `${where} the slate crosses the carrier line`);
+          assert.ok(b.head.y >= p.mailPanel.y - 1, `${where} the words are not below the line`);
+        }
+        // Six or more on the address side goes in two rows; the front stays one.
+        assert.equal(b.rows.length, side === 'back' && n >= 6 ? 2 : 1,
+          `${where} came out in ${b.rows.length} rows`);
+
+        /* The address side is an L: everything may use the full width above the
+         * carrier's line, and only what sits below it moves to the left. What
+         * nothing may do is enter the corner itself. */
         if (side === 'back') {
           assert.ok(p.mailPanel, `${where} lost the mail panel`);
-          assert.ok(b.box.w <= p.mailPanel.x + 1, `${where} the stack reaches the panel`);
-          for (const f of b.figures) {
-            assert.ok(f.slot.x + f.slot.w <= p.mailPanel.x + 1, `${where} a face in the panel`);
-          }
-          // The headline may use the full width, but only above the panel.
-          assert.ok(b.top.x + b.top.w <= c.w + 1, `${where} headline off the piece`);
-          if (b.top.w > b.box.w) {
-            assert.ok(b.sub ? b.sub.y + b.sub.block.h <= p.mailPanel.y : true,
-              `${where} full-width headline reaches into the panel`);
-          }
+          const m = p.mailPanel;
+          const clear = (r, what) => assert.ok(
+            r.x + r.w <= m.x + 1 || r.y + r.h <= m.y + 1, `${where} ${what} in the carrier corner`);
+          for (const f of b.figures) clear(f.slot, 'a face');
+          clear(b.bandRect, 'the name band');
+          clear({ x: b.cta.x, y: b.cta.y, w: b.cta.w, h: b.cta.h }, 'the call to action');
+          clear({ x: 0, y: b.seat.y, w: b.seat.block.w + b.cta.x * 2, h: b.seat.block.h },
+            'the district line');
+          // The band and the faces earn the full width by staying above the line.
+          assert.ok(b.bandRect.y + b.bandRect.h <= m.y + 1,
+            `${where} the name band crosses the carrier line`);
+          assert.ok(b.cta.x + b.cta.w <= m.x + 1, `${where} the call to action is not on the left`);
         } else {
           assert.equal(p.mailPanel, null, `${where} put a mail panel on the message side`);
         }
@@ -925,7 +948,7 @@ test('the name band says every name the same way, and never drops a surname', ()
   const c = CANVASES.find((x) => x.id === 'mail6');
   const piece = MAIL_PROGRAMS[0].pieces[0];
   const run = (n) => solve({ canvas: { w: c.w, h: c.h }, dpi: c.dpi, slate: slate(n),
-    copy: { ...SIDE_COMMON, ...piece.front, disclaimer: COPY.disclaimer },
+    copy: { ...SIDE_COMMON, ...piece.front },
     style: sideStyle(piece, 'front') }, measure).band;
 
   for (const n of [1, 4, 6, 9, 10]) {
@@ -939,7 +962,12 @@ test('the name band says every name the same way, and never drops a surname', ()
         `${f.candidate.name} lost the surname, which is what a voter matches on the ballot`);
     }
   }
-  // A wide slate has to give up first names before it gives up legibility.
-  assert.equal(run(2).figures[0].name.dropped, false, 'two names had room and did not use it');
-  assert.equal(run(10).figures[0].name.dropped, true, 'ten names kept first names that cannot fit');
+  // Every name is readable in the cell it is in, whichever form it took.
+  for (const n of [1, 4, 6, 9, 10]) {
+    const b = run(n);
+    for (const f of b.figures) {
+      assert.ok(f.name.px <= f.nameBox.w * 0.5,
+        `${n} names: ${f.name.text} is set wider than the cell it is under`);
+    }
+  }
 });

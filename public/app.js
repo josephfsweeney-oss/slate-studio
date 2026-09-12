@@ -78,7 +78,7 @@ const state = {
   waiveDisclaimer: false,
   ticked: new Set(),
   // The mail programme: which piece of it is open, and which side of that piece.
-  mail: { program: '', piece: '', side: 'front', sharedBack: true },
+  mail: { program: '', piece: '', side: 'front', sharedBack: true, twoRows: true },
   // Facts the app cannot look up, typed once per district and kept there.
   mailVars: {},
 };
@@ -388,11 +388,12 @@ function paintWarnings(d, slate) {
   }
   const piece = mailPiece();
   if (piece) {
-    out.push({ text: 'The carrier corner prints blank on purpose: the mail house sets the '
-      + 'indicia, the return address, the address block and the barcode. The paid for '
-      + 'line is on the artwork, at the foot of both sides.' });
+    out.push({ text: 'No disclaimer and a blank carrier corner, on purpose. The print shop '
+      + 'sets the indicia, the return address, the address block, the barcode and the '
+      + 'paid for line together. RSA 664:14 applies to the finished piece, so put that '
+      + 'in the work order. The handoff note in Both sides already says it.' });
   }
-  const noDisc = !state.copy.disclaimer.trim() && !state.waiveDisclaimer;
+  const noDisc = !piece && !state.copy.disclaimer.trim() && !state.waiveDisclaimer;
   if (noDisc) {
     out.push({ bad: true, text: 'No disclaimer. A finished political ad needs one under RSA 664:14. Add it, or tick "asset layer" if this is a layer somebody else will finish.' });
   }
@@ -1062,9 +1063,10 @@ function sideCopy(piece, side) {
   };
   const own = side === 'back' && state.mail.sharedBack ? SHARED_BACK : piece[side];
   /* Every side carries the district line and the call to action, and the piece
-   * carries the issue. The disclaimer stays on: this layout has a foot for it,
-   * and a finished political ad needs one under RSA 664:14. */
-  return { ...state.copy, ...blank, ...SIDE_COMMON, ...own };
+   * carries the issue. No disclaimer: the print shop sets it with the carrier's
+   * corner, which is theirs. RSA 664:14 still applies to the finished piece, so
+   * the handoff note says so in writing and the work order has to as well. */
+  return { ...state.copy, ...blank, ...SIDE_COMMON, ...own, disclaimer: '' };
 }
 
 /** The programme picker, the piece list and the variables, redrawn from state. */
@@ -1077,7 +1079,10 @@ function renderMailPanel() {
       .map((x) => `<option value="${x.id}">${x.n}. ${esc(x.label)}</option>`).join('');
     $('#mail-piece').value = piece ? piece.id : prog.pieces[0].id;
   }
-  if (prog) $('#mail-shared-back').checked = state.mail.sharedBack !== false;
+  if (prog) {
+    $('#mail-shared-back').checked = state.mail.sharedBack !== false;
+    $('#mail-two-rows').checked = state.mail.twoRows !== false;
+  }
   $('#mail-front').classList.toggle('on', state.mail.side !== 'back');
   $('#mail-back').classList.toggle('on', state.mail.side === 'back');
 
@@ -1108,6 +1113,7 @@ function applyMailSide() {
   state.copy = sideCopy(piece, side);
   Object.assign(state.style, sideStyle(piece, side));
   state.style.ground = 'palette';
+  state.style.twoRows = state.mail.twoRows !== false;
   // A finished piece has a photograph on it. Loading it with the piece is what
   // makes the programme a programme rather than eight blank image wells.
   loadProgrammeArt(piece);
@@ -1284,11 +1290,12 @@ function handoffNote(d, built) {
    * the artwork has no disclaimer on it. Otherwise the checklist above reads as
    * a piece that failed its own check. */
   if (mailPiece()) {
-    lines.push('', 'THE MAIL HOUSE SETS THE PANEL',
-      '  The carrier corner is blank on purpose. You set the indicia, the return',
-      '  address, the address block and the barcode. Nothing of ours is in the',
-      '  4 x 2.25 in corner, so the whole of it is yours. The paid for line is',
-      '  already on the artwork, at the foot of both sides.');
+    lines.push('', 'THE PRINT SHOP SETS THE PANEL AND THE PAID FOR LINE',
+      '  The carrier corner is blank on purpose and this artwork carries no',
+      '  disclaimer. You set the indicia, the return address, the address block,',
+      '  the barcode AND the paid for line. A finished political ad in New',
+      '  Hampshire needs that line under RSA 664:14. Nothing of ours is in the',
+      '  4 x 2.25 in corner, so the whole of it is yours.');
   }
   if (qr) {
     lines.push('', 'QR CODE', `  Points at: ${qr.url}`,
@@ -1597,6 +1604,12 @@ function bind() {
     state.mail.sharedBack = e.target.checked;
     applyMailSide();
     renderMailPanel(); syncControls(); saveLocal(); draw();
+  });
+
+  $('#mail-two-rows').addEventListener('change', (e) => {
+    state.mail.twoRows = e.target.checked;
+    state.style.twoRows = e.target.checked;
+    saveLocal(); draw();
   });
 
   for (const [sel, side] of [['#mail-front', 'front'], ['#mail-back', 'back']]) {

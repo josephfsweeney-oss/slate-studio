@@ -1406,11 +1406,12 @@ function paintSlateBand(ctx, plan, style, theme, assets, bleed = 0) {
     }
   }
 
-  /* The band of names, one under each face. */
-  if (b.bandRect) {
-    const r = b.bandRect;
+  /* A band of names under each row of faces. */
+  for (const row of b.rows || []) {
     ctx.fillStyle = dark ? accent : plate;
-    ctx.fillRect(r.x - B, r.y, r.w + B * 2, r.h);
+    ctx.fillRect(row.band.x - B, row.band.y, row.band.w + B * 2, row.band.h);
+  }
+  if (b.rows && b.rows.length) {
     ctx.textAlign = 'center';
     ctx.fillStyle = BRAND.white;
     for (const f of b.figures) {
@@ -1426,20 +1427,20 @@ function paintSlateBand(ctx, plan, style, theme, assets, bleed = 0) {
     ctx.fillStyle = ink;
     setFont(ctx, blk.font, blk.px, blk.ls);
     ctx.textAlign = 'center';
-    blk.lines.forEach((l, i) => ctx.fillText(l, b.cx, b.seat.y + blk.lh * (i + 0.84)));
+    blk.lines.forEach((l, i) => ctx.fillText(l, b.footCx, b.seat.y + blk.lh * (i + 0.84)));
   }
 
   /* The call to action: a solid block, square, the width of its own words. A
    * side of this programme that does not say when to vote has not finished. */
   if (b.cta) {
     const blk = b.cta.block;
-    const x = b.cx - b.cta.w / 2;
+    const x = b.cta.x;
     ctx.fillStyle = dark ? accent : (theme.ctaBg || accent);
     ctx.fillRect(x, b.cta.y, b.cta.w, b.cta.h);
     ctx.fillStyle = BRAND.white;
     setFont(ctx, blk.font, blk.px, blk.ls);
     ctx.textAlign = 'center';
-    ctx.fillText(blk.lines[0], b.cx, b.cta.y + (b.cta.h + blk.px * 0.74) / 2);
+    ctx.fillText(blk.lines[0], x + b.cta.w / 2, b.cta.y + (b.cta.h + blk.px * 0.74) / 2);
   }
 
   if ('letterSpacing' in ctx) ctx.letterSpacing = '0px';
