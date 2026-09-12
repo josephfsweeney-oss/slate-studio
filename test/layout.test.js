@@ -174,21 +174,32 @@ test('a one-line block shrinks to fit instead of losing its last words', () => {
   assert.equal(kicker.lines[0], 'ROCKINGHAM COUNTY DISTRICT TWENTY FIVE');
 });
 
-test('the mail panel is reserved and nothing is laid out inside it', () => {
+test('the mail panel is the carrier corner and nothing of ours is inside it', () => {
   const p = solve({
     canvas: { w: 3300, h: 1650 }, slate: slate(9),
     copy: { headline: 'Your Republican team', cta: 'Vote Tuesday, November 3',
             disclaimer: 'Paid for by the committee.' },
-    style: { mailPanel: 'right' },
+    style: { mailPanel: 'right' }, dpi: 300,
   }, measure);
   assert.ok(p.mailPanel, 'the plan must describe the panel');
-  const edge = p.mailPanel.x;
-  assert.ok(Math.abs(p.mailPanel.w - 3300 * (4.25 / 11)) < 1, 'panel is 4.25 of 11 inches');
-  for (const t of p.tiles) {
-    assert.ok(t.x + t.w <= edge + 1, `a portrait runs into the address block`);
-  }
-  assert.ok(p.copy.x + p.copy.w <= edge + 1, 'copy runs into the address block');
-  assert.ok(p.disclaimer.x + p.disclaimer.w <= edge + 1, 'disclaimer runs into the address block');
+  const m = p.mailPanel;
+  // Four inches by two and a quarter, in the lower right of the trim.
+  assert.ok(Math.abs(m.w - 4 * 300) < 1, `panel is ${(m.w / 300).toFixed(2)} in wide, wanted 4`);
+  assert.ok(Math.abs(m.h - 2.25 * 300) < 1, `panel is ${(m.h / 300).toFixed(2)} in tall, wanted 2.25`);
+  assert.ok(Math.abs(m.x + m.w - 3300) < 1 && Math.abs(m.y + m.h - 1650) < 1,
+    'the panel is not in the lower right corner');
+
+  const hits = (r) => r.x < m.x + m.w - 1 && m.x < r.x + r.w - 1
+    && r.y < m.y + m.h - 1 && m.y < r.y + r.h - 1;
+  for (const t of p.tiles) assert.ok(!hits(t), 'a portrait is inside the carrier corner');
+  assert.ok(!hits({ x: p.copy.x, y: p.copy.y, w: p.copy.w, h: p.copy.height }),
+    'the copy is inside the carrier corner');
+  assert.ok(p.disclaimer.x + p.disclaimer.w <= m.x + 1, 'the disclaimer runs under the panel');
+
+  // The whole point of a corner rather than a column: the space above it gets
+  // used. A full-height panel threw away three and a half inches by four.
+  assert.ok(p.tiles.some((t) => t.x + t.w > m.x), 'nothing was placed above the panel');
+  assert.ok(p.tiles.every((t) => t.y + t.h <= m.y + 1), 'a portrait hangs below the panel top');
 });
 
 test('with no mail panel the whole canvas is usable', () => {
@@ -554,4 +565,76 @@ test('cutting the copy on a sign makes the type bigger, and the warning says so 
   assert.match(warned, /\d+\.\d inches tall on a 18 inch piece/);
   // The road sign word budget is for road signs, not for a two word yard sign.
   assert.ok(!tight.warnings.some((w) => /road sign/.test(w)), tight.warnings.join(' | '));
+});
+
+/* ---------------------------------------------------------------- toppers --- */
+
+const AYOTTE = { name: 'Kelly Ayotte', first: 'GOV. KELLY', last: 'AYOTTE',
+  slug: 'Kelly-Ayotte', tag: 'Governor', cutout: '/cutouts/Kelly-Ayotte.webp', topper: true };
+
+test('a topper is on the piece but never on the ballot line', () => {
+  const withGov = [AYOTTE, ...slate(4)];
+  const ballot = solve({
+    canvas: { w: 1080, h: 1920 }, slate: withGov, copy: COPY,
+    style: { composition: 'ballot' }, seats: 4,
+  }, measure);
+  assert.equal(ballot.ballot.rows.length, 4, 'the governor was given a ballot oval');
+  assert.ok(!ballot.ballot.rows.some((r) => r.candidate.topper), 'a topper is in the oval rows');
+  assert.equal(ballot.ballot.seats, 4, 'the seat count counted the governor');
+  assert.ok(!ballot.warnings.some((w) => /only 4 Republicans/.test(w)),
+    'the seat gap warning miscounted with a topper on the slate');
+
+  const back = solve({
+    canvas: { w: 1275, h: 3300 }, slate: withGov, copy: BACK_COPY,
+    style: { composition: 'palmback' }, seats: 4,
+  }, measure);
+  assert.equal(back.palmback.ovals.rows.length, 4);
+  assert.match(back.palmback.ovals.rule.lines.join(' '), /ALL 4 OVALS/i);
+});
+
+test('a topper does get a face, a plate and a tile like anybody else', () => {
+  const withGov = [AYOTTE, ...slate(3)];
+  const p = solve({ canvas: { w: 1080, h: 1080 }, slate: withGov, copy: COPY, style: {} }, measure);
+  assert.equal(p.tiles.length, 4, 'the governor did not get a tile');
+  const gov = p.tiles.find((t) => t.candidate.topper);
+  assert.ok(gov, 'no tile for the topper');
+  assert.ok(gov.plate, 'the topper got no name plate');
+  assert.equal(gov.candidate.last, 'AYOTTE');
+});
+
+/* --------------------------------------------------------------- filenames --- */
+
+test('filenames sort by client, then programme, then surface', async () => {
+  const { buildName, canvasById } = await import('../public/presets.js');
+  const d = { county: 'Rockingham', district: 25 };
+  const name = buildName({
+    program: 'Ballot guide', surface: 'palm', canvas: canvasById('palm'),
+    audience: `${d.county}-${d.district}`, side: 'back',
+  });
+  assert.equal(name, 'nhgop-ballot-guide-palm-4.25x11-rockingham-25-back-v01.png');
+
+  // A print surface carries its trim size in inches, which is what a printer
+  // asks for. A screen surface carries pixels, which is what a platform asks.
+  assert.match(buildName({ program: 'x', surface: 'mail11', canvas: canvasById('mail11') }), /-11x5\.5-/);
+  assert.match(buildName({ program: 'x', surface: '1x1', canvas: canvasById('1x1') }), /-1080x1080-/);
+
+  // Lower case, hyphens, nothing else, and every field optional but the shape.
+  const messy = buildName({ program: 'Vote  for ALL the Seats!', surface: 'story',
+    canvas: canvasById('story'), audience: 'Coös 2' });
+  assert.match(messy, /^nhgop-vote-for-all-the-seats-story-1080x1920-co-s-2-v01\.png$/,
+    `got ${messy}`);
+  assert.ok(!/[A-Z_ ]/.test(messy), 'a filename with a capital or a space in it');
+
+  // The version field is there from the first file, so v02 has somewhere to go.
+  assert.match(buildName({ program: 'x', surface: 'palm', canvas: canvasById('palm'), version: 12 }), /-v12\./);
+});
+
+test('a print canvas states a trim size its label agrees with', async () => {
+  const { CANVASES, sizeField } = await import('../public/presets.js');
+  for (const c of CANVASES.filter((x) => x.dpi)) {
+    const field = sizeField(c);
+    const [a, b] = field.split('x').map(Number);
+    assert.ok(a > 0 && b > 0, `${c.id} has no trim size`);
+    assert.ok(Math.abs(a - c.w / c.dpi) < 0.01 && Math.abs(b - c.h / c.dpi) < 0.01);
+  }
 });

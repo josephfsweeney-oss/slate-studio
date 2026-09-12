@@ -15,6 +15,8 @@
  * transparent decks already in Drive.
  */
 
+import { encode as encodeQr } from './qr.js';
+
 /* Sampled off the Granite Guarantee sheet: the navy is 9.7% of that artwork and
  * the green 6.9%, so these are the two the brand actually runs on. */
 export const BRAND = {
@@ -32,12 +34,69 @@ export const BRAND = {
   deckSky: '#9FC0FF',
 };
 
-/* A mail panel takes 4.25 inches of an 11 inch piece: room for the indicia, the
- * return address, the address block and the barcode clear zone. */
-export const MAIL_PANEL_FRACTION = 4.25 / 11;
+/* The mail panel is the carrier's corner, not a whole column: four inches by two
+ * and a quarter, anchored to the lower right of the trim. That is all the
+ * indicia, the return address, the address block and the barcode clear zone
+ * need. Taking the full height instead threw away three and a half inches by
+ * four of an 11 x 5.5, which is the best space on the piece. */
+export const MAIL_PANEL = { wIn: 4.0, hIn: 2.25 };
+
+/** Kept for the older fraction-based callers. */
+export const MAIL_PANEL_FRACTION = MAIL_PANEL.wIn / 11;
+
+/** Where the panel sits, in pixels. Uses the canvas dpi when it has one, and
+ *  falls back to the same proportions of an 11 x 5.5 when it does not. */
+export function mailPanelRect(spec, w, h) {
+  if ((spec.style || {}).mailPanel !== 'right') return null;
+  const dpi = spec.dpi || 0;
+  const pw = dpi ? MAIL_PANEL.wIn * dpi : w * (MAIL_PANEL.wIn / 11);
+  const ph = dpi ? MAIL_PANEL.hIn * dpi : h * (MAIL_PANEL.hIn / 5.5);
+  const width = Math.min(pw, w * 0.52);
+  const height = Math.min(ph, h * 0.62);
+  return { x: w - width, y: h - height, w: width, h: height, dpi: dpi || w / 11 };
+}
 
 export const PHOTO_AR = 1.25;   // portrait tile is 4:5, height / width
 export const PLATE_AR = 0.34;   // name plate height as a fraction of tile width
+
+/* The QR block.
+ *
+ * 0.75 inch square is the floor in print and 1 inch is preferred, with a quiet
+ * zone of four modules that no art may enter. The URL is set in text beside it
+ * because plenty of people will read it rather than scan it, and because a
+ * printed URL still works when the code does not. */
+export const QR = { minIn: 0.75, preferredIn: 1.0, quiet: 4, screenFraction: 0.13 };
+
+const qrCache = new Map();
+function qrModules(url) {
+  if (qrCache.has(url)) return qrCache.get(url);
+  let out;
+  try { out = { code: encodeQr(url) }; } catch (e) { out = { error: e.message }; }
+  if (qrCache.size > 40) qrCache.clear();
+  qrCache.set(url, out);
+  return out;
+}
+
+/** A QR block sized for this surface, or null when no URL was given.
+ *  `maxSide` caps the square; `maxW` is the width the label may use. */
+function qrFor(measure, copy, spec, s, maxSide, maxW) {
+  const url = String(copy.url || '').trim();
+  if (!url) return null;
+  const { code, error } = qrModules(url);
+  const dpi = spec.dpi || 0;
+  const want = dpi ? QR.preferredIn * dpi : Math.max(84, s * QR.screenFraction);
+  const floor = dpi ? QR.minIn * dpi : 72;
+  const size = Math.max(0, Math.min(want, maxSide));
+  // The URL under the code, because plenty of people read it instead of
+  // scanning, and a printed URL still works when a code does not.
+  const label = fitBlock(measure, url, COND_SEMI, Math.max(9, size * 0.21),
+    Math.max(20, maxW), 1, 0.01, false);
+  return {
+    url, code: code || null, error: error || null, size,
+    tooSmall: size < floor - 0.5, floor,
+    label, w: Math.max(size, label.w || 0), h: size + (label.h ? label.h * 1.35 : 0),
+  };
+}
 
 const ANTON = { family: 'Anton', weight: 400 };
 const COND_BOLD = { family: 'Barlow Condensed', weight: 700 };
@@ -183,7 +242,7 @@ function idealTile(n, s) {
 /* ----------------------------------------------------------------- the solve */
 
 const COMPOSITIONS = ['stack', 'banner', 'split', 'slateOnly', 'palmcard',
-  'palmback', 'ballot', 'spotlight', 'versus', 'strip'];
+  'palmback', 'ballot', 'spotlight', 'versus', 'strip', 'stat', 'receipt', 'typeled'];
 
 /* The palm card is a designed template rather than a solved one: a fixed stack
  * of bands, in a fixed order, the way a rack card is read top to bottom. The
@@ -282,6 +341,16 @@ function solvePalmCard(spec, measure) {
     };
   });
 
+  /* The front's QR goes in the event band when there is one, and just above the
+   * footer when there is not. Either way it is the last thing on the card. */
+  const qr = qrFor(measure, copy, spec, s, Math.min(w * 0.24, h * 0.085), w * 0.34);
+  const qrBlock = qr && qr.code ? {
+    ...qr,
+    x: w - pad - qr.size,
+    y: (ev > 0 ? event.y + (ev - qr.h) / 2 : h - footerH - qr.h - h * 0.010),
+    centreOn: w - pad - qr.size / 2,
+  } : null;
+
   return {
     canvas: { w, h },
     composition: 'palmcard',
@@ -293,6 +362,7 @@ function solvePalmCard(spec, measure) {
     deck: null,
     copy: null,
     mailPanel: null,
+    qr: qrBlock,
     palm: { mast, ask: askBand, panel, strip: stripBand, event, hasTags,
             date: String(copy.cta || '').trim(), where: String(copy.details || '').trim() },
     disclaimer: disc
@@ -303,6 +373,7 @@ function solvePalmCard(spec, measure) {
       ...(ask.truncated ? ['The ask is too long for the card and was cut.'] : []),
       ...(shortfall > h * 0.04 ? ['The copy is crowding the portraits. Cut a line somewhere.'] : []),
       ...(vals.length > 6 ? ['More than six values will not fit the strip.'] : []),
+      ...qrWarnings(qr, qrBlock),
     ],
   };
 }
@@ -360,7 +431,9 @@ function solveBallot(spec, measure) {
     { role: 'details', block: det, gap: s * 0.018 },
     { role: 'cta', block: cta, gap: s * 0.034, h: cta.h ? cta.px * 1.84 : 0 },
   ];
-  const copyH = stackBlocks(entries, 0).height;
+  const qr = qrFor(measure, copy, spec, s, Math.min(copyW * 0.42, s * 0.20), copyW);
+  const qrH = qr && qr.code ? qr.h + s * 0.026 : 0;
+  const copyH = stackBlocks(entries, 0).height + qrH;
 
   let copyRect;
   let card;
@@ -376,17 +449,28 @@ function solveBallot(spec, measure) {
     card = { x: inner.x, y: inner.y + inner.h - cardH, w: inner.w, h: cardH };
   }
   const bands = stackBlocks(entries, copyRect.y);
-  const copyCramped = bands.height > copyRect.h + 1;
+  const copyCramped = bands.height + qrH > copyRect.h + 1;
+  const qrBlock = qr && qr.code ? {
+    ...qr,
+    x: wide ? copyRect.x : copyRect.x + (copyW - qr.size) / 2,
+    y: copyRect.y + bands.height + s * 0.026,
+    centreOn: wide ? copyRect.x + qr.size / 2 : copyRect.x + copyW / 2,
+  } : null;
 
   // The card: a header rule, then one row per name. Rows shrink to fit rather
   // than spilling, because a ballot with a name missing is worse than a small one.
   const headerH = ruleBlk.h + s * 0.024;
   const body = { x: card.x, y: card.y + headerH, w: card.w, h: card.h - headerH };
+  const ballotN = slate.filter((c) => !c.topper).length;
   const rowGap = Math.min(s * 0.012, body.h * 0.03);
-  const rowH = Math.max(s * 0.030, (body.h - rowGap * (n - 1)) / Math.max(1, n));
+  const rowH = Math.max(s * 0.030, (body.h - rowGap * (ballotN - 1)) / Math.max(1, ballotN));
   const ovalR = Math.min(rowH * 0.30, card.w * 0.045);
 
-  const rows = slate.map((c, i) => {
+  /* Only the people actually on this ballot line get an oval. A governor at the
+   * top of the ticket is on the piece, not on the House ballot, and an oval
+   * next to her name would be telling a voter to do something they cannot. */
+  const onBallot = slate.filter((c) => !c.topper);
+  const rows = onBallot.map((c, i) => {
     const y = body.y + i * (rowH + rowGap);
     return {
       candidate: c, x: body.x, y, w: body.w, h: rowH,
@@ -396,7 +480,8 @@ function solveBallot(spec, measure) {
       firstPx: Math.min(rowH * 0.27, s * 0.022),
     };
   });
-  const overflow = rows.length ? (rows[n - 1].y + rowH) > (card.y + card.h + s * 0.004) : false;
+  const overflow = rows.length
+    ? (rows[rows.length - 1].y + rowH) > (card.y + card.h + s * 0.004) : false;
 
   return {
     canvas: { w, h },
@@ -413,15 +498,17 @@ function solveBallot(spec, measure) {
       rule: ruleBlk,
       copyRect, bands: bands.items,
     },
+    qr: qrBlock,
     disclaimer: disc
       ? { text: disc, px: discPx, x: pad, y: h - discPx * 1.0, w: w - pad * 2, centreOn: w / 2 }
       : null,
     warnings: [
       ...(head.truncated ? ['The headline is too long for this canvas and was cut.'] : []),
       ...(ask.truncated ? ['The subhead is too long and was cut.'] : []),
-      ...(overflow ? [`${n} names will not fit the ballot card on this canvas. Use a taller one.`] : []),
+      ...(overflow ? [`${ballotN} names will not fit the ballot card on this canvas. Use a taller one.`] : []),
       ...(copyCramped ? ['The copy is longer than the space left beside the ballot. Cut a line.'] : []),
-      ...(seats > n ? [`This district elects ${seats} but only ${n} Republicans are on the slate. The card says ${seats}.`] : []),
+      ...qrWarnings(qr, qrBlock),
+      ...(seats > ballotN ? [`This district elects ${seats} but only ${ballotN} Republicans are on the slate. The card says ${seats}.`] : []),
     ],
   };
 }
@@ -436,7 +523,8 @@ function solveBallot(spec, measure) {
 function solvePalmBack(spec, measure) {
   const { w, h } = spec.canvas;
   const slate = spec.slate || [];
-  const n = slate.length;
+  // The oval band is the ballot line, so a topper is not one of these rows.
+  const n = slate.filter((c) => !c.topper).length;
   const style = spec.style || {};
   const copy = spec.copy || {};
   const s = Math.min(w, h);
@@ -573,7 +661,7 @@ function solvePalmBack(spec, measure) {
 
   const ovalTop = Math.max(pad, Math.min(y, h - footerH - ovalsH));
   const ovalR = rowPx * 0.34;
-  const rows = slate.map((c, i) => {
+  const rows = slate.filter((c) => !c.topper).map((c, i) => {
     const ry = ovalTop + ruleBlk.h + h * 0.016 + i * (rowH + rowGap);
     return {
       candidate: c, x: pad, y: ry, w: inner, h: rowH, px: rowPx,
@@ -582,6 +670,16 @@ function solvePalmBack(spec, measure) {
     };
   });
   const ovals = { x: 0, y: ovalTop, w, h: h - footerH - ovalTop, rule: ruleBlk, rows, seats };
+
+  /* The QR sits in the oval band, off to the right of the names. That is the
+   * commit read: somebody who has got this far is the one who will scan. */
+  const qr = qrFor(measure, copy, spec, s, Math.min(w * 0.26, ovals.h * 0.46), w * 0.34);
+  const qrBlock = qr && qr.code ? {
+    ...qr,
+    x: w - pad - qr.size,
+    y: ovals.y + ovals.h - qr.h - h * 0.010,
+    centreOn: w - pad - qr.size / 2,
+  } : null;
 
   return {
     canvas: { w, h },
@@ -594,6 +692,7 @@ function solvePalmBack(spec, measure) {
     copy: null,
     mailPanel: null,
     palmback: { mast, record, grid, callout, ovals },
+    qr: qrBlock,
     disclaimer: disc
       ? { text: disc, px: discPx, x: pad, y: h - discPx * 1.0, w: inner, centreOn: w / 2 }
       : null,
@@ -606,6 +705,7 @@ function solvePalmBack(spec, measure) {
       ...(vals.length > 6 ? ['More than six issues will not fit the grid.'] : []),
       ...(!recLines.length && !vals.length && !call.lines.length
         ? ['The back is empty. Fill in the record, the issues or the callout.'] : []),
+      ...qrWarnings(qr, qrBlock),
     ],
   };
 }
@@ -671,8 +771,11 @@ function solveSpotlight(spec, measure) {
       { role: 'cta', block: cta, gap: s * 0.030 * q, h: ctaH },
     ];
     const stack = stackBlocks(entries, 0);
-    const copyH = stack.height + (chipsH ? s * 0.024 * q + chipsH : 0);
-    return { q, kick, head, call, ask, cta, ctaH, entries, chipW, perRow, chipRows, chipH, chipsH, copyH };
+    const qrBox = qrFor(measure, copy, spec, s, Math.min(colW * 0.30, s * 0.17 * q), colW);
+    const qrH = qrBox && qrBox.code ? qrBox.h + s * 0.022 * q : 0;
+    const copyH = stack.height + qrH + (chipsH ? s * 0.024 * q + chipsH : 0);
+    return { q, kick, head, call, ask, cta, ctaH, entries, chipW, perRow, chipRows,
+      chipH, chipsH, copyH, qrBox, qrH };
   }
 
   /* How much height the copy column may have. Beside the face it may use the
@@ -689,7 +792,7 @@ function solveSpotlight(spec, measure) {
     }
     m = build(lo);
   }
-  const { kick, head, call, ask, cta, chipW, perRow, chipRows, chipH, chipsH, copyH } = m;
+  const { kick, head, call, ask, cta, chipW, perRow, chipRows, chipH, chipsH, copyH, qrBox, qrH } = m;
   // Past the search floor the copy will not compress any further. Cap the
   // column so nothing runs off the piece, and warn about the overrun.
   const cropped = copyH > budget;
@@ -719,15 +822,21 @@ function solveSpotlight(spec, measure) {
       : null,
   } : null;
 
-  // One pass, one set of numbers: the bands, then the chips under them.
+  // One pass, one set of numbers: the bands, then the QR, then the chips. They
+  // all line up with each other: left when the copy is left, centred when it is
+  // centred, so nothing hangs off the edge of a centred stack.
+  const centred = !wide && style.align !== 'left';
   const bands = stackBlocks(m.entries, copyRect.y);
+  const qrTop = copyRect.y + bands.height + s * 0.022 * m.q;
+  const qrPlaced = qrBox && qrBox.code ? {
+    ...qrBox, y: qrTop,
+    x: centred ? copyRect.x + (colW - qrBox.size) / 2 : copyRect.x,
+    centreOn: centred ? copyRect.x + colW / 2 : copyRect.x + qrBox.size / 2,
+  } : null;
   const chipsTop = chipsH
-    ? Math.min(copyRect.y + copyRect.h - chipsH, bands.height + copyRect.y + s * 0.024 * m.q)
+    ? Math.min(copyRect.y + copyRect.h - chipsH, copyRect.y + bands.height + qrH + s * 0.024 * m.q)
     : copyRect.y + copyRect.h;
-  // The chips line up with the copy above them. Left when the copy is left,
-  // centred when it is centred: a centred stack with one chip hanging off the
-  // left edge reads as a mistake, because it is one.
-  const chipsCentred = !wide && style.align !== 'left';
+  const chipsCentred = centred;
   const chips = rest.map((c, i) => {
     const col = i % perRow, row = Math.floor(i / perRow);
     const inRow = Math.min(perRow, rest.length - row * perRow);
@@ -752,6 +861,7 @@ function solveSpotlight(spec, measure) {
     copy: null,
     mailPanel: null,
     spotlight: { wide, hero: heroTile, chips, copyRect, bands: bands.items },
+    qr: qrPlaced,
     disclaimer: disc
       ? { text: disc, px: discPx, x: pad, y: h - discPx * 1.0, w: w - pad * 2, centreOn: w / 2 }
       : null,
@@ -761,6 +871,7 @@ function solveSpotlight(spec, measure) {
       ...(!hero ? ['Nobody is on the slate, so there is nobody to spotlight.'] : []),
       ...(rest.length > 9 ? ['More than nine chips will run very small. Drop some candidates.'] : []),
       ...(cropped ? ['The copy is longer than a spotlight of this size can hold. Cut a line, or drop a chip.'] : []),
+      ...qrWarnings(qrBox, qrPlaced),
     ],
   };
 }
@@ -1001,11 +1112,436 @@ function solveStrip(spec, measure) {
   };
 }
 
+
+/* --------------------------------------------------------------- the stats --- */
+
+/** "1,140 | What the average homeowner paid" per line, up to four. */
+function parseStats(raw) {
+  return String(raw || '').split('\n').map((line) => {
+    const [value, ...rest] = line.split('|');
+    return { value: (value || '').trim(), label: rest.join('|').trim() };
+  }).filter((x) => x.value).slice(0, 4);
+}
+
+/* ---------------------------------------------------------- stat, the piece ---
+ *
+ * The archetype is type-dominant with a number doing the work. Numbers sell, so
+ * the number is set large and the label small, and the first one gets the panel
+ * to itself. Everything else on the piece is support. The job this serves is
+ * "sell a policy or project": one number, one visual, one next step. */
+function solveStat(spec, measure) {
+  const { w, h } = spec.canvas;
+  const slate = spec.slate || [];
+  const n = slate.length;
+  const style = spec.style || {};
+  const copy = spec.copy || {};
+  const s = Math.min(w, h);
+  const density = style.density ?? 1;
+  const pad = s * 0.055 * density;
+  const gap = s * 0.030 * density;
+
+  const disc = (copy.disclaimer || '').trim();
+  const discPx = Math.max(11, s * 0.0165);
+  const src = String(copy.source || '').trim();
+  const srcPx = Math.max(9, s * 0.0135);
+  // The flag band is painted over the foot of the piece, so it is reserved here
+  // rather than discovered later by a source line disappearing under it.
+  const band = flagBand(style, s, disc ? discPx : 0).band;
+  const footH = Math.max(band, disc ? discPx * 1.9 : 0) + (src ? srcPx * 1.7 : 0);
+  const inner = { x: pad, y: pad, w: w - pad * 2, h: h - pad * 2 - footH };
+
+  const stats = parseStats(copy.stat);
+  const hero = stats[0] || null;
+  const rest = stats.slice(1);
+
+  // Faces along the foot, small and plateless: identity, not argument.
+  const faceW = n ? Math.min((inner.w - (n - 1) * gap * 0.4) / n, s * 0.11) : 0;
+  const facesH = n ? faceW * PHOTO_AR + s * 0.024 : 0;
+
+  const kick = fitBlock(measure, copy.kicker, COND_BOLD, s * 0.030, inner.w, 2, 0.16, true);
+  const head = fitBlock(measure, copy.headline, ANTON, s * 0.062, inner.w, 3, -0.01, true);
+  const ask = fitBlock(measure, copy.subhead, COND_SEMI, s * 0.036, inner.w, 3, 0.005, false);
+  const det = fitBlock(measure, copy.details, COND_MED, s * 0.028, inner.w, 4, 0.010, false);
+  const cta = fitBlock(measure, copy.cta, ANTON, s * 0.034, inner.w, 1, 0.02, true);
+
+  const qr = qrFor(measure, copy, spec, s, Math.min(inner.w * 0.26, s * 0.17), inner.w * 0.4);
+  const qrH = qr && qr.code ? qr.h + s * 0.020 : 0;
+
+  // The smaller numbers are measured before the hero, because the hero takes
+  // what is left and leaving these out of the sum is what put the QR code on
+  // top of the call to action.
+  const cols0 = rest.length >= 3 ? 3 : Math.max(1, rest.length);
+  const cellW0 = rest.length ? (inner.w - (cols0 - 1) * gap * 0.7) / cols0 : 0;
+  const smallsPre = rest.map((st) => ({
+    valueBlk: fitBlock(measure, st.value, ANTON, s * 0.070, cellW0 - s * 0.02, 1, -0.01, true),
+    labelBlk: fitBlock(measure, st.label, COND_MED, s * 0.024, cellW0 - s * 0.02, 3, 0.005, false),
+  }));
+  const smallHPre = smallsPre.length
+    ? Math.max(...smallsPre.map((x) => x.valueBlk.h + (x.labelBlk.h ? x.labelBlk.h + s * 0.008 : 0))) + s * 0.030
+    : 0;
+  const smallRowsPre = Math.ceil(smallsPre.length / cols0) || 0;
+
+  /* The hero number takes whatever is left once everything else is measured,
+   * which is the whole point: on this piece the number is the picture. */
+  const chrome = (kick.h ? kick.h + s * 0.008 : 0) + head.h
+    + (ask.h ? ask.h + s * 0.020 : 0) + (det.h ? det.h + s * 0.016 : 0)
+    + (cta.h ? cta.px * 1.84 + s * 0.030 : 0) + qrH + facesH
+    + smallHPre * smallRowsPre;
+  const heroRoom = Math.max(s * 0.12, inner.h - chrome - gap * 2);
+
+  const heroLabel = hero
+    ? fitBlock(measure, hero.label, COND_SEMI, s * 0.032, inner.w * 0.78, 3, 0.005, false)
+    : { lines: [], h: 0, px: 0 };
+  const heroPx = hero
+    ? (() => {
+      let px = Math.min(heroRoom - heroLabel.h - s * 0.012, s * 0.30);
+      // Shrink on width too: "$1,140" and "9%" are very different measures.
+      const wide = () => widthAt(measure, hero.value, ANTON, px, -0.02) > inner.w * 0.96;
+      let guard = 0;
+      while (wide() && px > s * 0.06 && guard++ < 80) px *= 0.96;
+      return Math.max(s * 0.06, px);
+    })()
+    : 0;
+  const heroH = hero ? heroPx * 1.02 + (heroLabel.h ? heroLabel.h + s * 0.012 : 0) : 0;
+
+  // The other numbers, side by side, at a fraction of the hero.
+  const cols = cols0;
+  const cellW = cellW0;
+  const smalls = rest.map((st, i) => ({ value: st.value, ...smallsPre[i] }));
+  const smallH = smallHPre;
+
+  const entries = [
+    { role: 'kicker', block: kick, gap: 0 },
+    { role: 'headline', block: head, gap: s * 0.008 },
+  ];
+  const top = stackBlocks(entries, inner.y);
+  let y = inner.y + top.height + (top.height ? gap : 0);
+
+  const heroRect = hero ? { x: inner.x, y, w: inner.w, h: heroH, px: heroPx, value: hero.value, label: heroLabel } : null;
+  y += heroH + (heroH ? gap * 0.8 : 0);
+
+  const smallRects = smalls.map((x, i) => ({
+    ...x,
+    x: inner.x + (i % cols) * (cellW + gap * 0.7),
+    y: y + Math.floor(i / cols) * smallH,
+    w: cellW, h: smallH - s * 0.030,
+  }));
+  y += smallH * Math.max(1, Math.ceil(smalls.length / cols)) * (smalls.length ? 1 : 0);
+
+  const tail = stackBlocks([
+    { role: 'ask', block: ask, gap: 0 },
+    { role: 'details', block: det, gap: s * 0.016 },
+    { role: 'cta', block: cta, gap: s * 0.030, h: cta.h ? cta.px * 1.84 : 0 },
+  ], y);
+  y = y + tail.height;
+
+  const facesY = inner.y + inner.h - faceW * PHOTO_AR;
+
+  /* Above the faces, always. The warning below says when the piece is over
+   * full; it must not also let the code land on somebody's head. */
+  const qrPlaced = qr && qr.code
+    ? { ...qr, x: inner.x + (inner.w - qr.size) / 2,
+        // Never above the block it belongs under, and never on the faces.
+        y: Math.max(y + s * 0.020,
+          n ? Math.min(y + s * 0.020, facesY - qr.h - s * 0.034) : y + s * 0.020),
+        centreOn: inner.x + inner.w / 2 }
+    : null;
+
+  const faces = slate.map((c, i) => {
+    const rowW = n * faceW + (n - 1) * gap * 0.4;
+    const x = inner.x + (inner.w - rowW) / 2 + i * (faceW + gap * 0.4);
+    return { candidate: c, x, y: facesY, w: faceW, h: faceW * PHOTO_AR,
+             photo: { x, y: facesY, w: faceW, h: faceW * PHOTO_AR }, plate: null };
+  });
+
+  const overrun = Math.max(0, (y + qrH) - facesY);
+
+  return {
+    canvas: { w, h },
+    composition: 'stat',
+    pad, gap, s, scale: 1,
+    grid: { cols: n || 1, rows: 1, tileW: faceW, tileH: faceW * PHOTO_AR },
+    slateRect: { x: inner.x, y: facesY, w: inner.w, h: facesH },
+    tiles: faces,
+    deck: null,
+    copy: null,
+    mailPanel: null,
+    qr: qrPlaced,
+    stat: { bands: [...top.items, ...tail.items], hero: heroRect, smalls: smallRects, faces },
+    source: src ? { text: src, px: srcPx, centreOn: w / 2 } : null,
+    disclaimer: disc
+      ? { text: disc, px: discPx, x: pad, y: h - discPx * 1.0, w: w - pad * 2, centreOn: w / 2 }
+      : null,
+    warnings: [
+      ...(!stats.length ? ['No number to lead with. Write one per line as "1,140 | what it is".'] : []),
+      ...(head.truncated ? ['The headline is too long for this canvas and was cut.'] : []),
+      ...(overrun > s * 0.01 ? ['The piece is over full. Drop a stat or cut a line.'] : []),
+      ...(stats.length && !src ? ['A number with no source is a liability. Put the source in.'] : []),
+      ...qrWarnings(qr, qrPlaced),
+    ],
+  };
+}
+
+/* ------------------------------------------------------- receipt, the piece ---
+ *
+ * The document archetype: it reads like a bill, because a bill gets read. The
+ * highest response rates on cost-of-living mail come from pieces that look like
+ * the thing they are about. That only works if it is honest, so the source line
+ * is not optional here and the app says so when it is missing. */
+function solveReceipt(spec, measure) {
+  const { w, h } = spec.canvas;
+  const style = spec.style || {};
+  const copy = spec.copy || {};
+  const s = Math.min(w, h);
+  const density = style.density ?? 1;
+  const pad = s * 0.055 * density;
+  const gap = s * 0.026 * density;
+
+  const disc = (copy.disclaimer || '').trim();
+  const discPx = Math.max(11, s * 0.0165);
+  const src = String(copy.source || '').trim();
+  const srcPx = Math.max(9, s * 0.0135);
+  // The flag band is painted over the foot of the piece, so it is reserved here
+  // rather than discovered later by a source line disappearing under it.
+  const band = flagBand(style, s, disc ? discPx : 0).band;
+  const footH = Math.max(band, disc ? discPx * 1.9 : 0) + (src ? srcPx * 1.7 : 0);
+  const inner = { x: pad, y: pad, w: w - pad * 2, h: h - pad * 2 - footH };
+
+  // The document header: the kicker is the document's name, not a campaign line.
+  /* On anything landscape the document goes left and the argument right, the
+   * way the reference mailer sets its proof side. Stacked on an 11 x 5.5 the
+   * document came out four inches wide and half an inch tall, which is not a
+   * document, it is a rule with numbers on it. */
+  const wide = w / h >= 1.35;
+  const colW = wide ? (inner.w - gap * 1.6) * 0.54 : inner.w;
+  const argW = wide ? inner.w - colW - gap * 1.6 : inner.w;
+
+  const title = fitBlock(measure, copy.kicker || 'Statement', COND_BOLD, s * 0.030, colW, 2, 0.14, true);
+  const headerH = title.h + s * 0.030;
+
+  /* Line items: "Label | 412" per line, the amount right aligned so the column
+   * reads as a column. Set in the text face, not the display face: a receipt
+   * that shouts is not a receipt. */
+  const items = String(copy.record || '').split('\n').map((line) => {
+    const [label, ...rest] = line.split('|');
+    return { label: (label || '').trim(), amount: rest.join('|').trim() };
+  }).filter((x) => x.label);
+  const rowPx = s * 0.030;
+  const rows = items.map((it) => ({
+    ...it,
+    labelBlk: fitBlock(measure, it.label, COND_MED, rowPx, colW * 0.66, 2, 0.005, false),
+    amountBlk: fitBlock(measure, it.amount, COND_BOLD, rowPx, colW * 0.30, 1, 0.01, false),
+  }));
+  const rowH = rows.length ? Math.max(...rows.map((r) => Math.max(r.labelBlk.h, r.amountBlk.h))) + s * 0.018 : 0;
+  const tableH = rows.length * rowH;
+
+  // The total, from the first stat line, set the way a bill sets a total.
+  const stats = parseStats(copy.stat);
+  const total = stats[0] || null;
+  const totalLabel = total
+    ? fitBlock(measure, total.label || 'Total', COND_BOLD, s * 0.030, colW * 0.56, 2, 0.06, true)
+    : { lines: [], h: 0, px: 0 };
+  const totalValue = total
+    ? fitBlock(measure, total.value, ANTON, s * 0.072, colW * 0.40, 1, -0.01, false)
+    : { lines: [], h: 0, px: 0 };
+  const totalH = total ? Math.max(totalLabel.h, totalValue.h) + s * 0.040 : 0;
+
+  // Then the argument, in the campaign's own voice, under the document.
+  const head = fitBlock(measure, copy.headline, ANTON, s * 0.056, argW, 3, -0.01, true);
+  const ask = fitBlock(measure, copy.subhead, COND_SEMI, s * 0.034, argW, 3, 0.005, false);
+  const cta = fitBlock(measure, copy.cta, ANTON, s * 0.034, argW, 1, 0.02, true);
+
+  const qr = qrFor(measure, copy, spec, s, Math.min(argW * 0.34, s * 0.16), argW * 0.72);
+  const qrH = qr && qr.code ? qr.h : 0;
+
+  const docH = headerH + tableH + totalH;
+  const argEntries = [
+    { role: 'headline', block: head, gap: 0 },
+    { role: 'ask', block: ask, gap: s * 0.018 },
+    { role: 'cta', block: cta, gap: s * 0.026, h: cta.h ? cta.px * 1.84 : 0 },
+  ];
+  const argH = stackBlocks(argEntries, 0).height;
+  const slack = wide
+    ? inner.h - Math.max(docH, argH + qrH + gap)
+    : inner.h - docH - argH - Math.max(qrH, 0) - gap * 2;
+
+  const argX = wide ? inner.x + colW + gap * 1.6 : inner.x;
+  const doc = {
+    x: inner.x,
+    y: inner.y + (wide ? Math.max(0, (inner.h - docH) / 2) : 0),
+    w: colW, h: docH, title, headerH, rows, rowH, tableH,
+    total: total ? { label: totalLabel, value: totalValue, h: totalH } : null,
+  };
+  const argTop = wide
+    ? inner.y + Math.max(0, (inner.h - argH - qrH - gap) / 2)
+    : inner.y + docH + gap + Math.max(0, slack) * 0.5;
+  const bands = stackBlocks(argEntries, argTop);
+
+  /* The code sits under the call to action, in the argument column. The bottom
+   * of the piece is then one block: what to do, and the way to do it. */
+  const qrPlaced = qr && qr.code
+    ? { ...qr, x: argX, y: argTop + bands.height + gap * 0.6,
+        centreOn: argX + qr.size / 2 }
+    : null;
+
+  return {
+    canvas: { w, h },
+    composition: 'receipt',
+    pad, gap, s, scale: 1,
+    grid: { cols: 1, rows: rows.length, tileW: 0, tileH: 0 },
+    slateRect: doc,
+    tiles: [],
+    deck: null,
+    copy: null,
+    mailPanel: null,
+    qr: qrPlaced,
+    receipt: { doc, bands: bands.items, wide, argX, argW },
+    source: src ? { text: src, px: srcPx, centreOn: w / 2 } : null,
+    disclaimer: disc
+      ? { text: disc, px: discPx, x: pad, y: h - discPx * 1.0, w: w - pad * 2, centreOn: w / 2 }
+      : null,
+    warnings: [
+      ...(!rows.length ? ['No line items. Write them as "What it was | 412", one per line.'] : []),
+      ...(!src ? ['A piece that looks like a bill has to say where the numbers came from. Fill in the source.'] : []),
+      ...(!total ? ['No total. Put the number that matters in the stat field as "1,140 | what it is".'] : []),
+      ...(slack < 0 ? ['The document and the argument together do not fit the piece. Cut a line item.'] : []),
+      ...(head.truncated ? ['The headline is too long for this canvas and was cut.'] : []),
+      'This mimics a bill on purpose. Every figure on it has to be defensible.',
+      ...qrWarnings(qr, qrPlaced),
+    ],
+  };
+}
+
+/* ------------------------------------------------------ type-led, the piece ---
+ *
+ * The headline is the image. For when the line is the whole argument, or when
+ * the photo assets are weak, which on a slate programme with 143 missing
+ * headshots is most of the state. */
+function solveTypeLed(spec, measure) {
+  const { w, h } = spec.canvas;
+  const slate = spec.slate || [];
+  const n = slate.length;
+  const style = spec.style || {};
+  const copy = spec.copy || {};
+  const s = Math.min(w, h);
+  const density = style.density ?? 1;
+  const pad = s * 0.060 * density;
+  const gap = s * 0.028 * density;
+
+  const disc = (copy.disclaimer || '').trim();
+  const discPx = Math.max(11, s * 0.0165);
+  const discH = disc ? discPx * 1.9 : 0;
+  const inner = { x: pad, y: pad, w: w - pad * 2, h: h - pad * 2 - discH };
+
+  // An identity strip rather than a slate grid: small faces, surnames only.
+  const showFaces = style.identityStrip !== false && n > 0;
+  const faceW = showFaces ? Math.min((inner.w - (n - 1) * gap * 0.4) / n, s * 0.10) : 0;
+  const facesH = showFaces ? faceW * PHOTO_AR + s * 0.022 : 0;
+
+  const kick = fitBlock(measure, copy.kicker, COND_BOLD, s * 0.032, inner.w, 2, 0.16, true);
+  const ask = fitBlock(measure, copy.subhead, COND_SEMI, s * 0.040, inner.w * 0.92, 4, 0.005, false);
+  const cta = fitBlock(measure, copy.cta, ANTON, s * 0.038, inner.w, 1, 0.02, true);
+  const qr = qrFor(measure, copy, spec, s, Math.min(inner.w * 0.24, s * 0.16), inner.w * 0.4);
+  const qrH = qr && qr.code ? qr.h + s * 0.022 : 0;
+
+  /* The headline takes everything the rest does not want, which is what makes
+   * it the image. It is only capped so a two word line does not turn into a
+   * pattern of letterforms. */
+  const others = (kick.h ? kick.h + s * 0.010 : 0)
+    + (ask.h ? ask.h + s * 0.024 : 0)
+    + (cta.h ? cta.px * 1.84 + s * 0.030 : 0) + qrH + facesH;
+  const room = Math.max(s * 0.10, inner.h - others - gap);
+  const head = (() => {
+    let px = Math.min(s * 0.34, room);
+    let block = fitBlock(measure, copy.headline, ANTON, px, inner.w, 5, -0.02, true);
+    let guard = 0;
+    while (block.h > room && px > s * 0.05 && guard++ < 60) {
+      px *= 0.94;
+      block = fitBlock(measure, copy.headline, ANTON, px, inner.w, 5, -0.02, true);
+    }
+    return block;
+  })();
+
+  const entries = [
+    { role: 'kicker', block: kick, gap: 0 },
+    { role: 'headline', block: head, gap: s * 0.010 },
+    { role: 'ask', block: ask, gap: s * 0.024 },
+    { role: 'cta', block: cta, gap: s * 0.030, h: cta.h ? cta.px * 1.84 : 0 },
+  ];
+  const stackH = stackBlocks(entries, 0).height;
+  const blockTop = inner.y + Math.max(0, (inner.h - facesH - stackH - qrH) / 2);
+  const bands = stackBlocks(entries, blockTop);
+
+  const centred = style.align !== 'left';
+  const qrPlaced = qr && qr.code
+    ? { ...qr, y: blockTop + bands.height + s * 0.022,
+        x: centred ? inner.x + (inner.w - qr.size) / 2 : inner.x,
+        centreOn: centred ? inner.x + inner.w / 2 : inner.x + qr.size / 2 }
+    : null;
+
+  const facesY = inner.y + inner.h - faceW * PHOTO_AR;
+  const faces = showFaces ? slate.map((c, i) => {
+    const rowW = n * faceW + (n - 1) * gap * 0.4;
+    const x = inner.x + (inner.w - rowW) / 2 + i * (faceW + gap * 0.4);
+    return { candidate: c, x, y: facesY, w: faceW, h: faceW * PHOTO_AR,
+             photo: { x, y: facesY, w: faceW, h: faceW * PHOTO_AR }, plate: null };
+  }) : [];
+
+  const dpi = spec.dpi || 0;
+  return {
+    canvas: { w, h },
+    composition: 'typeled',
+    pad, gap, s, scale: 1,
+    grid: { cols: n || 1, rows: 1, tileW: faceW, tileH: faceW * PHOTO_AR },
+    slateRect: { x: inner.x, y: facesY, w: inner.w, h: facesH },
+    tiles: faces,
+    deck: null,
+    copy: null,
+    mailPanel: null,
+    qr: qrPlaced,
+    typeled: { bands: bands.items, centred, faces },
+    disclaimer: disc
+      ? { text: disc, px: discPx, x: pad, y: h - discPx * 1.0, w: w - pad * 2, centreOn: w / 2 }
+      : null,
+    warnings: [
+      ...(!String(copy.headline || '').trim() ? ['A type-led piece with no headline is a blank.'] : []),
+      ...(head.truncated ? ['The headline is too long to be the image. Six words is the budget.'] : []),
+      ...(dpi && head.px / dpi < 1 && Math.min(w, h) / dpi >= 8
+        ? [`The headline is ${(head.px / dpi).toFixed(1)} inches on a type-led piece. Cut words until it is bigger.`] : []),
+      ...qrWarnings(qr, qrPlaced),
+    ],
+  };
+}
+
 /** Two per line, the way the strip on the reference card is set. */
 function pairUp(values) {
   const out = [];
   for (let i = 0; i < values.length; i += 2) out.push(values.slice(i, i + 2).join('   ·   '));
   return out.join('\n');
+}
+
+/* ------------------------------------------------------------- the foot band */
+
+/** Perceived lightness, 0 black to 1 white. */
+export function luminance(hex) {
+  const m = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex || '');
+  const rgb = m ? [1, 2, 3].map((i) => parseInt(m[i], 16)) : [0, 0, 0];
+  const [r, g, b] = rgb.map((v) => {
+    const c = v / 255;
+    return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+  });
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+
+/* The flag bar and the band under it. One definition, used by the engine to
+ * reserve the space and by the painter to fill it, because the source line was
+ * being laid out into a band the painter then drew on top of. */
+export function flagBand(style, s, discPx = 0, isStrip = false) {
+  if (isStrip || style.flagBar === false) return { rule: 0, band: 0 };
+  const rule = Math.max(3, s * 0.009);
+  const bg = style.bgType === 'transparent' ? '#FFFFFF' : (style.bgColor || '');
+  if (luminance(bg) <= 0.45) return { rule, band: 0 };
+  return { rule, band: Math.max(rule * 3, s * 0.052, discPx ? discPx * 2.6 : 0) };
 }
 
 /* Stack fitted blocks from `top`, each with its gap before it, and hand the
@@ -1045,7 +1581,9 @@ function fitBlock(measure, text, font, px, maxW, maxLines, ls, upper) {
   const truncated = lines.length > maxLines;
   if (truncated) lines = lines.slice(0, maxLines);
   const lh = size * (font === ANTON ? 0.98 : 1.2);
-  return { lines, px: size, lh, h: lh * lines.length, font, ls, truncated };
+  const widths = lines.map((l) => widthAt(measure, l, font, size, ls));
+  return { lines, px: size, lh, h: lh * lines.length, font, ls, truncated,
+           w: Math.max(0, ...widths, 0), widths };
 }
 
 function autoComposition(w, h, n, hasCopy) {
@@ -1169,6 +1707,9 @@ export function solve(spec, measure) {
   if (comp === 'spotlight') return solveSpotlight(spec, measure);
   if (comp === 'versus') return solveVersus(spec, measure);
   if (comp === 'strip') return solveStrip(spec, measure);
+  if (comp === 'stat') return solveStat(spec, measure);
+  if (comp === 'receipt') return solveReceipt(spec, measure);
+  if (comp === 'typeled') return solveTypeLed(spec, measure);
   if (!hasCopy) comp = 'slateOnly';
 
   // Reserve the disclaimer strip first. It is required on a finished ad under
@@ -1177,17 +1718,29 @@ export function solve(spec, measure) {
   const discPx = Math.max(11, s * 0.0165);
   const discH = disc ? discPx * 1.25 + gap * 0.5 : 0;
 
-  // A mail panel is carrier space, not canvas. Take it out before anything is
-  // laid out, so nothing is ever designed into the address block.
-  const panelW = style.mailPanel === 'right' ? w * MAIL_PANEL_FRACTION : 0;
+  /* A mail panel is carrier space, not canvas. Take it out before anything is
+   * laid out, so nothing is ever designed into the address block. It is a
+   * corner, so the copy loses its width but the faces keep the height above
+   * it: proof on the left, the slate upper right, the carrier's corner below.
+   * That is the archetype the reference mailer uses, and it is why a piece with
+   * a mail panel is always solved as a split. */
+  const panel = mailPanelRect(spec, w, h);
+  const panelW = panel ? panel.w : 0;
   const inner = {
     x: pad, y: pad,
-    w: w - 2 * pad - panelW, h: h - 2 * pad - discH,
+    w: w - 2 * pad - (panel ? 0 : 0), h: h - 2 * pad - discH,
   };
+  if (panel) {
+    inner.w = w - 2 * pad;
+    comp = hasCopy ? 'split' : 'slateOnly';
+  }
 
   if (comp === 'slateOnly') {
-    const g = gridOf(inner.w, inner.h);
-    return finish(spec, { comp, inner, slateRect: inner, copyRect: null, grid: g, k: 1, copyLayout: { height: 0, items: [] }, pad, gap, s, plate, discPx, disc, overflow: false });
+    const room = panel
+      ? { x: inner.x, y: inner.y, w: inner.w, h: panel.y - inner.y - gap }
+      : inner;
+    const g = gridOf(room.w, room.h);
+    return finish(spec, { comp, inner, slateRect: room, copyRect: null, grid: g, k: 1, copyLayout: { height: 0, items: [] }, pad, gap, s, plate, discPx, disc, overflow: false, panel });
   }
 
   const kMin = 0.46, kMax = 1.45;
@@ -1200,10 +1753,29 @@ export function solve(spec, measure) {
   for (let i = 0; i <= STEPS; i++) {
     const t = range[0] + (range[1] - range[0]) * (i / STEPS);
     const rects = carve(comp, inner, gap, t);
+    if (panel) {
+      /* The copy keeps the left of the piece full height. The slate takes the
+       * column above the carrier's corner, and nothing is ever laid out inside
+       * it. */
+      rects.copy = { x: inner.x, y: inner.y, w: inner.w - panelW - gap, h: inner.h };
+      rects.slate = {
+        x: inner.x + inner.w - panelW + gap * 0.25,
+        y: inner.y,
+        w: panelW - gap * 0.5,
+        h: panel.y - inner.y - gap,
+      };
+    }
     if (rects.copy.w < s * 0.18 || rects.slate.w < s * 0.14 || rects.slate.h < s * 0.12) continue;
 
-    const { k, overflow } = fitScale(measure, copy, s, rects.copy, kMin, kMax);
-    const cl = layoutCopy(measure, copy, s, k, rects.copy.w);
+    // The QR block is reserved out of the copy column before the copy is
+    // fitted to it, so a code can never be squeezed in afterwards on top of
+    // something or shrunk below the size a phone can read.
+    const qrHere = qrFor(measure, copy, spec, s,
+      Math.min(rects.copy.w * 0.44, rects.copy.h * 0.40), rects.copy.w);
+    const qrH = qrHere && qrHere.code ? qrHere.h + gap * 0.5 : 0;
+    const copyBox = { ...rects.copy, h: Math.max(s * 0.10, rects.copy.h - qrH) };
+    const { k, overflow } = fitScale(measure, copy, s, copyBox, kMin, kMax);
+    const cl = layoutCopy(measure, copy, s, k, copyBox.w);
     const g = gridOf(rects.slate.w, rects.slate.h);
 
     const copyScore = (k - kMin) / (kMax - kMin);
@@ -1212,11 +1784,11 @@ export function solve(spec, measure) {
     // get starved, then break ties toward the better overall balance.
     let score = 0.68 * Math.min(copyScore, tileScore) + 0.32 * ((copyScore + tileScore) / 2);
     // Wasted vertical space in the copy column is dead air on a stacked layout.
-    const slack = comp === 'split' ? 0 : Math.max(0, rects.copy.h - cl.height) / inner.h;
+    const slack = comp === 'split' ? 0 : Math.max(0, copyBox.h - cl.height) / inner.h;
     score -= slack * 0.35;
     if (overflow) score -= 0.5;
 
-    if (!best || score > best.score) best = { score, t, rects, k, cl, grid: g, overflow };
+    if (!best || score > best.score) best = { score, t, rects, k, cl, grid: g, overflow, qr: qrHere, qrH };
   }
 
   if (!best) {
@@ -1228,7 +1800,24 @@ export function solve(spec, measure) {
     comp, inner, slateRect: best.rects.slate, copyRect: best.rects.copy,
     grid: best.grid, k: best.k, copyLayout: best.cl,
     pad, gap, s, plate, discPx, disc, overflow: best.overflow,
+    qr: best.qr, qrH: best.qrH, panel,
   });
+}
+
+/* What went wrong with the QR, said plainly. An untested or unreadable code is
+ * the single cheapest way to waste a whole print run. */
+function qrWarnings(asked, placed) {
+  if (!asked) return [];
+  const out = [];
+  if (asked.error) out.push(`No QR code: ${asked.error}`);
+  else if (!placed) out.push('This layout has no room for a QR code, so the URL is text only.');
+  else if (placed.tooSmall) {
+    out.push('The QR code is below three quarters of an inch. Print it larger or it will not scan.');
+  }
+  if (asked.code) {
+    out.push(`QR points at ${asked.url}. Scan the exported file with two phones before it goes to print.`);
+  }
+  return out;
 }
 
 /* A yard sign and a road sign are read at forty miles an hour, not held. The
@@ -1301,6 +1890,7 @@ function finish(spec, r) {
   });
 
   let copy = null;
+  let qr = null;
   if (r.copyRect) {
     const cr = r.copyRect;
     const align = style.align || (r.comp === 'split' ? 'left' : 'center');
@@ -1308,13 +1898,17 @@ function finish(spec, r) {
       rect: cr, align, x: cr.x, y: copyTop, w: cr.w, height: copyH,
       items: r.copyLayout.items.map((it) => ({ ...it, absY: copyTop + it.y })),
     };
+    if (r.qr && r.qr.code) {
+      const top = copyTop + copyH + gap * 0.5;
+      qr = { ...r.qr, y: top, align,
+             x: align === 'center' ? cr.x + (cr.w - r.qr.size) / 2 : cr.x,
+             centreOn: align === 'center' ? cr.x + cr.w / 2 : cr.x + r.qr.size / 2 };
+    }
   }
 
   return {
     canvas: { w, h },
-    mailPanel: style.mailPanel === 'right'
-      ? { x: w - w * MAIL_PANEL_FRACTION, y: 0, w: w * MAIL_PANEL_FRACTION, h }
-      : null,
+    mailPanel: r.panel || null,
     composition: r.comp,
     pad: r.pad, gap, s,
     scale: r.k,
@@ -1325,13 +1919,19 @@ function finish(spec, r) {
       ? { x: slateRect.x + (slateRect.w - tileW) / 2, y: gy, w: tileW, h: tileH }
       : null,
     copy,
+    qr,
     disclaimer: r.disc
-      ? { text: r.disc, px: r.discPx, x: r.pad, y: h - r.pad * 0.55,
-          w: w - 2 * r.pad - (style.mailPanel === 'right' ? w * MAIL_PANEL_FRACTION : 0),
-          centreOn: r.pad + (w - 2 * r.pad - (style.mailPanel === 'right' ? w * MAIL_PANEL_FRACTION : 0)) / 2 }
+      ? (() => {
+        // Clear of the carrier's corner, which is the one part of a mail piece
+        // nothing of ours may touch.
+        const dw = w - 2 * r.pad - (r.panel ? r.panel.w : 0);
+        return { text: r.disc, px: r.discPx, x: r.pad, y: h - r.pad * 0.55,
+                 w: dw, centreOn: r.pad + dw / 2 };
+      })()
       : null,
     warnings: [
       ...bigPieceWarnings(spec, r, w, h),
+      ...qrWarnings(r.qr, qr),
       ...(r.overflow ? ['Copy is longer than the canvas can hold at a readable size. It was trimmed to fit.'] : []),
       ...trimmed.map((k) => `The ${k} is too long for this canvas and was cut off. Shorten it, or use a taller canvas.`),
       ...(!deckAR && tileW < idealTile(n, s) * 0.72

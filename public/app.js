@@ -1,7 +1,10 @@
 /* Slate Studio front end. */
 import { solve, BRAND } from './layout.js';
 import { paint, makeMeasurer } from './render.js';
-import { CANVASES, TEMPLATES, PALETTES, GROUNDS, TOKENS, fillTokens, buildFilename, canvasById } from './presets.js';
+import {
+  CANVASES, TEMPLATES, PALETTES, GROUNDS, TOKENS, TOPPERS,
+  fillTokens, buildFilename, buildName, canvasById, topperById,
+} from './presets.js';
 import { makeZip } from './zip.js';
 import * as photos from './photos.js';
 import { printSheet, slugLine, drawSlug, inchesOf } from './print.js';
@@ -14,7 +17,8 @@ const $$ = (s) => [...document.querySelectorAll(s)];
 const DEFAULT_DISCLAIMER = 'Paid for by Committee to Elect House Republicans, 75 S Main Street Unit 7 Box 159, Concord, NH 03301. Jason Osborne, Chairman.';
 
 const COPY_FIELDS = ['kicker', 'headline', 'subhead', 'details', 'cta', 'footer',
-  'disclaimer', 'returnAddress', 'indicia', 'values', 'record', 'callout', 'contrast'];
+  'disclaimer', 'returnAddress', 'indicia', 'values', 'record', 'callout', 'contrast',
+  'stat', 'source', 'url'];
 
 const COLOR_FIELDS = [
   ['#accent', 'accent'], ['#plate-accent', 'plateAccent'],
@@ -52,7 +56,7 @@ const state = {
   cw: 1080, ch: 1080,
   copy: {
     kicker: '', headline: '', subhead: '', details: '', cta: '', footer: '', disclaimer: '',
-    values: '', record: '', callout: '', contrast: '',
+    values: '', record: '', callout: '', contrast: '', stat: '', source: '', url: '',
     returnAddress: 'Committee to Elect House Republicans\n75 S Main Street Unit 7 Box 159\nConcord, NH 03301',
     indicia: 'NONPROFIT ORG\nU.S. POSTAGE\nPAID\nPERMIT NO. ___',
   },
@@ -64,6 +68,7 @@ const state = {
     accent: '#2F7C4E', plateColor: '#12314E', plateAccent: '#95DAB1',
     bar: ['#2F7C4E', '#12314E'],
     faceSource: 'cutouts', mailPanel: 'none', spotlight: '',
+    topper: '', topperAt: 'first',
     flagBar: true, headlineShadow: true, twoTone: true,
     logoPos: 'top-right', logoScale: 0.16,
   },
@@ -141,7 +146,14 @@ function activeSlate(d = district()) {
     list = [...list].sort((a, b) => (pos.get(a.name) ?? 99) - (pos.get(b.name) ?? 99));
   }
   const tags = state.tags[d.id] || {};
-  return list.map((n) => (tags[n.name] ? { ...n, tag: tags[n.name] } : n));
+  const out = list.map((n) => (tags[n.name] ? { ...n, tag: tags[n.name] } : n));
+
+  /* Whoever is at the top of the ticket, added to the drawing list only. The
+   * district record is untouched, so she is never counted in the seats, never
+   * closes a photo gap, and never gets a ballot oval. */
+  const top = topperById(state.style.topper);
+  if (!top) return out;
+  return state.style.topperAt === 'last' ? [...out, top] : [top, ...out];
 }
 
 const canvasSize = () => {
@@ -232,7 +244,10 @@ async function portraitThumb(n) {
 
 async function loadPortraits(d) {
   const out = {};
-  await Promise.all((d?.nominees || []).map(async (n) => {
+  // The toppers come along every time. It is one more image and it means the
+  // face is there the moment somebody switches the governor on.
+  const people = [...(d?.nominees || []), ...TOPPERS];
+  await Promise.all(people.map(async (n) => {
     const im = await portraitImage(n);
     if (im) out[n.name] = im;
   }));
@@ -833,11 +848,23 @@ function download(blob, name) {
   setTimeout(() => URL.revokeObjectURL(a.href), 4000);
 }
 
-const filenameNow = (scale = 1) => {
-  const d = district(), size = canvasSize();
-  const side = state.style.mailPanel === 'right' ? 'MailPanel' : '';
-  const tag = ($('#template').selectedOptions[0]?.textContent || 'Build') + (side ? '-' + side : '');
-  const base = buildFilename(d, size, tag);
+/** The programme name for the filename: whatever template is selected. */
+const programNow = () => $('#template').selectedOptions[0]?.textContent || 'Build';
+
+/** Which physical side this is, when the layout says. */
+function sideNow(styleOverride = state.style) {
+  if (styleOverride.composition === 'palmback') return 'back';
+  if (styleOverride.composition === 'palmcard') return 'front';
+  if (styleOverride.mailPanel === 'right') return 'back';
+  return '';
+}
+
+const filenameNow = (scale = 1, extra = {}) => {
+  const d = district();
+  const c = state.canvasId === 'custom'
+    ? { id: 'custom', w: state.cw, h: state.ch }
+    : canvasById(state.canvasId);
+  const base = buildFilename(d, c, programNow(), { side: sideNow(), ...extra });
   return scale === 1 ? base : base.replace(/\.png$/, '@2x.png');
 };
 
@@ -848,23 +875,122 @@ async function exportPng(scale) {
   cv.toBlob((b) => download(b, filenameNow(scale)), 'image/png');
 }
 
+/** One print-ready side: trim plus bleed, crop marks and a slug line. */
+async function printSide(d, styleOverride = {}, side = '') {
+  const size = canvasSize();
+  const style = { ...state.style, ...styleOverride };
+  const was = state.style;
+  state.style = style;                   // buildPlan reads state.style
+  let plan;
+  try { plan = buildPlan(d, size, activeSlate(d)); } finally { state.style = was; }
+  const dpi = canvasRec().dpi || 300;
+  const sheet = printSheet({ plan, style, assets, copy: resolvedCopy(d), dpi });
+  drawSlug(sheet.canvas.getContext('2d'), sheet.sheet,
+    slugLine(plan, dpi, `${d.county} ${d.district}${side ? ' ' + side : ''}`), dpi);
+  const blob = await new Promise((r) => sheet.canvas.toBlob(r, 'image/png'));
+  return { blob, plan, dpi, inches: inchesOf(plan.canvas, dpi),
+           name: filenameNow(1, { side }), side };
+}
+
 /** Trim size plus 1/8 inch of bleed, crop marks and a slug line. */
 async function exportPrint() {
   const d = district();
   if (!d) return;
-  const size = canvasSize();
-  const plan = buildPlan(d, size, activeSlate(d));
-  const dpi = canvasRec().dpi || 300;
-  const sheet = printSheet({ plan, style: state.style, assets, copy: resolvedCopy(d), dpi });
-  drawSlug(sheet.canvas.getContext('2d'), sheet.sheet,
-    slugLine(plan, dpi, `${d.county} ${d.district}`), dpi);
-  const inches = inchesOf(plan.canvas, dpi);
-  const name = filenameNow(1).replace(/\.png$/, '-PRINT.png');
-  sheet.canvas.toBlob((b) => {
-    download(b, name);
-    notice(`Print sheet: ${inches.w} x ${inches.h} in trim, 0.125 in bleed, crop marks, ${dpi} dpi. `
-      + 'Files are RGB, so ask the printer to proof colour.');
-  }, 'image/png');
+  const out = await printSide(d, {}, sideNow());
+  download(out.blob, out.name);
+  notice(`Print sheet: ${out.inches.w} x ${out.inches.h} in trim, 0.125 in bleed, crop marks, `
+    + `${out.dpi} dpi. Files are RGB, so ask the printer to proof colour.`);
+}
+
+/* Both sides at once, with the handoff note a printer actually needs.
+ *
+ * A mail piece is one job with two sides, and sending them one at a time is how
+ * a drop goes out with side two from last week. This builds the pair from the
+ * same copy, names them front and back, and writes down the trim, the bleed,
+ * the dpi, the decoded QR string and the disclaimer so nothing has to be asked
+ * for over email. */
+async function exportBothSides() {
+  const d = district();
+  if (!d) return;
+  const sides = bothSides();
+  if (!sides) return notice('This canvas has no second side. Use Print ready.', true);
+  const btn = $('#btn-both');
+  const was = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = 'Building...';
+  try {
+    const files = [];
+    const built = [];
+    for (const s of sides) {
+      const out = await printSide(d, s.style, s.side);
+      files.push({ name: out.name, data: new Uint8Array(await out.blob.arrayBuffer()) });
+      built.push(out);
+    }
+    const note = handoffNote(d, built);
+    files.push({ name: 'handoff.txt', data: new TextEncoder().encode(note) });
+    const zipName = buildName({
+      program: programNow(),
+      surface: canvasRec().id || 'custom',
+      canvas: canvasRec(),
+      audience: `${d.county}-${d.district}`,
+      side: 'both-sides',
+      ext: 'zip',
+    });
+    download(makeZip(files), zipName);
+    notice(`Both sides: ${built.map((b) => b.side).join(' and ')}, `
+      + `${built[0].inches.w} x ${built[0].inches.h} in trim at ${built[0].dpi} dpi, `
+      + 'with a handoff note. Open the PNGs and look at them before you send them.');
+  } catch (e) {
+    notice('Both sides failed: ' + e.message, true);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = was;
+  }
+}
+
+/** What a printer needs in writing, so nobody has to ask for it by email. */
+function handoffNote(d, built) {
+  const c = canvasRec();
+  const copy = resolvedCopy(d);
+  const qr = built.map((b) => b.plan.qr).find(Boolean);
+  const lines = [
+    `${d.county} District ${d.district}`,
+    `${programNow()} — ${c.label || 'custom'}`,
+    '',
+    'SPEC',
+    `  Trim         ${built[0].inches.w} x ${built[0].inches.h} in`,
+    `  Bleed        0.125 in on all four sides`,
+    `  Crop marks   yes, outside the bleed`,
+    `  Resolution   ${built[0].dpi} dpi`,
+    `  Colour       RGB. Convert to CMYK and proof before the run.`,
+    ...(c.die === 'hanger'
+      ? ['  Die          door hanger, 2.25 in tab, 1.375 in hole. Guides are on the',
+         '               artwork; cut from your own die and send a proof.'] : []),
+    ...(built.some((b) => b.plan.mailPanel)
+      ? ['  Mail panel   4 x 2.25 in, lower right of the trim on the back. Nothing of',
+         '               ours is inside it. Address block and barcode zone are clear.'] : []),
+    '',
+    'FILES',
+    ...built.map((b) => `  ${b.side.padEnd(6)} ${b.name}`),
+    '',
+    'CHECK BEFORE THE RUN',
+    '  [ ] Both sides are the same drop and the same version',
+    '  [ ] Disclaimer present and legible on every side',
+    ...(qr ? ['  [ ] QR scanned with two different phones'] : []),
+    '  [ ] Names, dates, addresses and the URL read character by character',
+    '  [ ] Nothing live inside the bleed',
+    '',
+    'DISCLAIMER, as supplied',
+    `  ${(copy.disclaimer || '').trim() || 'MISSING. Do not print without it.'}`,
+  ];
+  if (qr) {
+    lines.push('', 'QR CODE', `  Points at: ${qr.url}`,
+      `  Size on the piece: ${(qr.size / built[0].dpi).toFixed(2)} in square`,
+      '  Error correction: high. Quiet zone: 4 modules.');
+  }
+  const warn = [...new Set(built.flatMap((b) => b.plan.warnings || []))];
+  if (warn.length) lines.push('', 'THE APP FLAGGED', ...warn.map((x) => `  - ${x}`));
+  return lines.join('\n') + '\n';
 }
 
 async function saveToDrive() {
@@ -973,6 +1099,25 @@ async function runBatch() {
 
 /* ---------------------------------------------------------------------- wire */
 
+/** Which two sides this canvas and layout make a pair of, or null. */
+function bothSides() {
+  if (!isPrintCanvas()) return null;
+  const comp = state.style.composition;
+  const c = canvasRec();
+  if (['palmcard', 'palmback'].includes(comp) || c.id === 'palm' || c.id === 'hanger') {
+    return [
+      { side: 'front', style: { composition: 'palmcard', mailPanel: 'none' } },
+      { side: 'back', style: { composition: 'palmback', mailPanel: 'none' } },
+    ];
+  }
+  // Any other print canvas: the design, then the same design with the
+  // carrier's corner taken out of it.
+  return [
+    { side: 'front', style: { mailPanel: 'none' } },
+    { side: 'back', style: { mailPanel: 'right' } },
+  ];
+}
+
 function fillSelects() {
   $('#canvas').innerHTML = CANVASES.map((c) => `<option value="${c.id}">${c.label} — ${c.w}x${c.h}</option>`).join('')
     + '<option value="custom">Custom size</option>';
@@ -981,6 +1126,8 @@ function fillSelects() {
   $('#palettes').innerHTML = PALETTES.map((b) => `<button class="sw" data-pal="${b.id}">${b.label}</button>`).join('');
   $('#grounds').innerHTML = GROUNDS.map((g) => `<button class="sw" data-ground="${g.id}">${g.label}</button>`).join('');
   $('#tokens').innerHTML = TOKENS.map(([t]) => `<button class="tok" data-token="${t}">${t}</button>`).join('');
+  $('#topper').innerHTML = '<option value="">Nobody, just the district slate</option>'
+    + TOPPERS.map((t) => `<option value="${t.id}">Add ${esc(t.label)}</option>`).join('');
   $('#batch-canvases').innerHTML = CANVASES.map((c) =>
     `<button class="sw${['1x1', 'link', '16x9'].includes(c.id) ? ' on' : ''}" data-id="${c.id}">${c.label}</button>`).join('');
   const counties = [...new Set(state.catalog.districts.map((d) => d.county))];
@@ -1010,11 +1157,28 @@ function syncControls() {
    * square feed graphic is a box nobody can find the output of. */
   const comp = state.style.composition;
   $('#values-wrap').hidden = !['palmcard', 'palmback', 'versus'].includes(comp);
-  $('#record-wrap').hidden = comp !== 'palmback';
+  $('#record-wrap').hidden = !['palmback', 'receipt'].includes(comp);
   $('#callout-wrap').hidden = !['palmback', 'spotlight'].includes(comp);
   $('#contrast-wrap').hidden = comp !== 'versus';
+  $('#stat-wrap').hidden = !['stat', 'receipt'].includes(comp);
+  $('#source-wrap').hidden = !['stat', 'receipt'].includes(comp);
   $('#spotlight-wrap').hidden = comp !== 'spotlight';
   if (comp === 'spotlight') fillSpotlightPicker();
+
+  // The record field does two jobs, so it says which one it is doing.
+  $('#record-wrap').querySelector('.hint').textContent = comp === 'receipt'
+    ? 'one per line, as "What it was | 412"'
+    : 'one thing delivered per line';
+
+  $('#btn-both').hidden = !bothSides();
+  $('#topper').value = state.style.topper || '';
+  $('#topper-at').value = state.style.topperAt;
+  $('#topper-at-wrap').hidden = !state.style.topper;
+  const top = topperById(state.style.topper);
+  $('#topper-note').textContent = top
+    ? `${top.name} is on the piece as a face and a name. She is not on the House `
+      + 'ballot line, so she gets no oval and is not counted in the seats.'
+    : '';
   $('#btn-print').hidden = !isPrintCanvas();
   $('#mail-fields').hidden = state.style.mailPanel !== 'right';
   $('#composition').value = state.style.composition;
@@ -1178,6 +1342,12 @@ function bind() {
     state.style.spotlight = e.target.value;
     saveLocal(); draw();
   });
+  for (const [sel, key] of [['#topper', 'topper'], ['#topper-at', 'topperAt']]) {
+    $(sel).addEventListener('change', (e) => {
+      state.style[key] = e.target.value;
+      syncControls(); renderSlatePanel(); saveLocal(); draw();
+    });
+  }
   $('#density').addEventListener('input', (e) => { state.style.density = +e.target.value; scheduleDraw(); });
   for (const [sel, key] of [['#plate', 'plate'], ['#flagbar', 'flagBar'], ['#hshadow', 'headlineShadow'], ['#twotone', 'twoTone']]) {
     $(sel).addEventListener('change', async (e) => {
@@ -1276,6 +1446,7 @@ function bind() {
 
   $('#btn-png').addEventListener('click', () => exportPng(1));
   $('#btn-print').addEventListener('click', exportPrint);
+  $('#btn-both').addEventListener('click', exportBothSides);
   $('#btn-2x').addEventListener('click', () => exportPng(2));
   $('#btn-drive').addEventListener('click', saveToDrive);
   $('#btn-copy').addEventListener('click', copyImage);

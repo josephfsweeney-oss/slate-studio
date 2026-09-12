@@ -3,7 +3,7 @@
  * Draws a plan from layout.js onto a 2D canvas. Preview and export call this
  * with the same plan at the same canvas size, so what you approve is what ships.
  */
-import { BRAND, PHOTO_AR } from './layout.js';
+import { BRAND, PHOTO_AR, luminance, flagBand } from './layout.js';
 
 /* ------------------------------------------------------------------- helpers */
 
@@ -12,14 +12,10 @@ function hexToRgb(hex) {
   return m ? [parseInt(m[1], 16), parseInt(m[2], 16), parseInt(m[3], 16)] : [0, 0, 0];
 }
 
-/** Perceived lightness, 0 black to 1 white. Decides whether copy goes light or dark. */
-export function luminance(hex) {
-  const [r, g, b] = hexToRgb(hex).map((v) => {
-    const c = v / 255;
-    return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
-  });
-  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
-}
+/* Lightness and the foot band both live in the engine now: the engine has to
+ * reserve the band this file paints, and two copies of the rule had already
+ * drifted far enough to bury a source line under it. */
+export { luminance, flagBand } from './layout.js';
 
 function roundRect(ctx, x, y, w, h, r) {
   const rr = Math.min(r, w / 2, h / 2);
@@ -80,15 +76,10 @@ export function themeFor(style) {
 
 /** The closing bar. On a light ground it becomes a solid band, which is where
  *  the disclaimer then sits, so both painters have to agree on its size. */
+/* A display rail is 90px tall and carries no disclaimer, so a flag bar along
+ * the bottom is a third of the ad spent on a stripe. flagBand knows that. */
 function bandMetrics(plan, style) {
-  // A display rail is 90px tall and carries no disclaimer, so a flag bar along
-  // the bottom is a third of the ad spent on a stripe.
-  if (plan.strip || style.flagBar === false) return { rule: 0, band: 0 };
-  const rule = Math.max(3, plan.s * 0.009);
-  const light = luminance(style.bgType === 'transparent' ? '#FFFFFF' : (style.bgColor || '')) > 0.45;
-  if (!light) return { rule, band: 0 };
-  const need = plan.disclaimer ? plan.disclaimer.px * 2.6 : 0;
-  return { rule, band: Math.max(rule * 3, plan.s * 0.052, need) };
+  return flagBand(style, plan.s, plan.disclaimer ? plan.disclaimer.px : 0, Boolean(plan.strip));
 }
 
 /* ---------------------------------------------------------------- background */
@@ -411,7 +402,10 @@ function paintTagline(ctx, tile, style, theme) {
 function paintMailPanel(ctx, plan, style, copy) {
   const m = plan.mailPanel;
   if (!m) return;
-  const dpi = plan.canvas.w / 11;          // the 11 inch dimension sets the scale
+  // The panel carries its own scale now, because it is a fixed size in inches
+  // rather than a fraction of the piece. An 11 x 6 and an 11 x 5.5 get the same
+  // four inch corner, which is what the mail house is expecting.
+  const dpi = m.dpi || plan.canvas.w / 11;
   const inch = (n) => n * dpi;
   const ink = '#12314E';
 
@@ -973,6 +967,205 @@ function paintStrip(ctx, plan, style, theme) {
   if ('letterSpacing' in ctx) ctx.letterSpacing = '0px';
 }
 
+
+/* ---------------------------------------------------------------- the stat --- */
+
+/* Numbers sell, so the number is set large and the label small, with an accent
+ * rule down the side of it the way the reference mailer sets its proof block. */
+function paintStat(ctx, plan, style, theme) {
+  const st = plan.stat;
+  const box = { x: plan.pad, y: 0, w: plan.canvas.w - plan.pad * 2 };
+  paintBands(ctx, st.bands, plan, style, theme, box, true);
+
+  if (st.hero) {
+    const hr = st.hero;
+    const rule = Math.max(3, plan.s * 0.009);
+    ctx.fillStyle = theme.accent;
+    ctx.fillRect(hr.x, hr.y, hr.w, rule);
+    ctx.fillStyle = theme.primary;
+    setFont(ctx, { family: 'Anton', weight: 400 }, hr.px, -0.02);
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'alphabetic';
+    ctx.fillText(hr.value, hr.x + hr.w / 2, hr.y + rule + hr.px * 0.86);
+    if (hr.label.lines.length) {
+      ctx.fillStyle = theme.secondary;
+      setFont(ctx, hr.label.font, hr.label.px, hr.label.ls);
+      hr.label.lines.forEach((l, i) => ctx.fillText(l, hr.x + hr.w / 2,
+        hr.y + rule + hr.px * 1.02 + plan.s * 0.012 + hr.label.lh * (i + 0.84)));
+    }
+  }
+
+  for (const cell of st.smalls) {
+    ctx.fillStyle = theme.accent;
+    ctx.fillRect(cell.x, cell.y, Math.max(2, plan.s * 0.006), cell.h);
+    const pad = plan.s * 0.018;
+    ctx.textAlign = 'left';
+    ctx.fillStyle = theme.primary;
+    setFont(ctx, cell.valueBlk.font, cell.valueBlk.px, cell.valueBlk.ls);
+    ctx.fillText(cell.valueBlk.lines[0] || '', cell.x + pad, cell.y + cell.valueBlk.px * 0.88);
+    if (cell.labelBlk.lines.length) {
+      ctx.fillStyle = theme.secondary;
+      setFont(ctx, cell.labelBlk.font, cell.labelBlk.px, cell.labelBlk.ls);
+      cell.labelBlk.lines.forEach((l, i) => ctx.fillText(l, cell.x + pad,
+        cell.y + cell.valueBlk.h + plan.s * 0.008 + cell.labelBlk.lh * (i + 0.84)));
+    }
+  }
+  if ('letterSpacing' in ctx) ctx.letterSpacing = '0px';
+}
+
+/* ------------------------------------------------------------- the receipt --- */
+
+/* It reads like a bill because a bill gets read. Set in the text face with the
+ * amounts in a right aligned column, hairlines between the rows, and a heavier
+ * rule above the total. Nothing about the document half shouts. */
+function paintReceipt(ctx, plan, style, theme) {
+  const r = plan.receipt;
+  const d = r.doc;
+  const ink = theme.primary;
+
+  // The document sits on its own light card so it reads as a separate object
+  // from the campaign's argument underneath it.
+  ctx.fillStyle = theme.light ? '#FFFFFF' : 'rgba(255,255,255,.94)';
+  roundRect(ctx, d.x - plan.pad * 0.35, d.y - plan.pad * 0.30,
+    d.w + plan.pad * 0.70, d.h + plan.pad * 0.55, plan.s * 0.008);
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(18,49,78,.28)';
+  ctx.lineWidth = Math.max(1, plan.s * 0.0022);
+  ctx.stroke();
+
+  // Header: the document's own name, then a rule.
+  ctx.textBaseline = 'alphabetic';
+  ctx.textAlign = 'left';
+  ctx.fillStyle = 'rgba(18,49,78,.82)';
+  setFont(ctx, d.title.font, d.title.px, d.title.ls);
+  d.title.lines.forEach((l, i) => ctx.fillText(l, d.x, d.y + d.title.lh * (i + 0.86)));
+  ctx.fillStyle = 'rgba(18,49,78,.45)';
+  ctx.fillRect(d.x, d.y + d.headerH - plan.s * 0.012, d.w, Math.max(1, plan.s * 0.0025));
+
+  let y = d.y + d.headerH;
+  for (const row of d.rows) {
+    ctx.fillStyle = '#14161A';
+    ctx.textAlign = 'left';
+    setFont(ctx, row.labelBlk.font, row.labelBlk.px, row.labelBlk.ls);
+    row.labelBlk.lines.forEach((l, i) => ctx.fillText(l, d.x, y + row.labelBlk.lh * (i + 0.86)));
+    if (row.amountBlk.lines.length) {
+      ctx.textAlign = 'right';
+      ctx.fillStyle = ink;
+      setFont(ctx, row.amountBlk.font, row.amountBlk.px, row.amountBlk.ls);
+      ctx.fillText(row.amountBlk.lines[0], d.x + d.w, y + row.amountBlk.lh * 0.86);
+    }
+    y += d.rowH;
+    ctx.fillStyle = 'rgba(18,49,78,.14)';
+    ctx.fillRect(d.x, y - d.rowH * 0.18, d.w, 1);
+  }
+
+  if (d.total) {
+    ctx.fillStyle = ink;
+    ctx.fillRect(d.x, y + plan.s * 0.004, d.w, Math.max(2, plan.s * 0.005));
+    const ty = y + plan.s * 0.030;
+    ctx.textAlign = 'left';
+    setFont(ctx, d.total.label.font, d.total.label.px, d.total.label.ls);
+    ctx.fillStyle = ink;
+    d.total.label.lines.forEach((l, i) => ctx.fillText(l, d.x, ty + d.total.label.lh * (i + 0.86)));
+    ctx.textAlign = 'right';
+    setFont(ctx, d.total.value.font, d.total.value.px, d.total.value.ls);
+    ctx.fillStyle = theme.accent;
+    ctx.fillText(d.total.value.lines[0] || '', d.x + d.w, ty + d.total.value.px * 0.86);
+  }
+
+  paintBands(ctx, r.bands, plan, style, theme, { x: r.argX, y: 0, w: r.argW }, false);
+  if ('letterSpacing' in ctx) ctx.letterSpacing = '0px';
+}
+
+/* ------------------------------------------------------------- the type-led --- */
+
+function paintTypeLed(ctx, plan, style, theme) {
+  const t = plan.typeled;
+  const box = { x: plan.pad, y: 0, w: plan.canvas.w - plan.pad * 2 };
+  paintBands(ctx, t.bands, plan, style, theme, box, t.centred);
+
+  // Surnames under the identity strip, small, so the piece still says who.
+  for (const f of t.faces) {
+    const px = f.w * 0.20;
+    ctx.fillStyle = theme.secondary;
+    setFont(ctx, { family: 'Barlow Condensed', weight: 700 }, px, 0.06);
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'alphabetic';
+    ctx.fillText(f.candidate.last, f.x + f.w / 2, f.y + f.h + px * 1.15);
+  }
+  if ('letterSpacing' in ctx) ctx.letterSpacing = '0px';
+}
+
+/* --------------------------------------------------------------- the source --- */
+
+/* A number with no source is a liability, so the line has a place of its own
+ * above the disclaimer rather than being squeezed into it. */
+function paintSource(ctx, plan, style, theme) {
+  const src = plan.source;
+  if (!src) return;
+  // Above the flag band and above the disclaimer. The painter owns this
+  // position because the painter is what draws the band over the foot.
+  const { band } = bandMetrics(plan, style);
+  const floor = band > 0
+    ? plan.canvas.h - band
+    : plan.canvas.h - (plan.disclaimer ? plan.disclaimer.px * 1.9 : plan.pad * 0.4);
+  ctx.fillStyle = theme.light ? 'rgba(18,49,78,.58)' : 'rgba(255,255,255,.62)';
+  setFont(ctx, { family: 'Barlow Condensed', weight: 500 }, src.px, 0.01);
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'alphabetic';
+  ctx.fillText(src.text, src.centreOn ?? plan.canvas.w / 2, floor - src.px * 0.5);
+  if ('letterSpacing' in ctx) ctx.letterSpacing = '0px';
+}
+
+/* --------------------------------------------------------------------- QR --- */
+
+/* Dark on light, never inverted, with a quiet zone of four modules that no art
+ * may enter. On a dark ground the code gets its own white card, because a light
+ * code on a dark field is the reliable way to make a scanner give up. */
+function paintQr(ctx, block, theme, plan) {
+  if (!block || !block.code) return;
+  const { code, size } = block;
+  const quiet = 4;
+  const per = size / (code.size + quiet * 2);
+  ctx.save();
+  // The card, including the quiet zone.
+  ctx.fillStyle = '#FFFFFF';
+  ctx.fillRect(block.x, block.y, size, size);
+  ctx.fillStyle = '#000000';
+  for (let y = 0; y < code.size; y++) {
+    for (let x = 0; x < code.size; x++) {
+      if (!code.modules[y][x]) continue;
+      // Ceil the module size so neighbouring dark modules meet. A hairline of
+      // white between them is what stops a code scanning off cheap stock.
+      ctx.fillRect(
+        block.x + (quiet + x) * per,
+        block.y + (quiet + y) * per,
+        Math.ceil(per), Math.ceil(per),
+      );
+    }
+  }
+  ctx.restore();
+
+  if (block.label && block.label.lines.length) {
+    const lb = block.label;
+    ctx.fillStyle = theme.secondary;
+    setFont(ctx, lb.font, lb.px, lb.ls);
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'alphabetic';
+    // Clamp the label inside the piece. The code is often right aligned and the
+    // URL is wider than the code, so centring it on the square walks the text
+    // off the edge of the artwork.
+    const half = (lb.w || ctx.measureText(lb.lines[0]).width) / 2;
+    const margin = plan.pad * 0.5;
+    const cx = Math.min(
+      Math.max(block.centreOn ?? block.x + size / 2, margin + half),
+      plan.canvas.w - margin - half,
+    );
+    ctx.fillText(lb.lines[0], cx, block.y + size + lb.lh * 0.94);
+    if ('letterSpacing' in ctx) ctx.letterSpacing = '0px';
+  }
+}
+
 /* -------------------------------------------------------------- hanger die --- */
 
 /* The die line and the hang hole, drawn on the artwork so nothing important is
@@ -1030,6 +1223,7 @@ export function paint(ctx, plan, style, assets = {}, copy = {}, bleed = 0) {
     } else {
       paintPalmBack(ctx, plan, style, theme, assets, bleed);
     }
+    paintQr(ctx, plan.qr, theme, plan);
     paintDisclaimer(ctx, plan, style, theme);
     paintHangerDie(ctx, plan, style);
     ctx.restore();
@@ -1053,11 +1247,21 @@ export function paint(ctx, plan, style, assets = {}, copy = {}, bleed = 0) {
   } else if (plan.strip) {
     for (const tile of plan.tiles) paintTile(ctx, tile, plan, style, assets, theme);
     paintStrip(ctx, plan, style, theme);
+  } else if (plan.stat) {
+    for (const tile of plan.tiles) paintTile(ctx, tile, plan, style, assets, theme);
+    paintStat(ctx, plan, style, theme);
+  } else if (plan.receipt) {
+    paintReceipt(ctx, plan, style, theme);
+  } else if (plan.typeled) {
+    for (const tile of plan.tiles) paintTile(ctx, tile, plan, style, assets, theme);
+    paintTypeLed(ctx, plan, style, theme);
   } else {
     for (const tile of plan.tiles) paintTile(ctx, tile, plan, style, assets, theme);
     paintCopy(ctx, plan, style, theme);
   }
 
+  paintQr(ctx, plan.qr, theme, plan);
+  paintSource(ctx, plan, style, theme);
   paintLogo(ctx, plan, style, assets);
   paintDisclaimer(ctx, plan, style, theme);
   paintMailPanel(ctx, plan, style, copy);

@@ -74,8 +74,9 @@ composition from the canvas shape, and you can override it:
 | one nominee, any canvas | the spotlight |
 | a display rail, 4.5:1 or thinner | the strip |
 
-**Eleven layouts.** Five solve the copy and the grid together; the other six are
-designed pieces that take the slate as their subject.
+**Fourteen layouts.** Five solve the copy and the grid together; the rest are
+designed pieces that take the slate, a number, or the line itself as the
+subject.
 
 | Layout | What it is for |
 |---|---|
@@ -85,8 +86,14 @@ designed pieces that take the slate as their subject.
 | **Contrast** | two columns, ours and theirs. A choice reads faster than a claim |
 | **Ballot guide** | the ballot as the voter will see it, every oval filled, with the seat count generated from the district record |
 | **Display rail** | a leaderboard or a skyscraper: a few faces, one line, one pill |
+| **Numbers lead** | one number set large, its label small, the rest as a proof row. For selling a policy or a project |
+| **Document** | reads like a bill, because a bill gets read. The highest response rates on cost-of-living mail |
+| **Type led** | the headline is the image. For when the line is the whole argument, or the photos are weak |
 | **Palm card front** | the 4.25 x 11 rack card |
 | **Palm card back** | the record, the issues, one line worth remembering, then the ovals |
+
+Each is one of the archetypes in the `campaign-design-templates` skill, named
+the way that skill names them, so asking for a different one is one word.
 
 **Nineteen canvases** out of the box, plus any custom size. Download at 1x or
 2x, copy straight to the clipboard, or save to Drive.
@@ -104,6 +111,48 @@ laid out in them, and the hole and the tab line are drawn as guides so no face
 gets punched out. The printer still cuts from their own die, so send the trim
 size and ask for a proof.
 
+**QR codes are real ones.** Put a link in and the piece carries a working QR
+code at high error correction, dark on light, with a four module quiet zone and
+the URL set in text beside it for the people who would rather read it. One inch
+square in print, three quarters of an inch is the floor, and the app warns below
+it. The encoder is written out in `public/qr.js` because there are no runtime
+dependencies here and a dead code kills a whole drop. It is not trusted because
+the code reads correctly: the tests put the rendered pixels through a real
+decoder and compare the string that comes back. Two bugs were caught that way
+that no amount of reading would have found.
+
+**Both sides at once.** On a print canvas, **Both sides** builds the pair from
+the same copy, names them front and back, and hands back a ZIP with a
+`handoff.txt`: trim, bleed, crop marks, dpi, colour mode, the die on a door
+hanger, the mail panel, the disclaimer as supplied, the decoded QR string, the
+preflight checks, and everything the app flagged. A mail piece is one job with
+two sides, and sending them one at a time is how a drop goes out with side two
+from last week.
+
+**The mail panel is a corner, not a column.** Four inches by two and a quarter
+in the lower right of the trim, which is all the indicia, return address,
+address block and barcode clear zone need. The space above it is the best real
+estate on the piece and now gets used: proof on the left, the slate upper
+right, the carrier's corner below.
+
+**Top of the ticket.** Under **Slate**, add Governor Kelly Ayotte to any piece.
+She is a face and a name on the design and nothing else: she is not on the
+House ballot line, so she gets no oval on the ballot guide or the palm card
+back, she is not counted in the seats, and she never closes a district's photo
+gap. Next cycle's is one entry in `TOPPERS` plus the portrait.
+
+**Filenames that sort.** `client-program-surface-size-audience-side-v01.ext`,
+lower case and hyphenated:
+
+```
+nhgop-ballot-guide-palm-4.25x11-rockingham-25-back-v01.png
+nhgop-absentee-chase-mail11-11x5.5-rockingham-25-front-v01.png
+```
+
+The size is the trim in inches on a print canvas and pixels on screen, because
+those are the numbers a printer and a platform ask for. A folder of four hundred
+files from a dozen drops groups itself.
+
 **A sign is not a flyer.** On any piece over 16 inches the app measures the
 headline it just set and tells you how tall it came out in inches against what
 the distance needs. Three inches for a yard sign, six for a road sign. It also
@@ -113,6 +162,13 @@ forty miles an hour.
 **Four colour combinations**, all green and navy. Press **C** to cycle them, or
 use the **Colors** button. Every value is editable as hex if you need an exact
 brand colour.
+
+**Character budgets.** Not enforced. The engine shrinks the copy to fit as one
+voice, which is what lets it build 174 districts unattended, and the design
+skill would rather you cut the copy. Both are right; the difference is whether
+a person is looking. The budgets are in
+`.claude/skills/campaign-design-templates/references/copy-slots.md` and worth
+handing to whoever writes the copy.
 
 **Nineteen copy templates**, from Meet the slate to the absentee chase, the 72
 hour push, the polling place card, same-day registration, the volunteer ask, the
@@ -405,6 +461,12 @@ to looking the folder up by name.
   busy room, or hair against a dark background, it is not, and the preview on
   the plate is there to show you before it goes anywhere. A photo that will not
   knock out cleanly is better sent for a proper cutout.
+- The QR encoder tops out at version 10 at high error correction, which is 119
+  bytes. That is a short URL, which is what the code should point at anyway. A
+  longer string is refused with the reason rather than truncated.
+- The document layout mimics a bill on purpose. Every figure on it has to be
+  defensible, which is why the source line is not optional there and the app
+  says so when it is empty.
 - The contrast layout takes the other side's record from a field somebody
   types. Nothing checks it. Get it wrong in public and it is a correction, so
   source every line before it ships.

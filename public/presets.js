@@ -321,6 +321,28 @@ export const GROUNDS = [
   { id: 'transparent', label: 'Transparent' },
 ];
 
+/* Toppers: whoever is at the top of the ticket this cycle, added to a slate
+ * without being on it. A governor is not on the House ballot line and does not
+ * get an oval, is not counted in the seats, and never closes a district's photo
+ * gap. She is a face and a name on the piece, and nothing else.
+ *
+ * Adding next cycle's is one entry here, plus the portrait in public/cutouts. */
+export const TOPPERS = [
+  {
+    id: 'ayotte',
+    label: 'Governor Kelly Ayotte',
+    name: 'Kelly Ayotte',
+    first: 'GOV. KELLY',
+    last: 'AYOTTE',
+    slug: 'Kelly-Ayotte',
+    tag: 'Governor',
+    cutout: '/cutouts/Kelly-Ayotte.webp',
+    topper: true,
+  },
+];
+
+export const topperById = (id) => TOPPERS.find((t) => t.id === id) || null;
+
 /** Fill {{TOKENS}} from a district record. */
 export function fillTokens(str, district) {
   if (!str || !district) return str || '';
@@ -348,8 +370,60 @@ export function fillTokens(str, district) {
   return String(str).replace(/\{\{[A-Z_]+\}\}/g, (m) => (m in map ? map[m] : m));
 }
 
+/* Filenames.
+ *
+ *   client-program-surface-size-audience-side-v01.ext
+ *   nhgop-ballotguide-palm-4.25x11-rockingham-25-front-v01.png
+ *
+ * Lower case, hyphens, one field per slot, in that order. It sorts by client,
+ * then by programme, then by surface, so a folder of four hundred files from a
+ * dozen drops still groups itself. The old name led with the tag, which sorted
+ * the whole programme apart the moment there was more than one of them.
+ *
+ * The size is the trim size in inches on a print canvas and the pixel size on
+ * screen, because those are the numbers a printer and a platform ask for. */
+const hyphen = (v, fallback = '') => String(v ?? '').trim().toLowerCase()
+  .replace(/[^a-z0-9.]+/g, '-').replace(/^-+|-+$/g, '') || fallback;
+
+/** The size field: inches on a print canvas, pixels on screen. */
+export function sizeField(canvas) {
+  const trim = (n) => String(Math.round(n * 100) / 100);
+  return canvas.dpi
+    ? `${trim(canvas.w / canvas.dpi)}x${trim(canvas.h / canvas.dpi)}`
+    : `${canvas.w}x${canvas.h}`;
+}
+
+/**
+ * @param {object} parts
+ *   program   what the piece is for, from the template name
+ *   surface   the canvas id
+ *   canvas    the canvas record, for the size field
+ *   audience  the district, or whatever the variant is
+ *   side      'front' | 'back' | '' for a one-sided piece
+ *   version   1 upward
+ *   ext       png by default
+ */
+export function buildName({ client = 'nhgop', program, surface, canvas, audience,
+  side = '', version = 1, ext = 'png' }) {
+  const fields = [
+    hyphen(client, 'nhgop'),
+    hyphen(program, 'build'),
+    hyphen(surface, 'canvas'),
+    hyphen(sizeField(canvas || { w: 0, h: 0 })),
+    hyphen(audience),
+    hyphen(side),
+    `v${String(version).padStart(2, '0')}`,
+  ].filter(Boolean);
+  return `${fields.join('-')}.${ext}`;
+}
+
 /** A filename that sorts and searches the way the rest of the folder does. */
-export function buildFilename(district, canvas, tag = 'Build') {
-  const slug = (tag || 'Build').replace(/[^A-Za-z0-9]+/g, '-').replace(/^-|-$/g, '');
-  return `NHGOP-${slug}-${district.county}-${district.district}-${canvas.w}x${canvas.h}.png`;
+export function buildFilename(district, canvas, tag = 'Build', extra = {}) {
+  return buildName({
+    program: tag,
+    surface: canvas.id || `${canvas.w}x${canvas.h}`,
+    canvas,
+    audience: district ? `${district.county}-${district.district}` : '',
+    ...extra,
+  });
 }

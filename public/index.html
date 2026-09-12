@@ -55,6 +55,7 @@
       <button id="btn-png" class="primary">Download PNG</button>
       <button id="btn-2x" class="ghost">Download @2x</button>
       <button id="btn-print" class="ghost" title="Trim size plus bleed and crop marks">Print ready</button>
+      <button id="btn-both" class="ghost" title="Both sides, with crop marks and a handoff note">Both sides</button>
       <button id="btn-drive" class="ghost">Save to Drive</button>
       <button id="btn-copy" class="ghost">Copy image</button>
       <button id="btn-cycle" class="ghost" title="Cycle the colour combinations (press C)">Colors: Granite Guarantee</button>
@@ -97,6 +98,12 @@
         <textarea id="c-callout" rows="2" placeholder="Concord works for you, not the other way around."></textarea></label>
       <label class="f" id="contrast-wrap" hidden>Their record <span class="hint">one per line, the other side of the choice</span>
         <textarea id="c-contrast" rows="4" placeholder="An income tax, again"></textarea></label>
+      <label class="f" id="stat-wrap" hidden>Numbers <span class="hint">one per line, as "1,140 | what it is"</span>
+        <textarea id="c-stat" rows="3" placeholder="$1,140 | What the average homeowner paid in new taxes"></textarea></label>
+      <label class="f" id="source-wrap" hidden>Source <span class="hint">where the numbers came from</span>
+        <input id="c-source" placeholder="Town of Salem FY2026 adopted budget, page 14"></label>
+      <label class="f">Link <span class="hint">short, readable. Becomes a QR code</span>
+        <input id="c-url" placeholder="nhhousegop.com/salem"></label>
       <label class="f" id="spotlight-wrap" hidden>Spotlight on
         <select id="spotlight"></select></label>
       <label class="f">Footer <input id="c-footer" placeholder="Website or handle"></label>
@@ -140,6 +147,9 @@
           <option value="spotlight">Spotlight one candidate</option>
           <option value="versus">Contrast, two columns</option>
           <option value="ballot">Ballot guide</option>
+          <option value="stat">Numbers lead</option>
+          <option value="receipt">Document, reads like a bill</option>
+          <option value="typeled">Type led, the line is the image</option>
           <option value="strip">Display rail</option>
           <option value="palmcard">Palm card front, 4.25 x 11</option>
           <option value="palmback">Palm card back, 4.25 x 11</option>
@@ -170,6 +180,16 @@
           <option value="deck">Use the built deck layer</option>
         </select>
       </label>
+      <label class="f">Top of the ticket
+        <select id="topper"></select>
+      </label>
+      <label class="f" id="topper-at-wrap" hidden>Where
+        <select id="topper-at">
+          <option value="first">First on the piece</option>
+          <option value="last">Last on the piece</option>
+        </select>
+      </label>
+      <div class="sub" id="topper-note"></div>
       <div class="sub" id="face-note"></div>
       <div class="sub" id="slate-note"></div>
       <div id="slate-list" class="slate-list"></div>
