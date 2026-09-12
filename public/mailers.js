@@ -29,7 +29,19 @@ const LOOK = {
   silhouette: false,
 };
 
-const BACK_LOOK = { ...LOOK, composition: 'proof', bgColor: '#EEF4F0' };
+const BACK_LOOK = {
+  ...LOOK,
+  composition: 'proof',
+  bgColor: '#EEF4F0',
+  /* The carrier's corner prints blank. The mail house sets the indicia, the
+   * return address, the address block and the barcode, and they set the paid
+   * for line with them. Nothing of ours goes in there, not even a guide.
+   *
+   * That means this artwork carries no disclaimer. RSA 664:14 still applies to
+   * the finished piece, so the disclaimer has to arrive with the panel. Say so
+   * to the mail house in writing; the handoff note does. */
+  mailPanelBlank: true,
+};
 
 const ROLE = 'State Representative, {{COUNTY}} District {{DISTRICT}}';
 
@@ -40,7 +52,7 @@ export const MAIL_PROGRAMS = [{
   note: 'Eight two-sided 11 x 6 mailers. Claim on the front, receipt on the back.',
   pieces: [
     {
-      id: 'contract', n: 1, label: 'The Contract',
+      id: 'contract', art: 'contract', railSide: 'right', n: 1, label: 'The Contract',
       front: {
         kicker: 'New Hampshire House Republicans',
         headline: 'We Put It In Writing',
@@ -64,9 +76,9 @@ export const MAIL_PROGRAMS = [{
       },
     },
     {
-      id: 'income-tax', n: 2, label: 'No Income Tax',
+      id: 'income-tax', art: 'statehouse', railSide: 'left', n: 2, label: 'No Income Tax',
       front: {
-        kicker: 'Promise One',
+        kicker: 'The income tax',
         headline: 'They Had One Chance To Ban The Income Tax',
         subhead: 'Republicans voted to write the ban into the state constitution. It failed by 43 votes.',
         record: '',
@@ -88,9 +100,9 @@ export const MAIL_PROGRAMS = [{
       },
     },
     {
-      id: 'school-tax', n: 3, label: 'Cap Your School Tax',
+      id: 'school-tax', art: 'home', railSide: 'right', n: 3, label: 'Cap Your School Tax',
       front: {
-        kicker: 'Promise Two, on your ballot',
+        kicker: 'On your ballot November 3',
         headline: 'Cap Your School Tax',
         subhead: 'Republicans put a school tax cap on the November 3 ballot in every city and town. '
           + 'Your vote sets it.',
@@ -112,9 +124,9 @@ export const MAIL_PROGRAMS = [{
       },
     },
     {
-      id: 'housing', n: 4, label: 'Free Market Housing',
+      id: 'housing', art: 'framing', railSide: 'left', n: 4, label: 'Free Market Housing',
       front: {
-        kicker: 'Promise Three',
+        kicker: 'Housing',
         headline: 'We Changed The Law So We Can Build',
         subhead: 'You cannot bring rents down without more homes. '
           + 'Fifteen housing reform bills passed in one session.',
@@ -136,9 +148,9 @@ export const MAIL_PROGRAMS = [{
       },
     },
     {
-      id: 'energy', n: 5, label: 'Lower Energy Bills',
+      id: 'energy', art: 'grid', railSide: 'right', n: 5, label: 'Lower Energy Bills',
       front: {
-        kicker: 'Promise Four',
+        kicker: 'Your electric bill',
         headline: '26 Cents A Kilowatt',
         subhead: 'New Hampshire pays about 27 percent more for power than the country does. '
           + 'Bills come down when we build.',
@@ -160,9 +172,9 @@ export const MAIL_PROGRAMS = [{
       },
     },
     {
-      id: 'health', n: 6, label: 'Lower Health Care Costs',
+      id: 'health', art: 'bill', railSide: 'left', n: 6, label: 'Lower Health Care Costs',
       front: {
-        kicker: 'Promise Five',
+        kicker: 'What it costs',
         headline: 'Know The Price Before You Pay It',
         subhead: 'Republicans made hospital and insurer prices public and free to look up.',
         record: '',
@@ -183,9 +195,9 @@ export const MAIL_PROGRAMS = [{
       },
     },
     {
-      id: 'parents', n: 7, label: 'Parents Decide',
+      id: 'parents', art: 'family', railSide: 'right', n: 7, label: 'Parents Decide',
       front: {
-        kicker: 'Promise Six',
+        kicker: 'Your child’s school',
         headline: 'Fund Students, Not Systems',
         subhead: 'Republicans opened Education Freedom Accounts to every family in New Hampshire, '
           + 'whatever they earn.',
@@ -207,7 +219,7 @@ export const MAIL_PROGRAMS = [{
       },
     },
     {
-      id: 'close', n: 8, label: 'The Close',
+      id: 'close', art: 'town', railSide: 'left', n: 8, label: 'The Close',
       front: {
         kicker: 'Tuesday, November 3',
         headline: 'Seven Promises. In Writing.',
@@ -241,15 +253,44 @@ export function pieceById(programId, pieceId) {
   return p ? p.pieces.find((x) => x.id === pieceId) || null : null;
 }
 
-/** The style for one side of a piece, including the well brief and the badge. */
+/** The style for one side of a piece. */
 export function sideStyle(piece, side) {
   const base = side === 'back' ? BACK_LOOK : LOOK;
   return {
     ...base,
-    badge: side === 'back' ? '' : String(piece.n),
+    railSide: piece.railSide || 'right',
     mailPanel: side === 'back' ? 'right' : 'none',
   };
 }
+
+/** The bundled photograph for a piece, or null. */
+export const artUrl = (piece) => (piece && piece.art ? `/art/${piece.art}.webp` : null);
+
+/* One back for the whole drop.
+ *
+ * Eight different backs is eight plate changes and eight chances to bind the
+ * wrong side to the right front. One back gangs, and the only thing on it that
+ * changes district to district is the carrier's corner, which the mail house
+ * fills anyway. The receipt each piece was carrying moves onto its own front,
+ * where the claim it answers already is.
+ *
+ * The per piece backs are still in this file. Turn the shared back off and they
+ * come back, and that is the version to run when the drop is worth the plates:
+ * a roll call under a claim is the strongest thing in this programme. */
+export const SHARED_BACK_ART = '/art/portsmouth.webp';
+
+export const SHARED_BACK = {
+  kicker: 'The Granite Guarantee',
+  headline: 'Seven Promises. In Writing.',
+  record: 'No income tax. No sales tax.\nA cap on your school tax, on your ballot November 3.\n'
+    + 'Free market housing, so your kids can afford to stay.\nLower energy bills.\n'
+    + 'Lower health care costs, with the price posted before you pay it.\n'
+    + 'Parents deciding.\nSafe communities.',
+  callout: 'Ask the other side for theirs.',
+  source: '',
+  cta: 'Hold us to every one of them.',
+  brief: '',
+};
 
 /* The variables the app cannot look up. Every one of these is a fact about a
  * district, an opponent or a polling place, and the app inventing any of them

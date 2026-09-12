@@ -24,6 +24,12 @@ fs.mkdirSync(path.join(OUT, 'fonts'), { recursive: true });
 for (const f of fs.readdirSync('public/fonts')) {
   fs.copyFileSync(`public/fonts/${f}`, path.join(OUT, 'fonts', f));
 }
+
+// The programme photography, which the mail pieces load by name.
+fs.mkdirSync(path.join(OUT, 'art'), { recursive: true });
+for (const f of fs.readdirSync('public/art')) {
+  fs.copyFileSync(`public/art/${f}`, path.join(OUT, 'art', f));
+}
 // Copy every module and stylesheet, rather than a hand-kept list. A list goes
 // stale the moment app.js imports something new, and the page then dies on a
 // failed import with no options in any menu and nothing in the console but a
@@ -134,6 +140,7 @@ if (!html.includes(tag)) { console.error('static build: could not find the app s
 html = html.replace(tag, boot + '\n' + tag);
 fs.writeFileSync(path.join(OUT, 'index.html'), html);
 
-const files = fs.readdirSync(OUT).length + fs.readdirSync(path.join(OUT, 'fonts')).length;
+const files = fs.readdirSync(OUT).length + fs.readdirSync(path.join(OUT, 'fonts')).length
+  + fs.readdirSync(path.join(OUT, 'art')).length;
 console.log(`${OUT}: ${files} files, ${cat.counts.districts} districts, ${cat.counts.withCutouts} portraits`);
 console.log('An Artifact holds 256 files at most; this stays well inside that.');

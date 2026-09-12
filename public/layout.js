@@ -1654,9 +1654,29 @@ function solvePromise(spec, measure) {
   const spine = Math.max(3, w * GG.spine);
   const padX = w * GG.padX;
   const railW = w * GG.railFront;
-  const railX = w - railW;
-  const colX = padX;
-  const colW = Math.max(s * 0.2, railX - colX - w * 0.033);
+
+  /* The rail changes sides down the programme. Eight pieces with the picture in
+   * the same corner every time read as eight printings of one piece; alternating
+   * is what makes a series look like somebody laid it out. The spine always runs
+   * down the outside edge, away from the rail. */
+  const left = style.railSide === 'left';
+  const railX = left ? 0 : w - railW;
+  const colX = left ? railW + w * 0.033 : padX;
+  const colW = Math.max(s * 0.2, (left ? w - padX : railX) - colX - (left ? 0 : w * 0.033));
+  const spineRect = left
+    ? { x: w - spine, y: 0, w: spine, h }
+    : { x: 0, y: 0, w: spine, h };
+
+  /* The photograph is the ground of the copy side, full bleed, with the words
+   * reversed out of it. It used to sit behind the faces, and a cutout on a
+   * photograph fights it every time: on the schools piece the stock family's
+   * own children showed through between the candidates. Type over a scrimmed
+   * photograph is a treatment everybody knows how to read. A face over one is
+   * a mistake. So the picture takes the words' side and the roster keeps a
+   * clean ground. */
+  const photoRect = left
+    ? { x: railW, y: 0, w: w - railW, h }
+    : { x: 0, y: 0, w: railX, h };
 
   /* The rail is the district: this piece's whole right hand side is the people
    * on the ballot in it, with their names under them. A caption strip under the
@@ -1755,7 +1775,8 @@ function solvePromise(spec, measure) {
     mailPanel: null,
     qr: null,
     promise: {
-      spine: { x: 0, y: 0, w: spine, h },
+      spine: spineRect,
+      railSide: left ? 'left' : 'right',
       col: { x: colX, y: top, w: colW, h: room },
       bands: bands.items,
       badge: badge ? { text: badge, size: built.badgeSize, x: colX, y: top } : null,
@@ -1763,6 +1784,7 @@ function solvePromise(spec, measure) {
       lockup,
       bar,
       well,
+      photo: photoRect,
       caption: capBlk.lines.length
         ? { block: capBlk, x: bar.x + bar.w / 2, y: bar.y + (bar.h - capBlk.h) / 2 }
         : null,
@@ -1770,7 +1792,7 @@ function solvePromise(spec, measure) {
        * is painted before the rail, so whatever runs past the rail's edge is
        * covered rather than trimmed: the shape keeps its own proportions. */
       silhouette: style.silhouette === false ? null
-        : { x: railX - w * 0.14, y: 0, w: w * 0.2784, h },
+        : { x: left ? railW - w * 0.14 : railX - w * 0.14, y: 0, w: w * 0.2784, h },
     },
     disclaimer: null,
     warnings: [
@@ -1804,7 +1826,9 @@ function solveProof(spec, measure) {
   const colX = padX;
   const colW = Math.max(s * 0.2, railX - colX - w * 0.021);
 
-  const well = { x: railX, y: h * GG.wellTop, w: railW, h: h * GG.wellH };
+  const wellY = h * GG.wellTop;
+  const wellBottom = panel ? panel.y - h * 0.042 : h - wellY;
+  const well = { x: railX, y: wellY, w: railW, h: Math.max(h * 0.2, wellBottom - wellY) };
 
   const disc = (copy.disclaimer || '').trim();
   const discPx = Math.max(11, s * 0.02257);
@@ -1819,7 +1843,9 @@ function solveProof(spec, measure) {
     const kick = fitBlock(measure, copy.kicker, COND_SEMI, s * 0.02604 * k, colW, 2, 0.20, true);
     const head = fitBlock(measure, copy.headline, ANTON, s * 0.07292 * k, colW, 3, -0.005, true);
     const body = fitBlock(measure, bullets, COND_MED, s * 0.03646 * k, colW * 0.92, 8, 0.004, false);
-    const quote = fitBlock(measure, copy.callout ? `“${String(copy.callout).replace(/^[“"]|[”"]$/g, '')}”` : '',
+    const said = String(copy.callout || '').replace(/^[“"]|[”"]$/g, '').trim();
+    const attributed = Boolean(String(copy.source || '').trim());
+    const quote = fitBlock(measure, said ? (attributed ? `“${said}”` : said) : '',
       COND_SEMI, s * 0.03819 * k, colW, 3, 0.01, false);
     const src = fitBlock(measure, copy.source, COND_MED, s * 0.02257 * k, colW, 2, 0.02, false);
     const cta = fitBlock(measure, copy.cta, ANTON, s * 0.03819 * k, colW, 2, 0.02, true);

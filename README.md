@@ -528,6 +528,26 @@ with their name plates, the office under them once, and the wordmark bottom
 left. The address side carries the evidence, leaves the carrier its four by two
 and a quarter corner, and puts the disclaimer at the foot.
 
+Every piece ships with a licensed photograph. It is the ground of the copy
+side, full bleed, with the words reversed out of it and the roster kept on a
+clean panel beside it. A cutout on a photograph fights it; type on one does
+not. Drop your own picture in under **Replace the photo** and it takes over.
+
+The photographs are Adobe Stock, licensed to this account and sized down into
+`public/art`. That covers using them on the mail. Before this app is opened to
+anybody outside the committee, check the licence terms on redistribution.
+
+**One back for the whole drop** is on by default. Eight different backs is eight
+plate changes and eight chances to bind the wrong side to the right front. The
+per piece backs, each carrying the roll call for its own claim, are still in
+`public/mailers.js`: switch the shared back off and they come back, and that is
+the version to run when the drop is worth the plates.
+
+The artwork carries no disclaimer and the carrier's corner prints blank, on
+purpose. The mail house sets the panel and the paid for line with it. RSA 664:14
+still applies to the finished piece, so put that in the work order. The handoff
+note in **Both sides** already says it.
+
 Two things the app will not do for you:
 
 - **Who the piece names.** Five of the eight pieces say `{{CAND_NAME}}` or

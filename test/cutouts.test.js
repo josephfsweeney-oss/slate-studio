@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import path from 'node:path';
+import fs from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { ROOT } from '../server/config.js';
 
@@ -74,4 +75,24 @@ test('a public deployment cannot write portraits at all', (t) => {
   assert.equal(r.write.status, 403, r.write.body);
   assert.equal(r.landed, false, 'nothing was written');
   assert.equal(r.getIsRefused.status, 403);
+});
+
+/* The programme photography is part of the bundle, not a link to somebody's
+ * server. A mail piece whose picture is a 404 prints as a flat tint, and it
+ * prints that way silently. */
+test('every mail piece names a photograph that is actually in the bundle', async () => {
+  const { MAIL_PROGRAMS, SHARED_BACK_ART, artUrl } = await import('../public/mailers.js');
+  const wanted = new Set([SHARED_BACK_ART]);
+  for (const prog of MAIL_PROGRAMS) {
+    for (const piece of prog.pieces) {
+      const url = artUrl(piece);
+      assert.ok(url, `${piece.id} names no photograph`);
+      wanted.add(url);
+    }
+  }
+  for (const url of wanted) {
+    const file = path.join(ROOT, 'public', url.replace(/^\//, ''));
+    assert.ok(fs.existsSync(file), `${url} is not in the bundle`);
+    assert.ok(fs.statSync(file).size > 4096, `${url} is there but empty`);
+  }
 });

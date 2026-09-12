@@ -431,6 +431,13 @@ function paintMailPanel(ctx, plan, style, copy) {
   // A plain ground: scanners read badly over artwork.
   ctx.fillStyle = style.mailPanelGround || '#FFFFFF';
   ctx.fillRect(m.x, m.y, m.w, m.h);
+
+  /* Blank means blank. The mail house owns this corner: they set the indicia,
+   * the return address, the address block and the barcode, and a guide printed
+   * here is one more thing for somebody to leave on the plate. The white knocked
+   * out of the artwork is the whole instruction. */
+  if (style.mailPanelBlank) return;
+
   ctx.fillStyle = 'rgba(18,49,78,.12)';
   ctx.fillRect(m.x, m.y, Math.max(1, inch(0.008)), m.h);
 
@@ -1356,25 +1363,34 @@ function paintPromise(ctx, plan, style, theme, assets) {
   const navy = style.plateColor || BRAND.navy;
 
   paintGraniteMark(ctx, g.silhouette, accent, 0.05);
-  ctx.fillStyle = accent;
-  ctx.fillRect(g.spine.x, g.spine.y, g.spine.w, g.spine.h);
 
-  /* The panel is the district. A photo dropped in becomes its ground and the
-   * faces stand on top of it; with no photo it is a flat tint, which is what
-   * keeps a cutout reading as a cutout rather than as a hole in the page. */
-  ctx.fillStyle = style.slatePanel || '#DFE9E3';
-  ctx.fillRect(g.well.x, g.well.y, g.well.w, g.well.h);
-  if (assets.hero) {
+  /* The photograph takes the words' side, full bleed, under a scrim heavy
+   * enough that a headline sits on it rather than in it. The scrim is deepest
+   * where the small type is, because that is what goes first. */
+  const shot = assets.hero && g.photo;
+  if (shot) {
     const img = assets.hero;
-    const k = Math.max(g.well.w / img.width, g.well.h / img.height);
+    const r = g.photo;
+    const k = Math.max(r.w / img.width, r.h / img.height);
     ctx.save();
     ctx.beginPath();
-    ctx.rect(g.well.x, g.well.y, g.well.w, g.well.h);
+    ctx.rect(r.x, r.y, r.w, r.h);
     ctx.clip();
-    ctx.drawImage(img, g.well.x + (g.well.w - img.width * k) / 2,
-      g.well.y + (g.well.h - img.height * k) / 2, img.width * k, img.height * k);
+    ctx.drawImage(img, r.x + (r.w - img.width * k) / 2, r.y + (r.h - img.height * k) / 2,
+      img.width * k, img.height * k);
+    const [nr, ng, nb] = hexToRgb(navy);
+    const scrim = ctx.createLinearGradient(r.x, r.y, r.x, r.y + r.h);
+    scrim.addColorStop(0, `rgba(${nr},${ng},${nb},.70)`);
+    scrim.addColorStop(0.46, `rgba(${nr},${ng},${nb},.82)`);
+    scrim.addColorStop(1, `rgba(${nr},${ng},${nb},.93)`);
+    ctx.fillStyle = scrim;
+    ctx.fillRect(r.x, r.y, r.w, r.h);
     ctx.restore();
   }
+
+  // The roster keeps a clean ground, so a cutout reads as a cutout.
+  ctx.fillStyle = style.slatePanel || '#DFE9E3';
+  ctx.fillRect(g.well.x, g.well.y, g.well.w, g.well.h);
 
   // The caption strip under the panel: the office, said once.
   if (g.bar) {
@@ -1382,28 +1398,29 @@ function paintPromise(ctx, plan, style, theme, assets) {
     ctx.fillRect(g.bar.x, g.bar.y, g.bar.w, g.bar.h);
   }
 
-  if (g.badge) {
-    ctx.fillStyle = accent;
-    ctx.fillRect(g.badge.x, g.badge.y, g.badge.size, g.badge.size);
-    ctx.fillStyle = BRAND.white;
-    setFont(ctx, { family: 'Barlow Condensed', weight: 700 }, g.badge.size * 0.62, 0);
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(g.badge.text, g.badge.x + g.badge.size / 2, g.badge.y + g.badge.size * 0.54);
-  }
+  // The spine runs down the outside edge, over the photograph rather than under
+  // it: full bleed art would otherwise swallow it.
+  ctx.fillStyle = accent;
+  ctx.fillRect(g.spine.x, g.spine.y, g.spine.w, g.spine.h);
 
-  const kickX = g.badge ? g.badge.x + g.badge.size + plan.s * 0.024 : g.col.x;
+  /* On the photograph the words reverse out; on white they stay navy. One
+   * variable rather than a branch at every fillStyle below. */
+  const ink = shot ? BRAND.white : navy;
+  const soft = shot ? 'rgba(255,255,255,.82)' : theme.secondary;
+  const mark = shot ? (style.plateAccent || BRAND.mint) : accent;
+
+  const kickX = g.col.x;
   ctx.textBaseline = 'alphabetic';
   ctx.textAlign = 'left';
   for (const b of g.bands) {
     const blk = b.block;
     if (b.role === 'rule') {
-      ctx.fillStyle = accent;
+      ctx.fillStyle = mark;
       ctx.fillRect(g.col.x, b.y, g.ruleW, b.h);
       continue;
     }
     if (b.role === 'kicker') {
-      ctx.fillStyle = accent;
+      ctx.fillStyle = mark;
       setFont(ctx, blk.font, blk.px, blk.ls);
       const mid = g.badge ? g.badge.y + g.badge.size / 2 : b.y + blk.h / 2;
       blk.lines.forEach((l, i) => ctx.fillText(l,
@@ -1411,11 +1428,10 @@ function paintPromise(ctx, plan, style, theme, assets) {
       continue;
     }
     if (b.role === 'list') {
-      paintBullets(ctx, blk, g.col.x, b.y, accent, navy, 0.13, 0.30);
+      paintBullets(ctx, blk, g.col.x, b.y, mark, ink, 0.13, 0.30);
       continue;
     }
-    ctx.fillStyle = b.role === 'headline' ? navy
-      : b.role === 'claim' ? navy : theme.secondary;
+    ctx.fillStyle = b.role === 'headline' || b.role === 'claim' ? ink : soft;
     setFont(ctx, blk.font, blk.px, blk.ls);
     blk.lines.forEach((l, i) => ctx.fillText(l, g.col.x, b.y + blk.lh * (i + 0.84)));
   }
@@ -1429,7 +1445,7 @@ function paintPromise(ctx, plan, style, theme, assets) {
     ctx.textAlign = 'left';
   }
 
-  paintLockup(ctx, g.lockup, accent, navy);
+  paintLockup(ctx, g.lockup, mark, ink);
   if ('letterSpacing' in ctx) ctx.letterSpacing = '0px';
 }
 
