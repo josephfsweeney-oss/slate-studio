@@ -43,6 +43,18 @@ test('a portrait can be written and the index follows it', (t) => {
   assert.equal(r.restored, true, 'the probe put the original back');
 });
 
+test('the top of the ticket can have a portrait saved for her', (t) => {
+  /* She is on the piece without being on a district roster, and the route
+   * checks the slug against the roster to stop it being a way to write any
+   * file into the repo. Leaving the toppers out of that check is what made
+   * her the one person whose photo could not be changed. */
+  const r = probe();
+  if (noCutouts(r)) return t.skip(skipReason);
+  assert.equal(r.topper.status, 200, r.topper.body);
+  assert.equal(r.topper.json.name, 'Kelly Ayotte');
+  assert.equal(r.topperLanded, true, 'the file was not written');
+});
+
 test('a filename that is not a portrait never reaches the disk', (t) => {
   const r = probe();
   if (noCutouts(r)) return t.skip(skipReason);

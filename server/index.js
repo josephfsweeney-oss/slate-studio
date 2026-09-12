@@ -13,6 +13,7 @@ import { config, paths, ROOT, serverless } from './config.js';
 import * as auth from './google-auth.js';
 import * as drive from './drive.js';
 import * as catalog from './catalog.js';
+import { TOPPERS } from '../public/presets.js';
 
 const PUBLIC = path.join(ROOT, 'public');
 const MIME = {
@@ -250,9 +251,16 @@ async function api(req, res, url) {
       return json(res, 400, { error: 'A portrait filename is <Slug>.webp or <Slug>.png, nothing else.' });
     }
     const slug = file.replace(/\.(webp|png)$/i, '');
+    /* The slug has to belong to somebody: a nominee on a district roster, or
+     * whoever is at the top of the ticket. That is what keeps this route from
+     * being a way to write any file you like into the repo, and leaving the
+     * toppers out of it is what stopped the governor's portrait being saved. */
     const cat = await catalog.get();
-    const who = cat.districts.flatMap((d) => d.nominees).find((n) => n.slug === slug);
-    if (!who) return json(res, 404, { error: `No candidate on the roster has the slug ${slug}.` });
+    const who = cat.districts.flatMap((d) => d.nominees).find((n) => n.slug === slug)
+      || TOPPERS.find((t) => t.slug === slug);
+    if (!who) {
+      return json(res, 404, { error: `No candidate on the roster, and no top of the ticket, has the slug ${slug}.` });
+    }
     const target = path.join(catalog.CUTOUTS_DIR, file);
 
     if (req.method === 'DELETE') {

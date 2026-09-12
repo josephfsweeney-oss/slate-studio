@@ -64,9 +64,13 @@ test('render.yaml stays valid enough to deploy', () => {
 });
 
 test('the portrait index matches what is on disk', () => {
-  // The server reads data/cutouts.json because a serverless function is not
-  // bundled with public/. If that index drifts from the folder, the deployed
-  // app shows placeholders while the CDN happily serves the real images.
+  /* The server reads data/cutouts.json because a serverless function is not
+   * bundled with public/. If that index drifts from the folder, the deployed
+   * app shows placeholders while the CDN happily serves the real images.
+   *
+   * This reads files that test/cutouts.test.js writes and puts back, so the
+   * suite runs at a concurrency of one. Run in parallel it caught the other
+   * file mid-write and failed on a repo that was perfectly fine. */
   const dir = path.join(ROOT, 'public', 'cutouts');
   if (!fs.existsSync(dir)) return;                       // a code-only checkout
   const onDisk = fs.readdirSync(dir).filter((f) => /\.(webp|png)$/i.test(f)).sort();

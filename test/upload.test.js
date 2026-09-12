@@ -58,6 +58,25 @@ test('a file the browser cannot read says which file and what to do', () => {
     'no second decode attempt, so Safari cannot open a HEIC the way it can');
 });
 
+test('the roster panel resolves everybody on the piece, not just the roster', () => {
+  /* The governor was the one person whose photo could not be changed, because
+   * every lookup from a roster row searched the district's nominees and she is
+   * not one of them. Clicking her thumbnail found nobody and returned, which
+   * from the outside is a button that does nothing at all. */
+  assert.match(appjs, /const personByName = /, 'there is no shared resolver');
+  assert.match(appjs, /TOPPERS\.find\(\(t\) => t\.name === name\)/,
+    'the resolver does not look at the toppers');
+  const bare = [...appjs.matchAll(/district\(\)\?\.nominees\.find\([^)]*\)/g)]
+    .map((m) => m[0]);
+  assert.equal(bare.length, 1,
+    `${bare.length} places search only the district roster; they must go through `
+    + `personByName:\n  ${bare.join('\n  ')}`);
+  // And the cutout path on a topper is a hope, not a fact, so nothing may read
+  // it as proof a portrait exists.
+  assert.ok(!/n\?\.cutout \? 'The portrait that ships/.test(appjs),
+    'the editor still treats a topper cutout path as a portrait that is there');
+});
+
 test('there are three ways to get a photo in, not one', () => {
   assert.match(appjs, /addEventListener\('drop'/, 'no drag and drop');
   assert.match(appjs, /addEventListener\('paste'/, 'no paste');

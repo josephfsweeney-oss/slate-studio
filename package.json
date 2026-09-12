@@ -10,7 +10,7 @@
   "scripts": {
     "start": "node server/index.js",
     "dev": "node --watch server/index.js",
-    "test": "node --test test/*.test.js",
+    "test": "node --test --test-concurrency=1 test/*.test.js",
     "token": "node server/print-token.js",
     "verify": "node server/verify.js",
     "build:static": "node build/pack-atlas.mjs dist && node build/static-site.mjs dist",

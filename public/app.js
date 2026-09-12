@@ -127,7 +127,12 @@ const district = () => state.catalog?.districts.find((d) => d.id === state.distr
  * left rail would go on calling a finished slate incomplete if these read the
  * server's answer instead of working it out. Same rule as the server's, one
  * term wider. */
-const hasFace = (n) => overrides.has(n.slug) || Boolean(n.cutout);
+/* A topper's cutout path is where the portrait will be once somebody adds it,
+ * not proof that it is there. So for a topper the test is what actually
+ * loaded, otherwise the roster row claims a face the tile draws as a
+ * placeholder. */
+const hasFace = (n) => overrides.has(n.slug)
+  || (n.topper ? Boolean(assets.portraits[n.name]) : Boolean(n.cutout));
 const facesMissing = (d) => d.nominees.filter((n) => !hasFace(n)).length;
 const isReady = (d) => facesMissing(d) === 0;
 
@@ -487,7 +492,7 @@ function renderSlatePanel() {
  * one out of a texture atlas. Rendering the row first keeps the list instant. */
 function fillThumbs() {
   for (const btn of $$('#slate-list .ph')) {
-    const n = district()?.nominees.find((x) => x.name === btn.dataset.photo);
+    const n = personByName(btn.dataset.photo);
     if (!n) continue;
     portraitThumb(n).then((src) => {
       if (!src || !btn.isConnected) return;
@@ -544,7 +549,17 @@ const ed = {
   knockout: false, tol: 34, sourceName: '', token: 0,
 };
 
-const nominee = (name) => district()?.nominees.find((x) => x.name === name) || null;
+/* Anybody on the piece, by name: on this district's roster, or a topper.
+ *
+ * Looking only at the roster is why the photo editor would not open for the
+ * governor. Clicking her thumbnail found nobody and returned, silently, which
+ * from the outside is a button that does nothing. Everything that resolves a
+ * person from a row in the roster panel goes through here. */
+const personByName = (name) => district()?.nominees.find((x) => x.name === name)
+  || TOPPERS.find((t) => t.name === name)
+  || null;
+
+const nominee = personByName;
 const edStatus = (msg = '', bad = false) => {
   const el = $('#photo-status');
   el.textContent = msg;
@@ -586,7 +601,7 @@ function syncEditor() {
   $('#photo-use').hidden = !picking;
   $('#photo-download').hidden = !picking && !mine;
   $('#photo-default').hidden = !canWrite || (!picking && !mine);
-  $('#photo-remove').hidden = !(mine || (n?.cutout && canWrite));
+  $('#photo-remove').hidden = !(mine || (n && hasFace(n) && canWrite));
   $('#photo-remove').textContent = mine ? 'Remove my photo' : 'Remove the default';
   // The label's text, not the label's contents: the file input lives in there
   // and replacing textContent would throw it away.
@@ -597,9 +612,13 @@ function syncEditor() {
     ? 'Drag to move it, scroll or use the slider to zoom. The frame is the 4:5 tile the slate uses.'
     : mine
       ? `Your photo. It is on every canvas for ${ed.name} in this browser, and nowhere else yet.`
-      : n?.cutout
+      : n && hasFace(n)
         ? 'The portrait that ships with the app.'
-        : 'No headshot was ever sent, so this candidate shows as PHOTO NEEDED.';
+        // A topper points at where its portrait will be, so asking whether the
+        // file is actually there is the only honest test.
+        : n?.topper
+          ? `No portrait for ${ed.name} yet. Add one and it is on every piece.`
+          : 'No headshot was ever sent, so this candidate shows as PHOTO NEEDED.';
 
   $('#photo-knock-note').hidden = !picking;
   $('#photo-knock-note').textContent = ed.knockout

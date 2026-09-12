@@ -52,6 +52,16 @@ try {
   result.getIsRefused = await call('GET', `/api/cutout/${victim}`);
   result.untouched = fs.readFileSync(file).equals(original);
 
+  // A topper is on the piece without being on any district roster, and the
+  // route has to accept its slug or the portrait can never be saved.
+  result.topper = await call('POST', '/api/cutout/Kelly-Ayotte.webp', planted);
+  result.topperLanded = fs.existsSync(path.join(CUTOUTS_DIR, 'Kelly-Ayotte.webp'));
+  if (result.topperLanded) {
+    fs.rmSync(path.join(CUTOUTS_DIR, 'Kelly-Ayotte.webp'));
+    // Put the index back the way it was; the filename set has to be unchanged.
+    await call('POST', `/api/cutout/${victim}`, original);
+  }
+
   result.write = await call('POST', `/api/cutout/${victim}`, planted);
   result.landed = fs.readFileSync(file).equals(planted);
   result.indexed = JSON.parse(fs.readFileSync(path.join(process.cwd(), 'data', 'cutouts.json'), 'utf8')).includes(victim);
