@@ -1,7 +1,7 @@
 /* Slate Studio front end. */
 import { solve, BRAND } from './layout.js';
 import { paint, makeMeasurer } from './render.js';
-import { CANVASES, TEMPLATES, PALETTES, GROUNDS, TOKENS, fillTokens, buildFilename } from './presets.js';
+import { CANVASES, TEMPLATES, PALETTES, GROUNDS, TOKENS, fillTokens, buildFilename, canvasById } from './presets.js';
 import { makeZip } from './zip.js';
 import * as photos from './photos.js';
 import { printSheet, slugLine, drawSlug, inchesOf } from './print.js';
@@ -14,7 +14,7 @@ const $$ = (s) => [...document.querySelectorAll(s)];
 const DEFAULT_DISCLAIMER = 'Paid for by Committee to Elect House Republicans, 75 S Main Street Unit 7 Box 159, Concord, NH 03301. Jason Osborne, Chairman.';
 
 const COPY_FIELDS = ['kicker', 'headline', 'subhead', 'details', 'cta', 'footer',
-  'disclaimer', 'returnAddress', 'indicia', 'values'];
+  'disclaimer', 'returnAddress', 'indicia', 'values', 'record', 'callout', 'contrast'];
 
 const COLOR_FIELDS = [
   ['#accent', 'accent'], ['#plate-accent', 'plateAccent'],
@@ -52,7 +52,7 @@ const state = {
   cw: 1080, ch: 1080,
   copy: {
     kicker: '', headline: '', subhead: '', details: '', cta: '', footer: '', disclaimer: '',
-    values: '',
+    values: '', record: '', callout: '', contrast: '',
     returnAddress: 'Committee to Elect House Republicans\n75 S Main Street Unit 7 Box 159\nConcord, NH 03301',
     indicia: 'NONPROFIT ORG\nU.S. POSTAGE\nPAID\nPERMIT NO. ___',
   },
@@ -63,7 +63,7 @@ const state = {
     bgType: 'solid', bgColor: '#FFFFFF', bgColor2: '#235E3B', bgDim: 0.45,
     accent: '#2F7C4E', plateColor: '#12314E', plateAccent: '#95DAB1',
     bar: ['#2F7C4E', '#12314E'],
-    faceSource: 'cutouts', mailPanel: 'none',
+    faceSource: 'cutouts', mailPanel: 'none', spotlight: '',
     flagBar: true, headlineShadow: true, twoTone: true,
     logoPos: 'top-right', logoScale: 0.16,
   },
@@ -146,9 +146,12 @@ function activeSlate(d = district()) {
 
 const canvasSize = () => {
   if (state.canvasId === 'custom') return { w: state.cw, h: state.ch };
-  const c = CANVASES.find((x) => x.id === state.canvasId) || CANVASES[0];
+  const c = canvasById(state.canvasId);
   return { w: c.w, h: c.h };
 };
+
+/** The canvas record behind whatever is selected. Custom has no print settings. */
+const canvasRec = () => (state.canvasId === 'custom' ? {} : canvasById(state.canvasId));
 
 /* ------------------------------------------------------------------ portraits */
 
@@ -268,7 +271,14 @@ function buildPlan(d, size, slate) {
     // Nominal aspect, so the layout is right before the image finishes loading.
     if (pick) style.deckAspect = pick.h / pick.w;
   }
-  return solve({ canvas: size, slate, copy: resolvedCopy(d), style }, measure);
+  // The ballot layouts say how many ovals to fill, and that comes off the
+  // district record, not off anything anybody types.
+  return solve({
+    canvas: size, slate, copy: resolvedCopy(d), style,
+    seats: d?.seats ?? slate.length,
+    die: canvasRec().die || null,
+    dpi: canvasRec().dpi || 0,
+  }, measure);
 }
 
 function draw() {
@@ -331,9 +341,10 @@ function paintWarnings(d, slate) {
 
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
-/** Canvases authored at 300 dpi, where bleed and crop marks mean something. */
+/** Canvases with a real trim size, where bleed and crop marks mean something.
+ *  A canvas declares that by carrying a dpi; a screen canvas has none. */
 function isPrintCanvas() {
-  return ['palm', 'mail11'].includes(state.canvasId)
+  return Boolean(canvasRec().dpi)
     || (state.canvasId === 'custom' && Math.max(state.cw, state.ch) >= 1500);
 }
 
@@ -414,6 +425,8 @@ async function selectDistrict(id) {
   assets.portraits = d ? await loadPortraits(d) : {};
   assets.deck = d && state.style.faceSource === 'deck' ? await loadDeck(d, canvasSize()) : null;
   renderSlatePanel();
+  // A new district is a new slate, so the spotlight picker is out of date.
+  if (state.style.composition === 'spotlight') fillSpotlightPicker();
   saveLocal();
   draw();
 }
@@ -841,7 +854,7 @@ async function exportPrint() {
   if (!d) return;
   const size = canvasSize();
   const plan = buildPlan(d, size, activeSlate(d));
-  const dpi = state.canvasId === 'sign' ? 150 : 300;
+  const dpi = canvasRec().dpi || 300;
   const sheet = printSheet({ plan, style: state.style, assets, copy: resolvedCopy(d), dpi });
   drawSlug(sheet.canvas.getContext('2d'), sheet.sheet,
     slugLine(plan, dpi, `${d.county} ${d.district}`), dpi);
@@ -974,6 +987,15 @@ function fillSelects() {
   $('#batch-county').innerHTML = counties.map((c) => `<option>${c}</option>`).join('');
 }
 
+/** The candidates on this district's slate, for the spotlight picker. */
+function fillSpotlightPicker() {
+  const list = activeSlate();
+  const cur = state.style.spotlight;
+  $('#spotlight').innerHTML = '<option value="">First on the ballot</option>'
+    + list.map((n) => `<option value="${esc(n.name)}">${esc(n.name)}</option>`).join('');
+  $('#spotlight').value = list.some((n) => n.name === cur) ? cur : '';
+}
+
 function syncControls() {
   $('#canvas').value = state.canvasId;
   $('#custom-size').hidden = state.canvasId !== 'custom';
@@ -983,7 +1005,16 @@ function syncControls() {
     if (el) el.value = state.copy[k] || '';
   }
   $('#mailpanel').value = state.style.mailPanel;
-  $('#values-wrap').hidden = state.style.composition !== 'palmcard';
+
+  /* Only show a field the chosen layout actually paints. A values strip on a
+   * square feed graphic is a box nobody can find the output of. */
+  const comp = state.style.composition;
+  $('#values-wrap').hidden = !['palmcard', 'palmback', 'versus'].includes(comp);
+  $('#record-wrap').hidden = comp !== 'palmback';
+  $('#callout-wrap').hidden = !['palmback', 'spotlight'].includes(comp);
+  $('#contrast-wrap').hidden = comp !== 'versus';
+  $('#spotlight-wrap').hidden = comp !== 'spotlight';
+  if (comp === 'spotlight') fillSpotlightPicker();
   $('#btn-print').hidden = !isPrintCanvas();
   $('#mail-fields').hidden = state.style.mailPanel !== 'right';
   $('#composition').value = state.style.composition;
@@ -1054,7 +1085,17 @@ function bind() {
   $('#template').addEventListener('change', (e) => {
     const t = TEMPLATES.find((x) => x.id === e.target.value);
     if (!t) return;
-    state.copy = { ...state.copy, ...{ kicker: '', headline: '', subhead: '', details: '', cta: '', footer: '' }, ...t.copy };
+    // Every field a template can fill is cleared first. Otherwise the record
+    // from the palm card back is still sitting in the box when you pick the
+    // absentee chase, and it comes back the next time a layout paints it.
+    const blank = {
+      kicker: '', headline: '', subhead: '', details: '', cta: '', footer: '',
+      values: '', record: '', callout: '', contrast: '',
+    };
+    state.copy = { ...state.copy, ...blank, ...t.copy };
+    // A template that needs a particular layout says so. One that does not is
+    // saying the canvas decides, so it must not inherit the last one's.
+    state.style.composition = t.style?.composition || 'auto';
     if (t.style) {
       Object.assign(state.style, t.style);
       if (t.style.bgType) state.style.ground = t.style.bgType === 'transparent' ? 'transparent' : 'palette';
@@ -1133,6 +1174,10 @@ function bind() {
       draw();
     });
   }
+  $('#spotlight').addEventListener('change', (e) => {
+    state.style.spotlight = e.target.value;
+    saveLocal(); draw();
+  });
   $('#density').addEventListener('input', (e) => { state.style.density = +e.target.value; scheduleDraw(); });
   for (const [sel, key] of [['#plate', 'plate'], ['#flagbar', 'flagBar'], ['#hshadow', 'headlineShadow'], ['#twotone', 'twoTone']]) {
     $(sel).addEventListener('change', async (e) => {

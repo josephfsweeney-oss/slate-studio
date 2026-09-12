@@ -45,8 +45,12 @@ function clearShadow(ctx) {
 }
 
 /** Theme derived from whatever sits behind the copy. */
+/* Card layouts paint their own bands on a white stock, so the copy on them is
+ * always dark whatever the palette's ground is set to. */
+const CARD_COMPS = new Set(['palmcard', 'palmback']);
+
 export function themeFor(style) {
-  if (style.composition === 'palmcard') {
+  if (CARD_COMPS.has(style.composition)) {
     const accent = style.accent || BRAND.green;
     return {
       light: true, primary: BRAND.navy, secondary: 'rgba(18,49,78,.80)',
@@ -77,7 +81,9 @@ export function themeFor(style) {
 /** The closing bar. On a light ground it becomes a solid band, which is where
  *  the disclaimer then sits, so both painters have to agree on its size. */
 function bandMetrics(plan, style) {
-  if (style.flagBar === false) return { rule: 0, band: 0 };
+  // A display rail is 90px tall and carries no disclaimer, so a flag bar along
+  // the bottom is a third of the ad spent on a stripe.
+  if (plan.strip || style.flagBar === false) return { rule: 0, band: 0 };
   const rule = Math.max(3, plan.s * 0.009);
   const light = luminance(style.bgType === 'transparent' ? '#FFFFFF' : (style.bgColor || '')) > 0.45;
   if (!light) return { rule, band: 0 };
@@ -564,33 +570,498 @@ function paintLogo(ctx, plan, style, assets) {
   ctx.drawImage(img, x, y, dw, dh);
 }
 
+
+/* ------------------------------------------------------------------- ballot ---
+ *
+ * A mock ballot with every oval already filled. The point is recognition: what
+ * is on the card has to look like what is in the booth, or it teaches nothing.
+ */
+
+/** One ballot oval. Filled means marked, which is the whole instruction. */
+function paintOval(ctx, o, ink, filled) {
+  ctx.beginPath();
+  ctx.ellipse(o.cx, o.cy, o.rx, o.ry, 0, 0, Math.PI * 2);
+  ctx.lineWidth = Math.max(1, o.ry * 0.14);
+  ctx.strokeStyle = ink;
+  ctx.stroke();
+  if (!filled) return;
+  // Nearly to the edge. A small dot in the middle of a thick ring reads as a
+  // target; a marked ballot oval is almost solid.
+  ctx.beginPath();
+  ctx.ellipse(o.cx, o.cy, o.rx * 0.80, o.ry * 0.74, 0, 0, Math.PI * 2);
+  ctx.fillStyle = ink;
+  ctx.fill();
+}
+
+function paintBallotRows(ctx, rows, style, opts) {
+  const ink = opts.ink;
+  const accent = style.accent || BRAND.green;
+  ctx.textBaseline = 'alphabetic';
+  for (const r of rows) {
+    if (opts.stripe) {
+      ctx.fillStyle = 'rgba(18,49,78,.035)';
+      ctx.fillRect(r.x, r.y, r.w, r.h);
+    }
+    paintOval(ctx, r.oval, ink, true);
+    const c = r.candidate;
+    const namePx = r.namePx ?? Math.min(r.h * 0.46, r.px * 0.82);
+    const firstPx = r.firstPx ?? Math.min(r.h * 0.22, r.px * 0.42);
+    ctx.textAlign = 'left';
+    if (c.first) {
+      ctx.fillStyle = opts.quiet;
+      setFont(ctx, { family: 'Barlow Condensed', weight: 600 }, firstPx, 0.05);
+      ctx.fillText(c.first, r.textX, r.y + r.h * 0.38);
+    }
+    ctx.fillStyle = ink;
+    setFont(ctx, { family: 'Anton', weight: 400 }, namePx, -0.005);
+    ctx.fillText(c.last, r.textX, r.y + r.h * (c.first ? 0.90 : 0.68));
+
+    if (opts.party && r.w > namePx * 7) {
+      const px = firstPx * 0.92;
+      ctx.textAlign = 'right';
+      ctx.fillStyle = accent;
+      setFont(ctx, { family: 'Barlow Condensed', weight: 700 }, px, 0.12);
+      ctx.fillText('REPUBLICAN', r.x + r.w - px * 0.6, r.y + r.h * 0.62);
+    }
+    // A hairline between rows, the way a printed ballot separates them.
+    if (opts.rule) {
+      ctx.fillStyle = 'rgba(18,49,78,.14)';
+      ctx.fillRect(r.x + r.w * 0.03, r.y + r.h - 1, r.w * 0.94, 1);
+    }
+  }
+  if ('letterSpacing' in ctx) ctx.letterSpacing = '0px';
+}
+
+function paintBallot(ctx, plan, style, theme) {
+  const b = plan.ballot;
+  const { w } = plan.canvas;
+  const accent = style.accent || BRAND.green;
+  const ink = style.plateColor || BRAND.navy;
+
+  // The card is always light. A ballot is printed on paper and reads as paper.
+  ctx.save();
+  ctx.shadowColor = 'rgba(0,0,0,.22)';
+  ctx.shadowBlur = plan.s * 0.020;
+  ctx.shadowOffsetY = plan.s * 0.006;
+  ctx.fillStyle = BRAND.white;
+  roundRect(ctx, b.card.x, b.card.y, b.card.w, b.card.h, plan.s * 0.014);
+  ctx.fill();
+  ctx.restore();
+  clearShadow(ctx);
+
+  // Header: the instruction, in the accent, exactly as the ballot words it.
+  const hb = b.rule;
+  ctx.fillStyle = accent;
+  roundRect(ctx, b.card.x, b.card.y, b.card.w, b.headerH, plan.s * 0.014);
+  ctx.fill();
+  ctx.fillRect(b.card.x, b.card.y + b.headerH - plan.s * 0.014, b.card.w, plan.s * 0.014);
+  ctx.fillStyle = BRAND.white;
+  setFont(ctx, hb.font, hb.px, hb.ls);
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'alphabetic';
+  hb.lines.forEach((l, i) => ctx.fillText(l, b.card.x + b.card.w / 2,
+    b.card.y + (b.headerH - hb.h) / 2 + hb.lh * (i + 0.80)));
+
+  paintBallotRows(ctx, b.rows, style, {
+    ink, quiet: 'rgba(18,49,78,.62)', party: true, rule: true, stripe: false,
+  });
+
+  // The copy column.
+  paintBands(ctx, b.bands, plan, style, theme, b.copyRect, !b.wide);
+  if ('letterSpacing' in ctx) ctx.letterSpacing = '0px';
+}
+
+/* Draw the bands a solver positioned. Every y comes from the plan; nothing
+ * here advances a cursor of its own. The painter used to walk the same list and
+ * add the same gaps again, which is two places to get one number right: on the
+ * spotlight they disagreed and the call to action landed on top of the chips. */
+function paintBands(ctx, bands, plan, style, theme, box, centred) {
+  const tx = centred ? box.x + box.w / 2 : box.x;
+  ctx.textBaseline = 'alphabetic';
+  for (const b of bands) {
+    const blk = b.block;
+    ctx.textAlign = centred ? 'center' : 'left';
+    if (b.role === 'cta') {
+      const padX = blk.px * 0.62;
+      const boxH = b.h;
+      const tw = Math.min(box.w, widthOf(ctx, blk, blk.lines[0]) + padX * 2);
+      const bx = centred ? tx - tw / 2 : box.x;
+      ctx.fillStyle = theme.ctaBg;
+      roundRect(ctx, bx, b.y, tw, boxH, boxH / 2);
+      ctx.fill();
+      ctx.fillStyle = theme.ctaText;
+      setFont(ctx, blk.font, blk.px, blk.ls);
+      ctx.textAlign = 'center';
+      ctx.fillText(blk.lines[0], bx + tw / 2, b.y + (boxH + blk.px * 0.72) / 2);
+      continue;
+    }
+    // The callout is set as speech: a rule down the side, never quote marks,
+    // because curly quotes on a graphic read as a meme.
+    if (b.role === 'callout' && !centred) {
+      ctx.fillStyle = theme.accent;
+      ctx.fillRect(box.x, b.y, Math.max(2, plan.s * 0.005), blk.h * 1.02);
+    }
+    const x = b.role === 'callout' && !centred ? box.x + plan.s * 0.022 : tx;
+    blk.lines.forEach((l, i) => {
+      ctx.fillStyle = b.role === 'kicker' ? theme.accent
+        : b.role === 'headline'
+          ? ((style.twoTone !== false && blk.lines.length > 1 && i === 0) ? theme.headline2 : theme.primary)
+          : b.role === 'callout' ? theme.primary : theme.secondary;
+      setFont(ctx, blk.font, blk.px, blk.ls);
+      ctx.fillText(l, x, b.y + blk.lh * (i + 0.84));
+    });
+  }
+  if ('letterSpacing' in ctx) ctx.letterSpacing = '0px';
+}
+
+/** Width of an already-fitted block's line at its own size. */
+function widthOf(ctx, blk, line) {
+  setFont(ctx, blk.font, blk.px, blk.ls);
+  return ctx.measureText(line || '').width;
+}
+
+/* --------------------------------------------------------- palm card back --- */
+
+function paintPalmBack(ctx, plan, style, theme, assets, bleed) {
+  const p = plan.palmback;
+  const { w, h } = plan.canvas;
+  const accent = style.accent || BRAND.green;
+  const ink = style.plateColor || BRAND.navy;
+
+  // Masthead, the same navy block the front wears, so the two sides match.
+  const mastBottom = p.mast.y + p.mast.h - plan.pad * 0.3;
+  ctx.fillStyle = ink;
+  ctx.fillRect(-bleed, -bleed, w + bleed * 2, mastBottom + bleed);
+  ctx.fillStyle = accent;
+  ctx.fillRect(-bleed, mastBottom, w + bleed * 2, Math.max(3, w * 0.010));
+
+  let y = p.mast.y + plan.pad * 0.15;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'alphabetic';
+  if (p.mast.kicker.lines.length) {
+    ctx.fillStyle = style.plateAccent || BRAND.mint;
+    setFont(ctx, p.mast.kicker.font, p.mast.kicker.px, p.mast.kicker.ls);
+    for (const l of p.mast.kicker.lines) { y += p.mast.kicker.lh; ctx.fillText(l, w / 2, y - p.mast.kicker.lh * 0.24); }
+    y += h * 0.004;
+  }
+  const hd = p.mast.headline;
+  hd.lines.forEach((line, i) => {
+    ctx.fillStyle = (style.twoTone !== false && hd.lines.length > 1 && i === 0)
+      ? (style.plateAccent || BRAND.mint) : BRAND.white;
+    setFont(ctx, hd.font, hd.px, hd.ls);
+    ctx.fillText(line, w / 2, y + hd.lh * (i + 0.82));
+  });
+
+  // The record. A check, then the thing done. No bullets: a check is a claim.
+  if (p.record.rows.length) {
+    let ry = p.record.y;
+    const cx = p.record.x + p.record.px * 0.42;
+    for (const row of p.record.rows) {
+      paintCheck(ctx, cx, ry + row.h * 0.42, p.record.px * 0.40, accent);
+      ctx.fillStyle = ink;
+      ctx.textAlign = 'left';
+      setFont(ctx, row.font, row.px, row.ls);
+      row.lines.forEach((l, i) => ctx.fillText(l, p.record.x + p.record.px * 1.05, ry + row.lh * (i + 0.86)));
+      ry += row.h + h * 0.0085 * (p.q ?? 1);
+    }
+  }
+
+  // The issues, boxed, two across.
+  for (const cell of p.grid.cells) {
+    ctx.fillStyle = 'rgba(47,124,78,.10)';
+    roundRect(ctx, cell.x, cell.y, cell.w, cell.h, w * 0.016);
+    ctx.fill();
+    ctx.fillStyle = accent;
+    ctx.fillRect(cell.x, cell.y, Math.max(2, w * 0.006), cell.h);
+    const blk = cell.block;
+    ctx.fillStyle = ink;
+    ctx.textAlign = 'left';
+    setFont(ctx, blk.font, blk.px, blk.ls);
+    blk.lines.forEach((l, i) => ctx.fillText(l, cell.x + w * 0.024,
+      cell.y + (cell.h - blk.h) / 2 + blk.lh * (i + 0.82)));
+  }
+
+  // The one line worth remembering, with a rule beside it.
+  if (p.callout.block.lines.length) {
+    const c = p.callout.block;
+    ctx.fillStyle = accent;
+    ctx.fillRect(p.callout.x, p.callout.y, Math.max(3, w * 0.008), c.h * 1.04);
+    ctx.fillStyle = ink;
+    ctx.textAlign = 'left';
+    setFont(ctx, c.font, c.px, c.ls);
+    c.lines.forEach((l, i) => ctx.fillText(l, p.callout.x + w * 0.034, p.callout.y + c.lh * (i + 0.84)));
+  }
+
+  // The ovals: the instruction, then the names, on a tint so it reads as a step
+  // rather than more argument.
+  const ov = p.ovals;
+  ctx.fillStyle = 'rgba(18,49,78,.055)';
+  ctx.fillRect(-bleed, ov.y, w + bleed * 2, ov.h + bleed);
+  ctx.fillStyle = accent;
+  ctx.fillRect(-bleed, ov.y, w + bleed * 2, Math.max(2, w * 0.005));
+  const rb = ov.rule;
+  ctx.fillStyle = ink;
+  ctx.textAlign = 'center';
+  setFont(ctx, rb.font, rb.px, rb.ls);
+  rb.lines.forEach((l, i) => ctx.fillText(l, w / 2, ov.y + h * 0.016 + rb.lh * (i + 0.86)));
+  paintBallotRows(ctx, ov.rows, style, {
+    ink, quiet: 'rgba(18,49,78,.60)', party: false, rule: false, stripe: false,
+  });
+  if ('letterSpacing' in ctx) ctx.letterSpacing = '0px';
+}
+
+/** A tick. Two strokes, drawn rather than typed, so no font has to carry it. */
+function paintCheck(ctx, cx, cy, r, colour) {
+  ctx.save();
+  ctx.strokeStyle = colour;
+  ctx.lineWidth = Math.max(2, r * 0.34);
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  ctx.beginPath();
+  ctx.moveTo(cx - r * 0.62, cy);
+  ctx.lineTo(cx - r * 0.16, cy + r * 0.48);
+  ctx.lineTo(cx + r * 0.68, cy - r * 0.56);
+  ctx.stroke();
+  ctx.restore();
+}
+
+/** A cross, for the column that is not ours. */
+function paintCross(ctx, cx, cy, r, colour) {
+  ctx.save();
+  ctx.strokeStyle = colour;
+  ctx.lineWidth = Math.max(2, r * 0.30);
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(cx - r * 0.52, cy - r * 0.52);
+  ctx.lineTo(cx + r * 0.52, cy + r * 0.52);
+  ctx.moveTo(cx + r * 0.52, cy - r * 0.52);
+  ctx.lineTo(cx - r * 0.52, cy + r * 0.52);
+  ctx.stroke();
+  ctx.restore();
+}
+
+/* ---------------------------------------------------------------- spotlight --- */
+
+function paintSpotlight(ctx, plan, style, theme, assets) {
+  const sp = plan.spotlight;
+  const centred = !sp.wide && style.align !== 'left';
+  paintBands(ctx, sp.bands, plan, style, theme, sp.copyRect, centred);
+
+  // The rest of the slate, small, with surnames only. Present, not competing.
+  for (const chip of sp.chips) {
+    const img = assets.portraits && assets.portraits[chip.candidate.name];
+    if (img) {
+      const sc = Math.min(chip.photo.w / img.width, chip.photo.h / img.height);
+      const dw = img.width * sc, dh = img.height * sc;
+      ctx.drawImage(img, chip.photo.x + (chip.photo.w - dw) / 2,
+        chip.photo.y + chip.photo.h - dh, dw, dh);
+    } else {
+      paintSilhouette(ctx, chip.photo, theme);
+    }
+    const px = chip.w * 0.19;
+    ctx.fillStyle = theme.primary;
+    setFont(ctx, { family: 'Anton', weight: 400 }, px, 0);
+    ctx.textAlign = 'center';
+    ctx.fillText(chip.candidate.last, chip.x + chip.w / 2, chip.plate.y + px * 0.92);
+  }
+  if ('letterSpacing' in ctx) ctx.letterSpacing = '0px';
+}
+
+/* ------------------------------------------------------------------ versus --- */
+
+function paintVersus(ctx, plan, style, theme, assets) {
+  const v = plan.versus;
+  const accent = style.accent || BRAND.green;
+  const ink = theme.primary;
+
+  ctx.textBaseline = 'alphabetic';
+  ctx.textAlign = 'center';
+  let y = v.head.y;
+  if (v.head.kicker.lines.length) {
+    ctx.fillStyle = theme.accent;
+    setFont(ctx, v.head.kicker.font, v.head.kicker.px, v.head.kicker.ls);
+    v.head.kicker.lines.forEach((l, i) => ctx.fillText(l, plan.canvas.w / 2, y + v.head.kicker.lh * (i + 0.84)));
+    y += v.head.kicker.h + plan.s * 0.008;
+  }
+  v.head.headline.lines.forEach((l, i) => {
+    ctx.fillStyle = (style.twoTone !== false && v.head.headline.lines.length > 1 && i === 0)
+      ? theme.headline2 : ink;
+    setFont(ctx, v.head.headline.font, v.head.headline.px, v.head.headline.ls);
+    ctx.fillText(l, plan.canvas.w / 2, y + v.head.headline.lh * (i + 0.82));
+  });
+
+  // Ours in the brand green, theirs in a neutral grey. Not red: red is ours
+  // everywhere else in this programme and would read as an endorsement.
+  const column = (col, mine) => {
+    const tint = mine ? 'rgba(47,124,78,.12)' : 'rgba(18,49,78,.07)';
+    const mark = mine ? accent : '#8A93A3';
+    ctx.fillStyle = tint;
+    roundRect(ctx, col.x, col.y, col.w, col.h, plan.s * 0.018);
+    ctx.fill();
+    ctx.fillStyle = mark;
+    ctx.fillRect(col.x, col.y, col.w, Math.max(3, plan.s * 0.008));
+
+    const lb = col.label;
+    ctx.textAlign = 'center';
+    ctx.fillStyle = mark;
+    setFont(ctx, lb.font, lb.px, lb.ls);
+    ctx.fillText(lb.lines[0] || '', col.x + col.w / 2, col.y + plan.s * 0.030 + lb.px * 0.84);
+
+    let ry = col.y + plan.s * 0.030 + lb.h + plan.s * 0.020;
+    const r = col.px * 0.40;
+    for (const row of col.rows) {
+      (mine ? paintCheck : paintCross)(ctx, col.x + plan.s * 0.034, ry + row.lh * 0.44, r, mark);
+      ctx.fillStyle = mine ? ink : theme.secondary;
+      ctx.textAlign = 'left';
+      setFont(ctx, row.font, row.px, row.ls);
+      row.lines.forEach((l, i) => ctx.fillText(l, col.x + plan.s * 0.034 + r * 1.9, ry + row.lh * (i + 0.86)));
+      ry += row.h + col.rowGap;
+    }
+  };
+  column(v.left, true);
+  column(v.right, false);
+
+  if (v.cta) {
+    // The plan says how tall the pill is, so it cannot grow past what was
+    // reserved for it and land on the faces below.
+    const c = v.cta.block;
+    const tw = Math.min(v.cta.w, widthOf(ctx, c, c.lines[0]) + c.px * 1.24);
+    const bx = v.cta.x + (v.cta.w - tw) / 2;
+    ctx.fillStyle = theme.ctaBg;
+    roundRect(ctx, bx, v.cta.y, tw, v.cta.h, v.cta.h / 2);
+    ctx.fill();
+    ctx.fillStyle = theme.ctaText;
+    setFont(ctx, c.font, c.px, c.ls);
+    ctx.textAlign = 'center';
+    ctx.fillText(c.lines[0], bx + tw / 2, v.cta.y + (v.cta.h + c.px * 0.72) / 2);
+  }
+  if ('letterSpacing' in ctx) ctx.letterSpacing = '0px';
+}
+
+/* ------------------------------------------------------------------- strip --- */
+
+function paintStrip(ctx, plan, style, theme) {
+  const st = plan.strip;
+  const t = st.textRect;
+  ctx.textBaseline = 'alphabetic';
+
+  if (st.head.lines.length) {
+    const centred = st.vertical;
+    ctx.textAlign = centred ? 'center' : 'left';
+    const tx = centred ? t.x + t.w / 2 : t.x;
+    const top = t.y + Math.max(0, (t.h - st.head.h) / 2);
+    st.head.lines.forEach((l, i) => {
+      ctx.fillStyle = (style.twoTone !== false && st.head.lines.length > 1 && i === 0)
+        ? theme.headline2 : theme.primary;
+      setFont(ctx, st.head.font, st.head.px, st.head.ls);
+      ctx.fillText(l, tx, top + st.head.lh * (i + 0.82));
+    });
+  }
+  if (st.ctaRect && st.cta.lines.length) {
+    const c = st.cta;
+    const r = st.ctaRect;
+    const boxH = Math.min(r.h, c.h + c.px * 0.9);
+    const by = r.y + (r.h - boxH) / 2;
+    ctx.fillStyle = theme.ctaBg;
+    roundRect(ctx, r.x, by, r.w, boxH, Math.min(boxH / 2, plan.s * 0.10));
+    ctx.fill();
+    ctx.fillStyle = theme.ctaText;
+    setFont(ctx, c.font, c.px, c.ls);
+    ctx.textAlign = 'center';
+    c.lines.forEach((l, i) => ctx.fillText(l, r.x + r.w / 2, by + (boxH - c.h) / 2 + c.lh * (i + 0.82)));
+  }
+  if ('letterSpacing' in ctx) ctx.letterSpacing = '0px';
+}
+
+/* -------------------------------------------------------------- hanger die --- */
+
+/* The die line and the hang hole, drawn on the artwork so nothing important is
+ * laid out where the printer is going to cut. It is a guide, not ink: the
+ * printer works from their own die, and this is what stops a face being
+ * punched out of the middle of the tab. */
+function paintHangerDie(ctx, plan, style) {
+  const { w } = plan.canvas;
+  const d = plan.hangerDie;
+  if (!d) return;
+  const paths = () => {
+    ctx.beginPath();
+    ctx.ellipse(d.hole.cx, d.hole.cy, d.hole.r, d.hole.r, 0, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.ellipse(d.slot.cx, d.slot.cy, d.slot.rx, d.slot.ry, 0, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(d.tabLine.x, d.tabLine.y);
+    ctx.lineTo(d.tabLine.x + d.tabLine.w, d.tabLine.y);
+    ctx.stroke();
+  };
+  ctx.save();
+  ctx.setLineDash([w * 0.016, w * 0.012]);
+  // Twice, light under dark. The tab is usually a navy masthead and a navy
+  // guide on it is invisible, which is the one thing a guide may not be.
+  ctx.lineWidth = Math.max(3, w * 0.0075);
+  ctx.strokeStyle = 'rgba(255,255,255,.55)';
+  paths();
+  ctx.lineWidth = Math.max(1.5, w * 0.0032);
+  ctx.strokeStyle = 'rgba(18,49,78,.55)';
+  paths();
+  ctx.setLineDash([]);
+  ctx.restore();
+}
+
 /* ---------------------------------------------------------------------- entry */
 
 /** Paint a solved plan. `assets` = { portraits: {name -> Image}, bgImage, logo }. */
 export function paint(ctx, plan, style, assets = {}, copy = {}, bleed = 0) {
   const theme = themeFor(style);
   ctx.save();
-  if (plan.palm) {
-    // The palm card paints its own ground: it is bands, not one background.
+
+  // The card layouts paint their own ground: they are bands, not one background.
+  if (plan.palm || plan.palmback) {
     ctx.clearRect(-bleed, -bleed, plan.canvas.w + bleed * 2, plan.canvas.h + bleed * 2);
     ctx.fillStyle = style.cardGround || BRAND.ground;
     ctx.fillRect(-bleed, -bleed, plan.canvas.w + bleed * 2, plan.canvas.h + bleed * 2);
-    paintPalmCard(ctx, plan, style, theme, assets, bleed);
+    if (plan.palm) {
+      paintPalmCard(ctx, plan, style, theme, assets, bleed);
+      for (const tile of plan.tiles) {
+        paintTile(ctx, tile, plan, style, assets, theme);
+        paintTagline(ctx, tile, style, theme);
+      }
+    } else {
+      paintPalmBack(ctx, plan, style, theme, assets, bleed);
+    }
+    paintDisclaimer(ctx, plan, style, theme);
+    paintHangerDie(ctx, plan, style);
+    ctx.restore();
+    return theme;
+  }
+
+  paintBackground(ctx, plan, style, assets, bleed);
+  if (plan.deck) paintDeck(ctx, plan, assets, theme);
+
+  if (plan.spotlight) {
     for (const tile of plan.tiles) {
       paintTile(ctx, tile, plan, style, assets, theme);
       paintTagline(ctx, tile, style, theme);
     }
-    paintDisclaimer(ctx, plan, style, theme);
-    ctx.restore();
-    return theme;
+    paintSpotlight(ctx, plan, style, theme, assets);
+  } else if (plan.ballot) {
+    paintBallot(ctx, plan, style, theme);
+  } else if (plan.versus) {
+    for (const tile of plan.tiles) paintTile(ctx, tile, plan, style, assets, theme);
+    paintVersus(ctx, plan, style, theme, assets);
+  } else if (plan.strip) {
+    for (const tile of plan.tiles) paintTile(ctx, tile, plan, style, assets, theme);
+    paintStrip(ctx, plan, style, theme);
+  } else {
+    for (const tile of plan.tiles) paintTile(ctx, tile, plan, style, assets, theme);
+    paintCopy(ctx, plan, style, theme);
   }
-  paintBackground(ctx, plan, style, assets, bleed);
-  if (plan.deck) paintDeck(ctx, plan, assets, theme);
-  for (const tile of plan.tiles) paintTile(ctx, tile, plan, style, assets, theme);
-  paintCopy(ctx, plan, style, theme);
+
   paintLogo(ctx, plan, style, assets);
   paintDisclaimer(ctx, plan, style, theme);
   paintMailPanel(ctx, plan, style, copy);
+  paintHangerDie(ctx, plan, style);
   ctx.restore();
   return theme;
 }

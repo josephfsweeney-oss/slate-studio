@@ -25,11 +25,24 @@ const COPY = {
   disclaimer: 'Paid for by the Salem Republican Town Committee, Jane Doe, Treasurer.',
 };
 
+/* A display rail drops faces on purpose: four is the most that stays a face at
+ * 90px tall, and it says so in its warnings. Every other layout carries the
+ * whole slate. */
+const DROPS_FACES = new Set(['strip']);
+
 test('every slate size fits every canvas without overflow', () => {
   for (const c of CANVASES) {
     for (let n = 1; n <= 10; n++) {
       const p = solve({ canvas: { w: c.w, h: c.h }, slate: slate(n), copy: COPY, style: {} }, measure);
-      assert.equal(p.tiles.length, n, `${c.id} n=${n} tile count`);
+      if (DROPS_FACES.has(p.composition)) {
+        assert.ok(p.tiles.length > 0 && p.tiles.length <= n, `${c.id} n=${n} rail tile count`);
+        if (p.tiles.length < n) {
+          assert.ok(p.warnings.some((x) => /do not fit a rail/.test(x)),
+            `${c.id} n=${n} dropped faces without saying so`);
+        }
+      } else {
+        assert.equal(p.tiles.length, n, `${c.id} n=${n} tile count`);
+      }
       for (const t of p.tiles) {
         assert.ok(t.x >= -1 && t.y >= -1, `${c.id} n=${n} tile off the top left`);
         assert.ok(t.x + t.w <= c.w + 1, `${c.id} n=${n} tile off the right`);
@@ -247,4 +260,298 @@ test('the 4.25 by 11 palm card replaced the 5.5 by 8.5 one', () => {
   assert.equal(palm.h, 3300);
   assert.equal(palm.w / 300, 4.25);
   assert.equal(palm.h / 300, 11);
+});
+
+/* ------------------------------------------------------- the new layouts --- */
+
+/* Every rectangle any of these hands the painter has to sit on the canvas.
+ * A band with a negative y or a row past the bottom edge is not a warning, it
+ * is a piece that goes to a printer wrong. */
+const BACK_COPY = {
+  ...COPY,
+  values: 'No income tax, No sales tax, Safer streets, Parents decide',
+  record: 'Held the line on spending\nStopped an income tax\nBacked local police',
+  callout: 'Concord works for you, not the other way around.',
+  contrast: 'An income tax, again\nHigher energy bills\nMandates from Concord',
+};
+
+/** Every {x,y,w,h} and every {cx,cy} anywhere in a plan, with its path. */
+function rects(node, path = '', out = []) {
+  if (!node || typeof node !== 'object') return out;
+  if (typeof node.x === 'number' && typeof node.y === 'number'
+      && typeof node.w === 'number' && typeof node.h === 'number') {
+    out.push({ path, ...node });
+  }
+  for (const [k, v] of Object.entries(node)) {
+    if (k === 'candidate' || k === 'canvas') continue;
+    if (Array.isArray(v)) v.forEach((x, i) => rects(x, `${path}.${k}[${i}]`, out));
+    else if (v && typeof v === 'object') rects(v, `${path}.${k}`, out);
+  }
+  return out;
+}
+
+test('every new layout stays on the canvas, on every canvas', () => {
+  const comps = ['ballot', 'palmback', 'spotlight', 'versus', 'strip'];
+  for (const comp of comps) {
+    for (const c of CANVASES) {
+      for (const n of [1, 2, 3, 5, 9]) {
+        const p = solve({
+          canvas: { w: c.w, h: c.h }, slate: slate(n), copy: BACK_COPY,
+          style: { composition: comp }, seats: n,
+        }, measure);
+        assert.equal(p.composition, comp, `${comp} on ${c.id} fell back to ${p.composition}`);
+        const slack = Math.max(2, c.h * 0.004);
+        for (const r of rects(p)) {
+          const where = `${comp} ${c.id} n=${n} ${r.path}`;
+          assert.ok(r.w >= 0 && r.h >= 0, `${where} has a negative size`);
+          assert.ok(r.x >= -slack, `${where} runs off the left at x=${r.x.toFixed(0)}`);
+          assert.ok(r.y >= -slack, `${where} runs off the top at y=${r.y.toFixed(0)}`);
+          assert.ok(r.x + r.w <= c.w + slack, `${where} runs off the right`);
+          assert.ok(r.y + r.h <= c.h + slack, `${where} runs off the bottom`);
+        }
+      }
+    }
+  }
+});
+
+test('the ballot guide counts the seats, not the candidates', () => {
+  // A district can elect more seats than we have nominees for. The card has to
+  // say what the ballot says, and flag the gap rather than quietly shrink it.
+  const p = solve({
+    canvas: { w: 1080, h: 1920 }, slate: slate(3), copy: COPY,
+    style: { composition: 'ballot' }, seats: 4,
+  }, measure);
+  assert.equal(p.ballot.seats, 4);
+  assert.match(p.ballot.rule.lines.join(' '), /NOT MORE THAN 4/i);
+  assert.ok(p.warnings.some((w) => /only 3 Republicans/.test(w)), p.warnings.join(' | '));
+  assert.equal(p.ballot.rows.length, 3, 'one row per name on the slate');
+});
+
+test('a one-seat district is told to vote for one', () => {
+  const p = solve({
+    canvas: { w: 1080, h: 1920 }, slate: slate(1), copy: COPY,
+    style: { composition: 'ballot' }, seats: 1,
+  }, measure);
+  assert.match(p.ballot.rule.lines.join(' '), /VOTE FOR ONE/i);
+  assert.ok(!p.warnings.some((w) => /only/.test(w)));
+});
+
+test('the ballot rows are in order and never overlap', () => {
+  const p = solve({
+    canvas: { w: 1275, h: 3300 }, slate: slate(9), copy: COPY,
+    style: { composition: 'ballot' }, seats: 9,
+  }, measure);
+  const r = p.ballot.rows;
+  for (let i = 1; i < r.length; i++) {
+    assert.ok(r[i].y >= r[i - 1].y + r[i - 1].h - 1, `row ${i} overlaps row ${i - 1}`);
+    assert.equal(r[i].candidate.name, slate(9)[i].name, 'ballot order is the roster order');
+  }
+  assert.ok(r[8].y + r[8].h <= p.ballot.card.y + p.ballot.card.h + 2, 'the last row is inside the card');
+});
+
+test('the palm card back leaves room for the disclaimer and the ovals', () => {
+  const p = solve({
+    canvas: { w: 1275, h: 3300 }, slate: slate(4), copy: BACK_COPY,
+    style: { composition: 'palmback' }, seats: 4,
+  }, measure);
+  const b = p.palmback;
+  assert.equal(b.ovals.rows.length, 4);
+  assert.match(b.ovals.rule.lines.join(' '), /ALL 4 OVALS/i);
+  const last = b.ovals.rows[3];
+  assert.ok(last.y + last.h <= p.disclaimer.y - p.disclaimer.px,
+    'the last oval row runs into the disclaimer');
+  assert.ok(b.mast.y + b.mast.h <= b.record.y + 1, 'the record starts below the masthead');
+  assert.ok(b.record.y + b.record.h <= b.grid.y + 1, 'the issues start below the record');
+  assert.ok(b.grid.y + b.grid.h <= b.callout.y + 1, 'the callout starts below the issues');
+});
+
+test('an empty palm card back says so instead of printing a blank', () => {
+  const p = solve({
+    canvas: { w: 1275, h: 3300 }, slate: slate(2), copy: COPY,
+    style: { composition: 'palmback' }, seats: 2,
+  }, measure);
+  assert.ok(p.warnings.some((w) => /The back is empty/.test(w)), p.warnings.join(' | '));
+});
+
+test('the spotlight picks the named candidate and chips the rest', () => {
+  const s5 = slate(5);
+  const p = solve({
+    canvas: { w: 1080, h: 1080 }, slate: s5, copy: BACK_COPY,
+    style: { composition: 'spotlight', spotlight: s5[2].name },
+  }, measure);
+  assert.equal(p.spotlight.hero.candidate.name, s5[2].name);
+  assert.equal(p.spotlight.chips.length, 4);
+  assert.ok(!p.spotlight.chips.some((c) => c.candidate.name === s5[2].name),
+    'the hero is chipped as well as spotlit');
+  assert.ok(p.spotlight.hero.w > p.spotlight.chips[0].w * 1.5, 'the hero is not hero sized');
+});
+
+test('an unknown spotlight name falls back to the first on the ballot', () => {
+  const p = solve({
+    canvas: { w: 1080, h: 1080 }, slate: slate(3), copy: BACK_COPY,
+    style: { composition: 'spotlight', spotlight: 'Nobody At All' },
+  }, measure);
+  assert.equal(p.spotlight.hero.candidate.name, slate(3)[0].name);
+  assert.equal(p.spotlight.chips.length, 2);
+});
+
+test('a contrast with one side filled in says what is missing', () => {
+  const p = solve({
+    canvas: { w: 1080, h: 1080 }, slate: slate(3),
+    copy: { ...COPY, values: 'Lower taxes, Safer streets' },
+    style: { composition: 'versus' },
+  }, measure);
+  assert.ok(p.warnings.some((w) => /needs both sides/.test(w)), p.warnings.join(' | '));
+});
+
+test('a contrast stacks its columns on a story and splits them on a square', () => {
+  const tall = solve({ canvas: { w: 1080, h: 1920 }, slate: slate(3), copy: BACK_COPY, style: { composition: 'versus' } }, measure);
+  const square = solve({ canvas: { w: 1080, h: 1080 }, slate: slate(3), copy: BACK_COPY, style: { composition: 'versus' } }, measure);
+  assert.equal(tall.versus.stacked, true);
+  assert.equal(square.versus.stacked, false);
+  assert.ok(square.versus.right.x > square.versus.left.x, 'the columns are side by side');
+  assert.ok(tall.versus.right.y > tall.versus.left.y, 'the columns are one above the other');
+});
+
+test('a display rail carries no disclaimer and says so', () => {
+  const p = solve({
+    canvas: { w: 1456, h: 180 }, slate: slate(6), copy: COPY, style: {},
+  }, measure);
+  assert.equal(p.composition, 'strip', 'a leaderboard is a rail');
+  assert.equal(p.disclaimer, null);
+  assert.ok(p.warnings.some((w) => /no disclaimer/.test(w)), p.warnings.join(' | '));
+});
+
+test('an email header is a design surface, not a rail', () => {
+  // 3:1 is wide. It is not a leaderboard, and the ordinary solve handles it.
+  const p = solve({ canvas: { w: 1200, h: 400 }, slate: slate(5), copy: COPY, style: {} }, measure);
+  assert.notEqual(p.composition, 'strip');
+  assert.equal(p.tiles.length, 5);
+});
+
+test('a single nominee gets the spotlight, not a grid of one', () => {
+  const p = solve({ canvas: { w: 1080, h: 1080 }, slate: slate(1), copy: COPY, style: {} }, measure);
+  assert.equal(p.composition, 'spotlight');
+  assert.equal(p.tiles.length, 1);
+});
+
+test('the print canvases all declare a dpi and the screen ones do not', () => {
+  const print = CANVASES.filter((c) => c.dpi);
+  assert.ok(print.length >= 8, 'the print set is there');
+  for (const c of print) {
+    assert.ok(c.dpi >= 50 && c.dpi <= 300, `${c.id} has an odd dpi`);
+    const inches = { w: c.w / c.dpi, h: c.h / c.dpi };
+    assert.ok(inches.w >= 3 && inches.h >= 3, `${c.id} is smaller than a business card`);
+    // The label carries the trim size, so it has to match the pixels.
+    const m = /(\d+(?:\.\d+)?)\s*x\s*(\d+(?:\.\d+)?)/.exec(c.label);
+    assert.ok(m, `${c.id} label does not name its trim size`);
+    const [a, b] = [Number(m[1]), Number(m[2])];
+    const ft = /ft/.test(c.note || '') || /ft/.test(c.label);
+    const want = ft ? [a * 12, b * 12] : [a, b];
+    assert.ok(Math.abs(inches.w - want[0]) < 0.02 && Math.abs(inches.h - want[1]) < 0.02,
+      `${c.id} says ${m[0]} but is ${inches.w.toFixed(2)} x ${inches.h.toFixed(2)} in`);
+  }
+  for (const c of CANVASES.filter((x) => !x.dpi)) {
+    assert.ok(!/\d\s*x\s*\d+\s*(in|ft)/.test(c.label), `${c.id} looks like a print size with no dpi`);
+  }
+});
+
+test('every template asks for a layout that exists and fills what it paints', () => {
+  const NEEDS = {
+    versus: ['values', 'contrast'],
+    palmback: ['record', 'values', 'callout'],   // at least one of these
+    palmcard: ['values'],
+  };
+  const known = new Set(['auto', 'stack', 'banner', 'split', 'slateOnly', 'palmcard',
+    'palmback', 'ballot', 'spotlight', 'versus', 'strip']);
+  const ids = new Set();
+  for (const t of TEMPLATES) {
+    assert.ok(!ids.has(t.id), `two templates share the id ${t.id}`);
+    ids.add(t.id);
+    const comp = t.style?.composition;
+    if (!comp) continue;
+    assert.ok(known.has(comp), `${t.id} asks for the layout ${comp}, which does not exist`);
+    const need = NEEDS[comp];
+    if (!need) continue;
+    const filled = need.filter((k) => String(t.copy[k] || '').trim());
+    if (comp === 'versus') {
+      assert.equal(filled.length, need.length,
+        `${t.id} is a contrast with only ${filled.join(', ') || 'nothing'} filled in`);
+    } else {
+      assert.ok(filled.length, `${t.id} paints ${comp} but fills none of ${need.join(', ')}`);
+    }
+  }
+});
+
+test('every canvas has a unique id and a sane size', () => {
+  const ids = new Set();
+  for (const c of CANVASES) {
+    assert.ok(!ids.has(c.id), `two canvases share the id ${c.id}`);
+    ids.add(c.id);
+    assert.ok(c.w >= 100 && c.h >= 100 && c.w <= 8000 && c.h <= 8000, `${c.id} is an odd size`);
+    assert.ok(c.label && c.note, `${c.id} is missing a label or a note`);
+  }
+  assert.ok(ids.has('hanger') && ids.has('palm'), 'the door hanger sits beside the palm card');
+});
+
+test('the door hanger keeps the layout out of the tab and the punch', () => {
+  const flat = solve({
+    canvas: { w: 1275, h: 3300 }, slate: slate(6), copy: COPY,
+    style: { composition: 'palmcard' }, seats: 6,
+  }, measure);
+  const hung = solve({
+    canvas: { w: 1275, h: 3300 }, slate: slate(6), copy: COPY,
+    style: { composition: 'palmcard' }, seats: 6, die: 'hanger',
+  }, measure);
+
+  assert.equal(hung.canvas.h, 3300, 'the card is still the full trim size');
+  assert.ok(hung.hangerDie, 'no die was worked out');
+  const tab = hung.hangerDie.tab;
+  assert.ok(tab > 3300 * 0.19 && tab < 3300 * 0.22, `the tab is ${Math.round(tab)}px, which is not 2.25 inches`);
+
+  // Nothing the app lays out may start above the tab line, and nothing at all
+  // may sit where the hole is going to be punched.
+  const hole = hung.hangerDie.hole;
+  for (const t of hung.tiles) {
+    assert.ok(t.y >= tab - 1, 'a portrait is inside the hanger tab');
+    assert.ok(t.y > hole.cy + hole.r, 'a portrait is where the punch goes');
+  }
+  assert.ok(hung.palm.panel.y >= tab - 1, 'the faces panel starts inside the tab');
+  // Same card, less room, so the faces come out smaller. That is the trade.
+  assert.ok(hung.grid.tileW < flat.grid.tileW, 'the hanger got the same tile size as the flat card');
+  assert.ok(hung.warnings.some((w) => /die/.test(w)), 'the die is not called out as a guide');
+});
+
+test('a sign that cannot be read at distance says so in inches', () => {
+  const wordy = { ...COPY, headline: 'Your Republican team for Salem is on the ballot this November' };
+  const road = solve({
+    canvas: { w: 4800, h: 2400 }, slate: slate(9), copy: wordy, style: {}, dpi: 50,
+  }, measure);
+  assert.ok(road.warnings.some((w) => /road sign/.test(w)), road.warnings.join(' | '));
+  assert.ok(road.warnings.some((w) => /inches tall/.test(w)), road.warnings.join(' | '));
+
+  // A palm card is held in the hand. The same copy on one is nobody's problem.
+  const palm = solve({
+    canvas: { w: 1275, h: 3300 }, slate: slate(9), copy: wordy, style: {}, dpi: 300,
+  }, measure);
+  assert.ok(!palm.warnings.some((w) => /inches tall|road sign/.test(w)), palm.warnings.join(' | '));
+});
+
+test('cutting the copy on a sign makes the type bigger, and the warning says so in inches', () => {
+  /* Three inches of letter is the rule of thumb for a yard sign read from a
+   * car, so the warning fires on most of them. That is the point: it is there
+   * to be acted on, and acting on it has to visibly work. */
+  const sign = (copy) => solve({ canvas: { w: 3600, h: 2700 }, slate: slate(2), copy, style: {}, dpi: 150 }, measure);
+  const headPx = (p) => p.copy.items.find((i) => i.key === 'headline').px;
+
+  const wordy = sign({ ...COPY, headline: 'Your Republican team for Salem is on the ballot this November' });
+  const tight = sign({ headline: 'Vote Republican', disclaimer: COPY.disclaimer });
+  assert.ok(headPx(tight) > headPx(wordy) * 1.5,
+    `cutting the copy barely moved the headline: ${headPx(wordy).toFixed(0)} to ${headPx(tight).toFixed(0)}`);
+
+  const warned = wordy.warnings.find((w) => /inches tall/.test(w));
+  assert.ok(warned, wordy.warnings.join(' | '));
+  assert.match(warned, /\d+\.\d inches tall on a 18 inch piece/);
+  // The road sign word budget is for road signs, not for a two word yard sign.
+  assert.ok(!tight.warnings.some((w) => /road sign/.test(w)), tight.warnings.join(' | '));
 });

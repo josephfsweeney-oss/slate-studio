@@ -71,18 +71,65 @@ composition from the canvas shape, and you can override it:
 | 16:9, link card, email header | copy beside the faces |
 | square | copy above or below, depending on slate size |
 | story, palm card, yard sign | copy stacked over the faces |
+| one nominee, any canvas | the spotlight |
+| a display rail, 4.5:1 or thinner | the strip |
 
-**Nine canvases** out of the box, from an Instagram square to a 24x18 yard sign
-at 150 dpi, plus any custom size. Download at 1x or 2x, copy straight to the
-clipboard, or save to Drive.
+**Eleven layouts.** Five solve the copy and the grid together; the other six are
+designed pieces that take the slate as their subject.
+
+| Layout | What it is for |
+|---|---|
+| Copy above / below / beside the faces | the ordinary feed and mail work |
+| Faces only | an asset layer somebody else finishes |
+| **Spotlight** | one candidate large, the rest as chips. The 93 single-nominee districts, and a member posting to their own feed |
+| **Contrast** | two columns, ours and theirs. A choice reads faster than a claim |
+| **Ballot guide** | the ballot as the voter will see it, every oval filled, with the seat count generated from the district record |
+| **Display rail** | a leaderboard or a skyscraper: a few faces, one line, one pill |
+| **Palm card front** | the 4.25 x 11 rack card |
+| **Palm card back** | the record, the issues, one line worth remembering, then the ovals |
+
+**Nineteen canvases** out of the box, plus any custom size. Download at 1x or
+2x, copy straight to the clipboard, or save to Drive.
+
+| | |
+|---|---|
+| Screen | square feed, link card, 16:9, story, X post, email header |
+| Display | 300x250, 728x90, 320x50, 160x600, all at 2x |
+| Print | palm card 4.25x11, **door hanger 4.25x11**, walk card 4x6, flyer 8.5x11, mail 11x5.5 and 11x6, yard sign both ways, road sign 8x4 ft |
+
+Every print canvas declares its dpi, which is what unlocks **Print ready**:
+trim size plus an eighth of an inch of bleed, crop marks, and a slug line. The
+door hanger also carries its die: the top 2.25 inches are the tab, nothing is
+laid out in them, and the hole and the tab line are drawn as guides so no face
+gets punched out. The printer still cuts from their own die, so send the trim
+size and ask for a proof.
+
+**A sign is not a flyer.** On any piece over 16 inches the app measures the
+headline it just set and tells you how tall it came out in inches against what
+the distance needs. Three inches for a yard sign, six for a road sign. It also
+counts the words on a road sign, because nobody reads more than about eight at
+forty miles an hour.
 
 **Four colour combinations**, all green and navy. Press **C** to cycle them, or
 use the **Colors** button. Every value is editable as hex if you need an exact
 brand colour.
 
+**Nineteen copy templates**, from Meet the slate to the absentee chase, the 72
+hour push, the polling place card, same-day registration, the volunteer ask, the
+donate ask, the record, the contrast and the ballot guide. A template that needs
+a particular layout switches to it; one that does not hands the canvas back the
+choice.
+
 **Tokens** fill per district, so one piece of copy builds the whole state:
 `{{SEAT}}`, `{{COUNTY}}`, `{{DISTRICT}}`, `{{TOWNS}}`, `{{COUNT}}`, `{{NAMES}}`,
-`{{SURNAMES}}`, `{{SEATS}}`.
+`{{SURNAMES}}`, `{{SEATS}}`, `{{REPUBLICANS}}`, `{{TEAM}}`.
+
+**The undervote is the other photo gap.** 81 of the 174 districts elect more
+than one member and 237 of the 330 nominees run in one of them. A voter who
+marks a single name in a nine seat district hands the other eight away. The
+ballot guide and the palm card back both generate the instruction from the
+district record rather than from anything anybody types, so the number of ovals
+is right on all 174 pieces.
 
 **Batch build** runs that copy across every portrait-ready district, or one
 county, or whatever you tick, at every canvas you pick, and hands back a ZIP.
@@ -358,6 +405,12 @@ to looking the folder up by name.
   busy room, or hair against a dark background, it is not, and the preview on
   the plate is there to show you before it goes anywhere. A photo that will not
   knock out cleanly is better sent for a proper cutout.
+- The contrast layout takes the other side's record from a field somebody
+  types. Nothing checks it. Get it wrong in public and it is a correction, so
+  source every line before it ships.
+- The ballot guide draws the ovals the way New Hampshire prints them, in the
+  roster's surname order, with the seat count off the district record. It is a
+  guide, not a sample ballot: it shows the Republicans and nobody else.
 - Photos added in the browser live in that browser. A different machine, a
   different profile or a cleared site data and they are gone. Make them the
   default, or download them, the moment they are right.

@@ -89,8 +89,16 @@
       <label class="f">Subhead <textarea id="c-subhead" rows="2"></textarea></label>
       <label class="f">Details <textarea id="c-details" rows="3" placeholder="One line per line break"></textarea></label>
       <label class="f">Call to action <input id="c-cta" placeholder="Vote Tuesday, November 3"></label>
-      <label class="f" id="values-wrap" hidden>Values strip <span class="hint">the issue words, comma separated</span>
+      <label class="f" id="values-wrap" hidden>Values <span class="hint">the issue words, comma separated</span>
         <input id="c-values" placeholder="No new taxes, Safer streets, Parents decide, Lower energy bills"></label>
+      <label class="f" id="record-wrap" hidden>The record <span class="hint">one thing delivered per line</span>
+        <textarea id="c-record" rows="4" placeholder="Held the line on spending"></textarea></label>
+      <label class="f" id="callout-wrap" hidden>Callout <span class="hint">the one line worth remembering</span>
+        <textarea id="c-callout" rows="2" placeholder="Concord works for you, not the other way around."></textarea></label>
+      <label class="f" id="contrast-wrap" hidden>Their record <span class="hint">one per line, the other side of the choice</span>
+        <textarea id="c-contrast" rows="4" placeholder="An income tax, again"></textarea></label>
+      <label class="f" id="spotlight-wrap" hidden>Spotlight on
+        <select id="spotlight"></select></label>
       <label class="f">Footer <input id="c-footer" placeholder="Website or handle"></label>
       <div id="mail-fields" hidden>
         <label class="f">Return address <textarea id="c-returnAddress" rows="3"></textarea></label>
@@ -129,7 +137,12 @@
           <option value="banner">Copy below the faces</option>
           <option value="split">Copy beside the faces</option>
           <option value="slateOnly">Faces only</option>
-          <option value="palmcard">Palm card, 4.25 x 11</option>
+          <option value="spotlight">Spotlight one candidate</option>
+          <option value="versus">Contrast, two columns</option>
+          <option value="ballot">Ballot guide</option>
+          <option value="strip">Display rail</option>
+          <option value="palmcard">Palm card front, 4.25 x 11</option>
+          <option value="palmback">Palm card back, 4.25 x 11</option>
         </select>
       </label>
       <label class="f">Copy alignment
