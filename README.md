@@ -522,42 +522,48 @@ Content panel. Pick the programme and the app sets the canvas, both layouts and
 both sides' copy; pick a piece and switch sides with the two buttons. **Both
 sides** exports the pair with crop marks and a handoff note.
 
-Each piece is a claim on the message side and the receipt for it on the address
-side. The message side puts the district's candidates down the right hand rail
-with their name plates, the office under them once, and the wordmark bottom
-left. The address side carries the evidence, leaves the carrier its four by two
-and a quarter corner, and puts the disclaimer at the foot.
+Both sides are the same stack:
 
-Every piece ships with a licensed photograph. It is the ground of the copy
-side, full bleed, with the words reversed out of it and the roster kept on a
-clean panel beside it. A cutout on a photograph fights it; type on one does
-not. Drop your own picture in under **Replace the photo** and it takes over.
+    headline on the issue, big
+    one line saying who it is for
+    the whole slate, cut out, shoulder to shoulder, no boxes
+    a band of names, one under each face
+    the town and the district
+    VOTE REPUBLICAN NOVEMBER 3
+    the paid-for line
 
-The photographs are Adobe Stock, licensed to this account and sized down into
-`public/art`. That covers using them on the mail. Before this app is opened to
-anybody outside the committee, check the licence terms on redistribution.
+No card, no tile, no plate. A face in a box is a database record; a row of
+faces at the same height standing on the same band is a team, and the band
+labels them once instead of six times. Everybody fills the same height, and a
+wide crop is trimmed at the sides rather than scaled down, so nobody ends up
+shorter than the row and floating above the band.
 
-**One back for the whole drop** is on by default. Eight different backs is eight
-plate changes and eight chances to bind the wrong side to the right front. The
-per piece backs, each carrying the roll call for its own claim, are still in
-`public/mailers.js`: switch the shared back off and they come back, and that is
-the version to run when the drop is worth the plates.
+The message side gets the whole piece. The address side gets everything to the
+left of the carrier's corner, which on an 11 x 6 is seven inches by six, and
+the headline runs the full width across the top when it clears the panel.
 
-The artwork carries no disclaimer and the carrier's corner prints blank, on
-purpose. The mail house sets the panel and the paid for line with it. RSA 664:14
-still applies to the finished piece, so put that in the work order. The handoff
-note in **Both sides** already says it.
+The stack is measured from the foot up, so a longer headline costs the faces
+height rather than pushing the paid-for line off the bottom.
+
+Two colourways, both derived from the palette rather than written down. On a
+light ground the headline is plain type with an accent rule under it and the
+name band is the plate colour. On a dark ground the headline sits in a solid
+accent block and the band is the accent. **Classic red** and **Classic red on
+navy** are the committee's own mail colours.
 
 Two things the app will not do for you:
 
-- **Who the piece names.** Five of the eight pieces say `{{CAND_NAME}}` or
-  `{{CAND_LAST}}`. In a district with one nominee that is settled. In a district
-  with nine it is not, so pick the person under **This piece is for**. Until you
-  do, the token stays on the artwork and the warning stays up. It will not guess.
 - **The facts it does not hold.** `{{TAX_RATE}}`, `{{OPP_LAST}}`, `{{OPP_VOTE}}`,
   `{{POLL_HOURS}}` and `{{POLL_PLACE}}` are facts about one district, one
   opponent or one polling place. Type them in the Mail variables fields. They are
   kept per district, so Salem's rate never travels to Keene.
+- **The town.** `{{TOWN}}` and `{{PLACE}}` come off the manifest's Towns column.
+  With it empty the district line reads "Rockingham District 25" rather than
+  "Salem Rockingham District 25", which is true and less useful.
+
+The carrier's corner prints blank: the mail house sets the indicia, the return
+address, the address block and the barcode. The paid-for line is on the artwork,
+at the foot of both sides.
 
 The copy is transcribed from the Granite Guarantee mailer artwork. Every bill
 number, vote count and quotation in `public/mailers.js` came off that artwork.

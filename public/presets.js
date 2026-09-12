@@ -42,6 +42,7 @@ export const TOKENS = [
   ['{{SEAT}}', 'Rockingham District 25'],
   ['{{TOWNS}}', 'Salem, or Derry and Londonderry'],
   ['{{TOWN}}', 'Salem, the first town listed'],
+  ['{{PLACE}}', 'Salem Rockingham District 25'],
   ['{{REPUBLICANS}}', '9 Republicans, or 1 Republican'],
   ['{{TEAM}}', 'team, or candidate'],
   ['{{COUNT}}', '9'],
@@ -312,6 +313,22 @@ export const PALETTES = [
     bar: ['#2F7C4E', '#12314E'],
   },
   {
+    /* The committee's own mail colourway: navy type on white with the red
+     * blocks, or white on navy with them. The Granite Guarantee sheet is green
+     * and navy; the mail the committee has actually run is navy and red, and
+     * both are brand. */
+    id: 'classic', label: 'Classic red', ground: 'light',
+    bgType: 'solid', bgColor: '#F4F5F7',
+    accent: '#BF0A30', plateColor: '#12314E', plateAccent: '#FFFFFF',
+    bar: ['#BF0A30', '#12314E'],
+  },
+  {
+    id: 'classic-navy', label: 'Classic red on navy', ground: 'dark',
+    bgType: 'solid', bgColor: '#12314E',
+    accent: '#BF0A30', plateColor: '#0D2740', plateAccent: '#FFFFFF',
+    bar: ['#BF0A30', '#FFFFFF'],
+  },
+  {
     id: 'navy', label: 'Navy', ground: 'dark',
     bgType: 'solid', bgColor: '#12314E',
     accent: '#2F7C4E', plateColor: '#0D2740', plateAccent: '#95DAB1',
@@ -405,6 +422,12 @@ export function fillTokens(str, district, vars = {}) {
     '{{SEAT}}': `${district.county} District ${district.district}`,
     '{{TOWNS}}': towns,
     '{{TOWN}}': townList[0] || seat,
+    /* The line a mail piece puts under the names: the town first, because that
+     * is the word a voter recognises, then the seat. With no town on file it is
+     * the seat on its own rather than the seat said twice. */
+    '{{PLACE}}': townList[0]
+      ? `${townList[0]} ${district.county} District ${district.district}`
+      : `${district.county} District ${district.district}`,
     '{{COUNT}}': String(district.nominees.length),
     '{{SEATS}}': String(district.seats ?? district.nominees.length),
     '{{SURNAMES}}': surnames.join(', '),

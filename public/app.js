@@ -5,8 +5,8 @@ import {
   CANVASES, TEMPLATES, PALETTES, GROUNDS, TOKENS, TOPPERS,
   fillTokens, buildFilename, buildName, canvasById, topperById,
 } from './presets.js';
-import { MAIL_PROGRAMS, MAIL_VARS, SHARED_BACK, SHARED_BACK_ART, artUrl, programById,
-  pieceById, sideStyle } from './mailers.js';
+import { MAIL_PROGRAMS, MAIL_VARS, SHARED_BACK, SHARED_BACK_ART, SIDE_COMMON, artUrl,
+  programById, pieceById, sideStyle } from './mailers.js';
 import { makeZip } from './zip.js';
 import * as photos from './photos.js';
 import { printSheet, slugLine, drawSlug, inchesOf } from './print.js';
@@ -388,12 +388,11 @@ function paintWarnings(d, slate) {
   }
   const piece = mailPiece();
   if (piece) {
-    out.push({ text: 'This artwork carries no disclaimer and a blank carrier corner, '
-      + 'on purpose. The mail house sets the panel and the paid for line with it. '
-      + 'RSA 664:14 still applies to the finished piece, so put that in the work order. '
-      + 'The handoff note in Both sides already does.' });
+    out.push({ text: 'The carrier corner prints blank on purpose: the mail house sets the '
+      + 'indicia, the return address, the address block and the barcode. The paid for '
+      + 'line is on the artwork, at the foot of both sides.' });
   }
-  const noDisc = !piece && !state.copy.disclaimer.trim() && !state.waiveDisclaimer;
+  const noDisc = !state.copy.disclaimer.trim() && !state.waiveDisclaimer;
   if (noDisc) {
     out.push({ bad: true, text: 'No disclaimer. A finished political ad needs one under RSA 664:14. Add it, or tick "asset layer" if this is a layer somebody else will finish.' });
   }
@@ -1062,10 +1061,10 @@ function sideCopy(piece, side) {
     values: '', record: '', callout: '', contrast: '', stat: '', source: '', brief: '',
   };
   const own = side === 'back' && state.mail.sharedBack ? SHARED_BACK : piece[side];
-  /* The disclaimer comes off the artwork. The mail house sets it with the panel,
-   * because the panel is theirs and the paid for line rides with it. The handoff
-   * note says so in writing, which is the part that matters. */
-  return { ...state.copy, ...blank, ...own, disclaimer: '' };
+  /* Every side carries the district line and the call to action, and the piece
+   * carries the issue. The disclaimer stays on: this layout has a foot for it,
+   * and a finished political ad needs one under RSA 664:14. */
+  return { ...state.copy, ...blank, ...SIDE_COMMON, ...own };
 }
 
 /** The programme picker, the piece list and the variables, redrawn from state. */
@@ -1286,11 +1285,10 @@ function handoffNote(d, built) {
    * a piece that failed its own check. */
   if (mailPiece()) {
     lines.push('', 'THE MAIL HOUSE SETS THE PANEL',
-      '  This artwork carries no disclaimer and the carrier corner is blank on',
-      '  purpose. You set the indicia, the return address, the address block, the',
-      '  barcode AND the paid for line. A finished political ad in New Hampshire',
-      '  needs that line under RSA 664:14. Nothing of ours is in the 4 x 2.25 in',
-      '  corner, so the whole of it is yours.');
+      '  The carrier corner is blank on purpose. You set the indicia, the return',
+      '  address, the address block and the barcode. Nothing of ours is in the',
+      '  4 x 2.25 in corner, so the whole of it is yours. The paid for line is',
+      '  already on the artwork, at the foot of both sides.');
   }
   if (qr) {
     lines.push('', 'QR CODE', `  Points at: ${qr.url}`,

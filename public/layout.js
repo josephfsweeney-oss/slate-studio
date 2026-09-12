@@ -1562,61 +1562,26 @@ function pairUp(values) {
   return out.join('\n');
 }
 
-/* A cluster of faces with the names under the group.
+/* Fit a copy column to the room it has, in both directions.
  *
- * Not a grid of tiles. Every candidate used to sit in their own box with their
- * own plate under them, which is nine cards on one card: nine borders, nine
- * shadows, nine little labels, and no group. Out of the boxes they read as one
- * team standing together, which is the thing the piece is actually claiming.
- *
- * Four across is the ceiling. Past four the faces are too small to be faces at
- * this width, and the rows balance rather than leaving a row of one hanging off
- * the bottom: nine goes three and three and three, not four and four and one.
- *
- * The names go under the whole group, in ballot order, the way a team
- * photograph is captioned. Positional, left to right, which is how everybody
- * already reads one.
- */
-function clusterFaces(measure, slate, box, s, opts = {}) {
-  const n = slate.length;
-  if (!n) return { tiles: [], names: { lines: [], h: 0, px: 0 }, namesY: box.y, rows: 0, cols: 0 };
-  const maxCols = opts.maxCols || 4;
-  const rows = Math.ceil(n / maxCols);
-  const cols = Math.ceil(n / rows);
-
-  // Clustered, not spaced: the gap is a seam between people standing together.
-  const gapX = box.w * 0.012;
-  const gapY = box.w * 0.016;
-
-  /* The names first, because they are the fixed cost. Surnames alone once the
-   * group is big enough that first names would not fit on two lines anyway. */
-  const long = n > 4;
-  const label = (c) => (long ? c.last : `${firstLine(c, opts.style || {})} ${c.last}`).trim();
-  const namePx = Math.min(box.w * 0.052, box.h * 0.070);
-  const names = fitBlock(measure, slate.map(label).join('   ·   '),
-    COND_BOLD, namePx, box.w, 3, 0.06, true);
-  const namesH = names.h ? names.h + box.h * 0.030 : 0;
-
-  const faceBox = { w: box.w, h: Math.max(1, box.h - namesH) };
-  const tileW = Math.min((faceBox.w - (cols - 1) * gapX) / cols,
-    (faceBox.h - (rows - 1) * gapY) / rows / PHOTO_AR);
-  const tileH = tileW * PHOTO_AR;
-  const gridH = rows * tileH + (rows - 1) * gapY;
-  const top = box.y + Math.max(0, (faceBox.h - gridH) / 2);
-
-  const tiles = slate.map((c, i) => {
-    const row = Math.floor(i / cols);
-    const col = i % cols;
-    const inRow = Math.min(cols, n - row * cols);
-    const rowW = inRow * tileW + (inRow - 1) * gapX;
-    const x = box.x + (box.w - rowW) / 2 + col * (tileW + gapX);
-    const y = top + row * (tileH + gapY);
-    // No plate. The names are under the group, once.
-    return { candidate: c, x, y, w: tileW, h: tileH,
-             photo: { x, y, w: tileW, h: tileH }, plate: null };
-  });
-
-  return { tiles, names, namesY: top + gridH + box.h * 0.030, rows, cols, tileW, tileH };
+ * Shrinking to fit is the half everybody writes. Growing into slack is the half
+ * that matters: a column sized for the longest headline in a programme leaves
+ * the shortest sitting in the top third with nothing under it. The cap keeps a
+ * four word piece from turning into a poster by accident. */
+function fitColumn(build, density, room, { min = 0.42, max = 1.6, fill = 0.92 } = {}) {
+  let built = build(density);
+  for (let guard = 0; built.height > room && built.k > min && guard < 60; guard++) {
+    built = build(built.k * 0.95);
+  }
+  if (built.height > room * 0.82) return built;
+  for (let guard = 0; guard < 60; guard++) {
+    const next = build(Math.min(max, built.k * 1.04));
+    if (next.height > room * fill || next.k >= max) {
+      return next.height <= room ? next : built;
+    }
+    built = next;
+  }
+  return built;
 }
 
 /* ----------------------------------------------------------------- poster --- */
@@ -1723,338 +1688,234 @@ function solvePoster(spec, measure) {
   };
 }
 
-/* ------------------------------------------------- the Granite Guarantee pair
+/* --------------------------------------------------- the mail pair: one band */
+
+/* Both sides of a mail piece are the same stack, and the stack is the layout
+ * the committee's own artwork uses:
  *
- * Two compositions that together make one mail piece. `promise` is the message
- * side: a claim in the campaign's own voice, with the candidate on it. `proof`
- * is the address side: the receipt for that claim, with the carrier's corner
- * left alone. They are a pair on purpose. A claim with no receipt behind it is
- * a slogan, and a receipt with no claim in front of it is a spreadsheet.
+ *     headline on the issue, big, centred
+ *     one line saying who it is for
+ *     the whole slate, cut out, shoulder to shoulder, no boxes
+ *     a band of names, one under each face
+ *     the town and the district
+ *     VOTE REPUBLICAN NOVEMBER 3
+ *     the disclaimer
  *
- * Proportions come off the Granite Guarantee mailer artwork, an 11 x 6.
+ * No card, no tile, no plate. A face in a box is a database record; six faces
+ * standing together at the same scale are a team, and the name band under them
+ * does the labelling once instead of six times.
  *
- * Both sides hold a right hand rail four inches wide, because four inches is
- * what the mail panel takes on the back. Holding the same rail on the front
- * means the image well is the same box on every piece in the programme, and it
- * means the two sides line up when they print head to head.
+ * The message side gets the whole piece. The address side gets everything to
+ * the left of the carrier's corner, which on an 11 x 6 is seven inches by six:
+ * near enough square, which is the proportion the artwork was drawn at.
+ *
+ * The stack is measured from the foot up. The disclaimer, the call to action,
+ * the district line and the name band are all fixed costs, so they are taken
+ * out first and the faces get what is left. A longer headline costs the faces
+ * height rather than pushing the paid-for line off the bottom of the piece.
  */
-const GG = {
-  spine: 0.01326,     // fractions of the canvas width: the coloured bar at the left
-  padX: 0.04545,      // 48 / 1056
-  railFront: 0.39110, // 413 / 1056
-  railBack: 0.36364,  // 384 / 1056, which is the mail panel width
-  barH: 0.22569,      // fractions of the canvas height: the candidate strip
-  wellTop: 0.04167,
-  wellH: 0.39236,
-};
-
-/* Fit a copy column to the room it has, in both directions.
- *
- * Shrinking to fit is the half everybody writes. Growing into slack is the half
- * that matters on an 11 x 6: the same eight pieces carry between twenty and
- * eighty words, and a column sized for the longest one leaves the shortest
- * sitting in the top third of the piece with five inches of nothing under it.
- * The cap keeps a four word piece from turning into a poster. */
-function fitColumn(build, density, room, { min = 0.42, max = 1.6, fill = 0.92 } = {}) {
-  let built = build(density);
-  for (let guard = 0; built.height > room && built.k > min && guard < 60; guard++) {
-    built = build(built.k * 0.95);
-  }
-  if (built.height > room * 0.82) return built;
-  for (let guard = 0; guard < 60; guard++) {
-    const next = build(Math.min(max, built.k * 1.04));
-    if (next.height > room * fill || next.k >= max) {
-      return next.height <= room ? next : built;
-    }
-    built = next;
-  }
-  return built;
-}
-
-/** A zero-width block that still takes a turn in the stack, for painted rules. */
-const solidBlock = (h) => (h > 0
-  ? { lines: [''], px: h, h, w: 0, widths: [0], rule: true }
-  : { lines: [], h: 0, px: 0, w: 0, widths: [] });
-
-/* One line per item. A line break is the separator, because these lists carry
- * sentences and a sentence is allowed to have a comma in it. A single line with
- * commas and no break is taken as a comma list, so the shorter fields still
- * work the way the rest of the app's list fields do. */
-function listLines(raw) {
-  const text = String(raw || '').trim();
-  if (!text) return [];
-  const parts = text.includes('\n') ? text.split('\n') : text.split(',');
-  return parts.map((t) => t.trim()).filter(Boolean);
-}
-
-/** The name line for the candidate strip: one person, or the surnames. */
-function barName(slate, style) {
-  if (!slate.length) return '';
-  if (slate.length === 1) {
-    const c = slate[0];
-    return `${firstLine(c, style)} ${c.last}`.trim();
-  }
-  const last = slate.map((c) => c.last);
-  /* A raised dot between two names wraps onto its own line the moment the
-   * strip is tight, and a line that starts with a dot is not a name line. */
-  if (last.length === 2) return `${last[0]} & ${last[1]}`;
-  return last.join(', ');
-}
-
-/* ------------------------------------------------------ promise: message side */
-
-function solvePromise(spec, measure) {
+function solveSlateBand(spec, measure, side) {
   const { w, h } = spec.canvas;
   const slate = spec.slate || [];
   const n = slate.length;
   const style = spec.style || {};
   const copy = spec.copy || {};
-  const s = Math.min(w, h);
   const density = style.density ?? 1;
 
-  const spine = Math.max(3, w * GG.spine);
-  const padX = w * GG.padX;
+  const panel = side === 'back'
+    ? mailPanelRect({ ...spec, style: { ...style, mailPanel: 'right' } }, w, h)
+    : null;
+  const box = panel ? { x: 0, y: 0, w: panel.x, h } : { x: 0, y: 0, w, h };
+  const s = Math.min(box.w, box.h);
 
-  /* The picture runs the whole piece and the roster is a card laid on it.
-   *
-   * The first pass split the piece down the middle: photograph on one half,
-   * roster on the other, edge to edge. Two rectangles meeting on a hard seam is
-   * what a program produces when nobody has looked at it. A card with a margin
-   * round it and a shadow under it is what somebody produces who has. It also
-   * makes the picture worth buying, because you can see it.
-   *
-   * The card changes sides down the programme. Eight pieces with it in the same
-   * corner every time read as eight printings of one piece. */
-  const left = style.railSide === 'left';
-  const margin = w * 0.026;
-  const cardW = w * 0.352;
-  const cardX = left ? margin : w - margin - cardW;
-  const cardY = h * 0.062;
-  const cardH = h - cardY * 2;
-  const gutter = w * 0.030;
-  const colX = left ? cardX + cardW + gutter : padX;
-  const colW = Math.max(s * 0.2, (left ? w - padX : cardX - gutter) - colX);
-  const spineRect = left
-    ? { x: w - spine, y: 0, w: spine, h }
-    : { x: 0, y: 0, w: spine, h };
+  const pad = box.w * 0.040 * density;
+  const inner = { x: box.x + pad, y: pad * 1.15, w: box.w - pad * 2, h: h - pad * 2.0 };
+  const cx = inner.x + inner.w / 2;
 
-  // The photograph is the whole piece. The scrim and the card do the rest.
-  const photoRect = { x: 0, y: 0, w, h };
-
-  /* The rail is the district: this piece's whole right hand side is the people
-   * on the ballot in it, with their names under them. A caption strip under the
-   * panel says what office they are running for, once, rather than once per
-   * face. With no caption the panel takes the strip's height as well. */
-  /* The caption strip is the foot of the card, not a band under it, so the card
-   * stays one object. */
-  const caption = String(copy.footer || '').trim();
-  const card = { x: cardX, y: cardY, w: cardW, h: cardH };
-  const barH = caption ? cardH * 0.128 : 0;
-  const bar = caption ? { x: cardX, y: cardY + cardH - barH, w: cardW, h: barH } : null;
-  const well = { x: cardX, y: cardY, w: cardW, h: cardH - barH };
-
-  /* The wordmark sits in the bottom left corner and never moves, so the copy
-   * column stops above it rather than running through it. */
-  const lockA = Math.max(9, s * 0.04514);
-  const lockB = Math.max(7, s * 0.03125);
-  const lockH = lockA * 0.9 + lockB * 0.95 + s * 0.007;
-  const lockup = style.lockup === false ? null
-    : { x: colX, w: colW, aPx: lockA, bPx: lockB, h: lockH, y: h - h * 0.045 - lockH };
-
-  const top = h * 0.06944;
-  const floorY = (lockup ? lockup.y : h - padX * 0.5) - s * 0.030;
-  const room = Math.max(s * 0.20, floorY - top);
-
-  const listText = listLines(copy.record).join('\n');
-
-  /* Everything is measured at one scale, and the scale comes down until the
-   * column fits between the top margin and the wordmark. Shrinking the whole
-   * column together is what keeps the hierarchy: a headline that shrinks on its
-   * own ends up the same size as the deck under it. */
-  const build = (k) => {
-    // The painted rule in front of the kicker comes out of its measure, or a
-    // long kicker runs under the card.
-    const kickPx = s * 0.02778 * k;
-    const kickW = colW - kickPx * 1.77;
-    const kick = fitBlock(measure, copy.kicker, COND_SEMI, kickPx, Math.max(20, kickW), 2, 0.20, true);
-    const head = fitBlock(measure, copy.headline, ANTON, s * 0.13194 * k, colW, 4, -0.01, true);
-    const ruleH = head.lines.length ? Math.max(2, s * 0.01042 * k) : 0;
-    const deck = fitBlock(measure, copy.subhead, COND_MED, s * 0.03993 * k, colW, 4, 0.004, false);
-    const list = fitBlock(measure, listText, COND_MED, s * 0.03646 * k, colW * 0.93, 9, 0.02, true);
-    const claim = fitBlock(measure, copy.details, COND_SEMI, s * 0.03472 * k, colW, 3, 0.006, false);
-    const entries = [
-      { role: 'kicker', block: kick, gap: 0 },
-      { role: 'headline', block: head, gap: s * 0.0243 * k },
-      { role: 'rule', block: solidBlock(ruleH), gap: s * 0.0243 * k, h: ruleH },
-      { role: 'deck', block: deck, gap: s * 0.0243 * k },
-      { role: 'list', block: list, gap: s * 0.0304 * k },
-      { role: 'claim', block: claim, gap: s * 0.0304 * k },
-    ];
-    return { entries, height: stackBlocks(entries, 0).height, k };
-  };
-
-  const built = fitColumn(build, density, room);
-  const bands = stackBlocks(built.entries, top);
-  const ruleW = w * 0.14205;
-
-  /* The faces, clustered inside the panel with the names under the group. */
-  const inset = well.w * 0.055 * density;
-  const cl = clusterFaces(measure, slate, {
-    x: well.x + inset, y: well.y + inset,
-    w: well.w - inset * 2, h: well.h - inset * 2,
-  }, s, { style, maxCols: 4 });
-  const tiles = cl.tiles;
-  const tileW = cl.tileW || 0;
-  const g = { cols: cl.cols || 1, rows: cl.rows || 1 };
-  const tileH = cl.tileH || 0;
-
-  const capBlk = caption
-    ? fitBlock(measure, caption, COND_SEMI, barH * 0.30, bar.w * 0.90, 1, 0.14, true)
-    : { lines: [], h: 0, px: 0 };
-
-  const dpi = spec.dpi || 0;
-  return {
-    canvas: { w, h },
-    composition: 'promise',
-    pad: padX, gap: s * 0.03, s, scale: built.k,
-    grid: { cols: g.cols, rows: g.rows, tileW, tileH },
-    slateRect: bar,
-    tiles,
-    deck: null,
-    copy: null,
-    mailPanel: null,
-    qr: null,
-    promise: {
-      spine: spineRect,
-      railSide: left ? 'left' : 'right',
-      col: { x: colX, y: top, w: colW, h: room },
-      bands: bands.items,
-      ruleW,
-      lockup,
-      bar,
-      card,
-      well,
-      names: cl.names.lines.length
-        ? { block: cl.names, x: well.x + well.w / 2, y: cl.namesY } : null,
-      photo: photoRect,
-      caption: capBlk.lines.length
-        ? { block: capBlk, x: bar.x + bar.w / 2, y: bar.y + (bar.h - capBlk.h) / 2 }
-        : null,
-      /* The state, ghosted, in the gutter between the column and the rail. It
-       * is painted before the rail, so whatever runs past the rail's edge is
-       * covered rather than trimmed: the shape keeps its own proportions. */
-      silhouette: style.silhouette === false ? null
-        : { x: left ? cardX + cardW - w * 0.14 : cardX - w * 0.14, y: 0, w: w * 0.2784, h },
-    },
-    disclaimer: null,
-    warnings: [
-      ...(!String(copy.headline || '').trim() ? ['The message side has no headline.'] : []),
-      ...(built.k < 0.62 ? ['The copy column shrank past two thirds to fit. Cut words rather than shrink type.'] : []),
-      ...(n === 0 ? ['No candidate on the message side. The panel is empty.'] : []),
-      ...(dpi && tileW / dpi < 0.9 && n > 0
-        ? [`${n} faces put each portrait under an inch wide. This programme reads as a `
-          + 'one candidate piece, so run it per candidate or drop the district to its top name.'] : []),
-    ],
-  };
-}
-
-/* -------------------------------------------------------- proof: address side */
-
-function solveProof(spec, measure) {
-  const { w, h } = spec.canvas;
-  const style = spec.style || {};
-  const copy = spec.copy || {};
-  const s = Math.min(w, h);
-  const density = style.density ?? 1;
-
-  const spine = Math.max(3, w * GG.spine);
-  const padX = w * GG.padX;
-
-  /* The rail is the mail panel's own width, so the evidence above it and the
-   * address block below it share one edge. */
-  const panel = mailPanelRect({ ...spec, style: { ...style, mailPanel: 'right' } }, w, h);
-  const railW = panel ? panel.w : w * GG.railBack;
-  const railX = w - railW;
-  const colX = padX;
-  const colW = Math.max(s * 0.2, railX - colX - w * 0.021);
-
-  const wellY = h * GG.wellTop;
-  const wellBottom = panel ? panel.y - h * 0.042 : h - wellY;
-  const well = { x: railX, y: wellY, w: railW, h: Math.max(h * 0.2, wellBottom - wellY) };
+  /* ------------------------------------------------------------ the foot up */
 
   const disc = (copy.disclaimer || '').trim();
-  const discPx = Math.max(11, s * 0.02257);
-  const discH = disc ? discPx * 1.9 : 0;
-  const top = h * 0.05903;
-  const floorY = h - discH - s * 0.02;
-  const room = Math.max(s * 0.2, floorY - top);
+  const discPx = Math.max(9, box.h * 0.0175);
+  const discBlk = fitBlock(measure, disc, COND_MED, discPx, inner.w, 2, 0.004, false);
+  const discH = discBlk.h ? discBlk.h + box.h * 0.014 : 0;
 
-  const bullets = listLines(copy.record).join('\n');
+  const ctaPx = box.h * 0.064 * density;
+  const ctaBlk = fitBlock(measure, copy.cta, ANTON, ctaPx, inner.w * 0.90, 1, 0.005, true);
+  const ctaH = ctaBlk.h ? ctaBlk.px * 1.58 : 0;
 
-  const build = (k) => {
-    const kick = fitBlock(measure, copy.kicker, COND_SEMI, s * 0.02604 * k, colW, 2, 0.20, true);
-    const head = fitBlock(measure, copy.headline, ANTON, s * 0.07292 * k, colW, 3, -0.005, true);
-    const body = fitBlock(measure, bullets, COND_MED, s * 0.03646 * k, colW * 0.92, 8, 0.004, false);
-    const said = String(copy.callout || '').replace(/^[“"]|[”"]$/g, '').trim();
-    const attributed = Boolean(String(copy.source || '').trim());
-    const quote = fitBlock(measure, said ? (attributed ? `“${said}”` : said) : '',
-      COND_SEMI, s * 0.03819 * k, colW, 3, 0.01, false);
-    const src = fitBlock(measure, copy.source, COND_MED, s * 0.02257 * k, colW, 2, 0.02, false);
-    const cta = fitBlock(measure, copy.cta, ANTON, s * 0.03819 * k, colW, 2, 0.02, true);
-    const entries = [
-      { role: 'kicker', block: kick, gap: 0 },
-      { role: 'headline', block: head, gap: s * 0.0226 * k },
-      { role: 'body', block: body, gap: s * 0.0260 * k },
-      { role: 'quote', block: quote, gap: s * 0.0330 * k },
-      { role: 'source', block: src, gap: s * 0.0087 * k },
-      { role: 'cta', block: cta, gap: s * 0.0295 * k },
-    ];
-    return { entries, height: stackBlocks(entries, 0).height, k };
+  const seatLine = String(copy.footer || '').trim();
+  const seatBlk = fitBlock(measure, seatLine, ANTON, box.h * 0.058 * density, inner.w, 1, 0.01, true);
+  const seatH = seatBlk.h ? seatBlk.h + box.h * 0.016 : 0;
+
+  /* The name band. Every name is fitted to its own slot, and a slot that cannot
+   * hold the whole name drops the first name rather than setting the surname at
+   * a size nobody reads. The surname is what a voter matches on the ballot. */
+  /* One size and one form for the whole band. Fitting each name to its own slot
+   * gave a row that said LORIE BALL, HUMINICK, JOHN JANIGIAN, KASSAS: half of
+   * them introduced and half of them filed. Either everybody gets their first
+   * name or nobody does, and the size is the size the longest one can hold. */
+  const slotW = n ? inner.w / n : 0;
+  const wide = (t, px) => widthAt(measure, t, COND_BOLD, px, 0.03) <= slotW * 0.90;
+  const full = slate.map((c) => `${firstLine(c, style)} ${c.last}`.trim());
+  const short = slate.map((c) => String(c.last || '').trim());
+  const floorPx = Math.min(box.h * 0.020, slotW * 0.115);
+  let bandPx = Math.min(box.h * 0.028, slotW * 0.170) * density;
+  let texts = full;
+  let guard = 0;
+  while (!texts.every((t) => wide(t, bandPx)) && guard++ < 40) {
+    if (bandPx <= floorPx && texts === full) { texts = short; bandPx = Math.min(box.h * 0.028, slotW * 0.170) * density; continue; }
+    if (bandPx <= floorPx * 0.72) break;
+    bandPx *= 0.95;
+  }
+  const dropped = texts !== full;
+  const names = texts.map((t) => ({ text: t, px: bandPx, dropped }));
+  const bandH = n ? bandPx * 2.30 : 0;
+
+  const footH = discH + ctaH + seatH + bandH;
+
+  /* -------------------------------------------------------- the headline down */
+
+  /* On a dark ground the headline sits in a solid block, the way the artwork
+   * sets it; on a light one it is plain type with a rule under it. Same
+   * hierarchy, drawn the way each ground wants. */
+  const onDark = luminance(style.bgType === 'transparent' ? '#FFFFFF' : (style.bgColor || '#FFFFFF')) <= 0.45;
+
+  /* On the address side the carrier's corner is only the bottom two and a
+   * quarter inches, so the four inches above it are the piece's, not theirs.
+   * The headline and the line under it take the full width there and the rest
+   * of the stack stays in the column, which is the shape the piece actually
+   * is. If the headline is long enough to reach down past the panel's top edge
+   * it falls back to the column, because nothing may cross into that corner. */
+  const wideTop = panel ? { x: pad, w: w - pad * 2 } : { x: inner.x, w: inner.w };
+  const topLimit = panel ? panel.y - box.h * 0.030 : h;
+
+  const subPx = box.h * 0.050 * density;
+  const fitSub = (width) => fitBlock(measure, copy.subhead, COND_BOLD, subPx, width * 0.98, 2, 0.045, true);
+  let top = wideTop;
+  let sub = fitSub(top.w);
+  let subH = sub.h ? sub.h + box.h * 0.024 : 0;
+
+  /* The headline takes what the faces can spare. Faces get a floor: a slate
+   * photographed at chest height and then printed an inch tall is a row of
+   * thumbnails, and the whole point of this layout is that they are people. */
+  const faceFloor = Math.max(box.h * 0.26, inner.w * 0.10);
+  const fitHead = (width, room) => {
+    let px = Math.min(box.h * 0.150 * density, room);
+    let blk = fitBlock(measure, copy.headline, ANTON, px, width, 3, -0.012, true);
+    let guard = 0;
+    while (blk.h > room && px > box.h * 0.035 && guard++ < 60) {
+      px *= 0.94;
+      blk = fitBlock(measure, copy.headline, ANTON, px, width, 3, -0.012, true);
+    }
+    return blk;
   };
+  const roomFor = (sh) => Math.max(box.h * 0.10, inner.h - footH - sh - faceFloor);
 
-  const built = fitColumn(build, density, room);
-  const bands = stackBlocks(built.entries, top);
+  let head = fitHead(top.w, roomFor(subH));
+  let blockPad = onDark && head.lines.length ? head.px * 0.30 : 0;
+  let ruleH = !onDark && head.lines.length ? Math.max(3, box.h * 0.0085) : 0;
+  let headH = head.h ? head.h + blockPad * 2 + (ruleH ? ruleH + box.h * 0.018 : box.h * 0.010) : 0;
 
-  const briefPx = Math.max(10, s * 0.0295);
-  const brief = fitBlock(measure, copy.brief || style.brief || '', COND_MED, briefPx, well.w - s * 0.055, 4, 0.004, false);
+  // Too tall to clear the panel, so it comes back into the column.
+  if (panel && inner.y + headH + subH > topLimit) {
+    top = { x: inner.x, w: inner.w };
+    sub = fitSub(top.w);
+    subH = sub.h ? sub.h + box.h * 0.024 : 0;
+    head = fitHead(top.w, roomFor(subH));
+    blockPad = onDark && head.lines.length ? head.px * 0.30 : 0;
+    ruleH = !onDark && head.lines.length ? Math.max(3, box.h * 0.0085) : 0;
+    headH = head.h ? head.h + blockPad * 2 + (ruleH ? ruleH + box.h * 0.018 : box.h * 0.010) : 0;
+  }
+  const topCx = top.x + top.w / 2;
+
+  /* ------------------------------------------------------------- the figures */
+
+  const headTop = inner.y;
+  const subTop = headTop + headH;
+  const figTop = subTop + subH;
+  const bandTop = h - pad * 1.15 - discH - ctaH - seatH - bandH;
+  const figH = Math.max(1, bandTop - figTop);
+
+  /* Shoulder to shoulder. Each figure owns a slot and is drawn to the full
+   * height of the band, so a tall portrait and a short one still line up at the
+   * chin and at the foot. They are allowed past their slot, which is what makes
+   * a row of people rather than a row of stamps. */
+  const figures = slate.map((c, i) => {
+    const slotX = inner.x + i * slotW;
+    return {
+      candidate: c,
+      slot: { x: slotX, y: figTop, w: slotW, h: figH },
+      /* The cutout fills the band's height, but never more than a slot and a
+       * third across. Scaled by height alone a wide crop swallowed its
+       * neighbours whole: on Rockingham 25 one shoulder covered the man beside
+       * him. The cap is what keeps them a row rather than a pile. */
+      /* Wider than the slot on purpose. The cap is what stops one crop
+       * swallowing its neighbour, and a narrow slot needs a looser one or the
+       * trim cuts into the face rather than the shoulder. */
+      maxW: Math.min(slotW * (n >= 7 ? 1.62 : 1.32), figH * 0.92),
+      name: names[i],
+      nameBox: { x: slotX, y: bandTop, w: slotW, h: bandH },
+    };
+  });
 
   const dpi = spec.dpi || 0;
-  const clash = panel && bands.items.some((b) => {
-    const right = colX + colW;
-    return right > panel.x && b.y + b.h > panel.y;
-  });
+  const cramped = figH < faceFloor * 0.92;
   return {
     canvas: { w, h },
-    composition: 'proof',
-    pad: padX, gap: s * 0.03, s, scale: built.k,
-    grid: { cols: 1, rows: 1, tileW: 0, tileH: 0 },
-    slateRect: null,
+    composition: side === 'back' ? 'proof' : 'promise',
+    pad, gap: box.h * 0.02, s, scale: 1,
+    grid: { cols: n || 1, rows: 1, tileW: slotW, tileH: figH },
+    slateRect: { x: inner.x, y: figTop, w: inner.w, h: figH },
+    // Painted by the band painter, not by paintTile: no plate, no silhouette box.
     tiles: [],
     deck: null,
     copy: null,
     mailPanel: panel,
     qr: null,
-    proof: {
-      spine: { x: 0, y: 0, w: spine, h },
-      col: { x: colX, y: top, w: colW, h: room },
-      bands: bands.items,
-      well,
-      brief,
-      wellIn: dpi ? { w: well.w / dpi, h: well.h / dpi } : null,
+    band: {
+      side,
+      box,
+      inner,
+      pad,
+      cx,
+      onDark,
+      top,
+      topCx,
+      head: head.lines.length
+        ? { block: head, y: headTop, pad: blockPad, ruleH,
+            ruleY: headTop + head.h + blockPad * 2 + box.h * 0.014 }
+        : null,
+      sub: sub.lines.length ? { block: sub, y: subTop } : null,
+      figures,
+      bandRect: n ? { x: box.x, y: bandTop, w: box.w, h: bandH } : null,
+      seat: seatBlk.lines.length ? { block: seatBlk, y: bandTop + bandH + box.h * 0.016 } : null,
+      // Full width, the way the artwork sets it: the last thing on the piece
+      // and the one instruction it is actually giving.
+      cta: ctaBlk.lines.length
+        ? { block: ctaBlk, y: h - pad * 1.15 - discH - ctaH, h: ctaH, w: inner.w }
+        : null,
     },
-    disclaimer: disc
-      ? { text: disc, px: discPx, x: colX, y: h - discPx * 0.9, w: colW, centreOn: colX + colW / 2 }
+    disclaimer: discBlk.lines.length
+      ? { text: disc, px: discBlk.px, block: discBlk, x: inner.x,
+          y: h - pad * 1.15 - discBlk.h + discBlk.lh * 0.84, w: inner.w, centreOn: cx }
       : null,
     warnings: [
-      ...(!disc ? ['No disclaimer. A finished political ad needs one under RSA 664:14.'] : []),
-      ...(!String(copy.headline || '').trim() ? ['The address side has no headline.'] : []),
-      ...(!bullets ? ['The address side is the proof. With no evidence lines it is only a second front.'] : []),
-      ...(built.k < 0.62 ? ['The copy column shrank past two thirds to fit. Cut words rather than shrink type.'] : []),
-      ...(clash ? ['Copy reaches into the mail panel. Shorten it or the carrier will reject the piece.'] : []),
-      ...(dpi && !style.heroImage ? ['The evidence well is still a brief. Drop the document photo in before print.'] : []),
+      ...(!n ? ['Nobody on the piece. A slate mailer with no slate is a background.'] : []),
+      ...(!String(copy.headline || '').trim() ? [`The ${side === 'back' ? 'address' : 'message'} side has no headline.`] : []),
+      ...(!String(copy.cta || '').trim() ? ['No call to action. Every side of this programme tells somebody when to vote.'] : []),
+      ...(cramped
+        ? [`${n} faces across ${(inner.w / (dpi || 300)).toFixed(1)} inches leaves each one `
+          + 'too small to recognise. Cut the headline, or run this district as two pieces.'] : []),
+      ...(names.some((x) => x.dropped)
+        ? ['Some first names came off the band to fit the slot. The surname is what a '
+          + 'voter matches on the ballot, so that is the one that stays.'] : []),
+      ...(head.truncated ? ['The headline is longer than three lines will hold.'] : []),
     ],
   };
 }
+
+function solvePromise(spec, measure) { return solveSlateBand(spec, measure, 'front'); }
+function solveProof(spec, measure) { return solveSlateBand(spec, measure, 'back'); }
 
 /* ------------------------------------------------------------- the foot band */
 
@@ -2107,30 +1968,19 @@ function fitBlock(measure, text, font, px, maxW, maxLines, ls, upper) {
   const paras = raw.split('\n').map((t) => (upper ? t.toUpperCase() : t));
   let size = px;
   let lines;
-  /* Which rendered line each source line starts on. A bullet belongs to an
-   * item, not to a line of type: without this a two line item gets two bullets,
-   * and the second one reads as a separate promise that starts mid sentence. */
-  let starts;
   const floor = px * 0.5;
   for (;;) {
     lines = [];
-    starts = [];
-    for (const p of paras) {
-      starts.push(lines.length);
-      lines.push(...balancedWrap(measure, p, font, size, ls, maxW));
-    }
+    for (const p of paras) lines.push(...balancedWrap(measure, p, font, size, ls, maxW));
     if (lines.length <= maxLines || size <= floor) break;
     size *= 0.94;
   }
   const truncated = lines.length > maxLines;
-  if (truncated) {
-    lines = lines.slice(0, maxLines);
-    starts = starts.filter((i) => i < lines.length);
-  }
+  if (truncated) lines = lines.slice(0, maxLines);
   const lh = size * (font === ANTON ? 0.98 : 1.2);
   const widths = lines.map((l) => widthAt(measure, l, font, size, ls));
   return { lines, px: size, lh, h: lh * lines.length, font, ls, truncated,
-           starts, w: Math.max(0, ...widths, 0), widths };
+           w: Math.max(0, ...widths, 0), widths };
 }
 
 function autoComposition(w, h, n, hasCopy) {

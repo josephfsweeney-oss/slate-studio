@@ -1309,294 +1309,139 @@ function paintHangerDie(ctx, plan, style) {
 
 /* ---------------------------------------------------------------------- entry */
 
-/* ---------------------------------------------- the Granite Guarantee pair --- */
+/* --------------------------------------------------- the mail pair: one band */
 
-/* New Hampshire, traced off the Granite Guarantee artwork. Kept as path data at
- * the artwork's own viewBox so it scales to any canvas without redrawing. */
-const NH_VIEWBOX = { w: 511, h: 1000 };
-const NH_PATH = 'M478.8 839.5L488.6 848.7L496.2 855.9L510.7 863.6L506.6 873.8L499.5 886.0L498.3 887.8L495.2 890.3L485.4 910.1L481.4 920.1L480.2 927.0L479.7 929.6L479.4 934.1L470.8 938.4L460.5 930.3L455.9 928.8L452.5 928.8L448.2 929.5L429.9 937.0L418.6 941.0L413.0 943.7L397.7 950.9L387.8 955.5L383.4 958.1L377.8 964.8L378.9 984.8L371.7 982.6L361.4 982.9L358.9 986.1L348.0 1000.0L279.5 997.8L254.9 997.1L216.1 995.8L207.0 995.4L181.3 994.6L173.0 994.3L131.7 992.7L122.7 992.4L75.3 990.6L39.8 989.3L28.9 988.9L26.9 988.8L26.5 986.8L21.4 975.5L17.9 971.7L12.9 968.4L3.7 958.1L0.1 940.1L0.0 936.4L31.0 883.7L34.1 843.0L33.9 840.8L31.5 834.5L28.7 825.1L32.2 806.2L34.5 798.5L43.9 766.4L42.9 758.6L42.0 750.7L41.6 738.6L43.9 723.8L46.4 707.6L46.5 695.8L44.2 689.0L62.5 658.7L61.1 653.2L62.5 645.5L69.9 619.6L78.6 607.6L89.2 602.2L96.6 593.5L102.7 579.9L103.1 569.5L107.3 549.5L120.0 537.0L124.6 524.9L124.2 521.6L123.8 517.6L122.2 516.4L122.3 510.5L128.3 492.4L138.3 462.9L142.3 446.2L138.7 441.5L135.6 433.8L134.7 401.8L135.3 399.4L137.1 396.0L150.0 382.4L152.7 381.1L194.9 367.8L204.1 364.9L204.5 359.1L210.2 352.4L218.3 349.6L220.6 349.6L223.7 351.6L233.6 347.6L241.6 341.3L263.8 318.7L269.1 311.0L281.2 279.5L276.6 264.5L264.0 236.8L256.7 224.5L256.1 217.6L257.0 214.6L271.2 193.3L292.4 156.4L292.9 153.9L286.6 139.8L280.8 125.5L281.0 121.6L282.9 119.5L289.8 116.2L294.9 116.6L299.9 115.4L290.5 114.1L292.3 92.3L294.2 91.1L310.8 71.0L319.4 39.8L317.9 35.2L307.0 27.6L318.5 24.6L334.5 13.3L347.2 2.5L350.7 1.1L355.5 5.5L356.5 10.9L364.8 19.1L378.4 23.6L390.6 24.4L392.7 23.5L394.7 19.6L396.0 16.9L400.1 4.2L402.1 1.3L405.8 0.0L408.2 31.8L412.5 111.7L418.7 214.4L421.0 270.8L425.4 374.9L426.2 396.5L426.7 406.5L428.7 470.2L431.0 538.8L431.3 549.5L432.1 585.4L434.0 614.9L434.0 619.9L434.4 626.7L434.6 630.9L436.6 670.1L441.9 676.7L441.4 681.3L439.4 683.7L441.5 693.1L439.1 705.8L432.7 729.3L432.5 738.0L433.4 743.6L438.1 756.1L442.2 759.8L448.2 761.5L452.0 766.0L453.2 769.5L466.8 785.9L473.4 791.1L474.9 794.3L476.8 794.9L479.3 796.2L476.4 815.6L476.2 818.0L474.9 830.6L476.5 837.3L478.8 839.5Z';
-
-let nhPath = null;
-/** The state outline, ghosted. Silent when Path2D is not available. */
-function paintGraniteMark(ctx, r, colour, alpha) {
-  if (!r || typeof Path2D === 'undefined') return;
-  if (!nhPath) nhPath = new Path2D(NH_PATH);
-  const k = Math.min(r.w / NH_VIEWBOX.w, r.h / NH_VIEWBOX.h);
-  ctx.save();
-  ctx.globalAlpha = alpha;
-  ctx.fillStyle = colour;
-  ctx.translate(r.x + (r.w - NH_VIEWBOX.w * k) / 2, r.y + (r.h - NH_VIEWBOX.h * k) / 2);
-  ctx.scale(k, k);
-  ctx.fill(nhPath);
-  ctx.restore();
-}
-
-/* An image well: the picture once somebody drops one in, and until then the
- * brief for it, printed on the artboard. A plain grey box reads as a design
- * choice at a glance, which is exactly how a placeholder ends up on a press. */
-function paintWell(ctx, well, brief, img, opts) {
-  if (!well) return;
-  const { label, size, tint, ink, dash } = opts;
-  if (img) {
-    const scale = Math.max(well.w / img.width, well.h / img.height);
-    const dw = img.width * scale, dh = img.height * scale;
-    ctx.save();
-    ctx.beginPath();
-    ctx.rect(well.x, well.y, well.w, well.h);
-    ctx.clip();
-    ctx.drawImage(img, well.x + (well.w - dw) / 2, well.y + (well.h - dh) / 2, dw, dh);
-    ctx.restore();
-    return;
-  }
-  const pad = Math.min(well.w, well.h) * 0.055;
-  ctx.save();
-  ctx.fillStyle = tint;
-  ctx.fillRect(well.x, well.y, well.w, well.h);
-  ctx.strokeStyle = dash;
-  ctx.setLineDash([well.w * 0.022, well.w * 0.016]);
-  ctx.lineWidth = Math.max(2, well.w * 0.005);
-  ctx.strokeRect(well.x + ctx.lineWidth, well.y + ctx.lineWidth,
-    well.w - ctx.lineWidth * 2, well.h - ctx.lineWidth * 2);
-  ctx.setLineDash([]);
-  ctx.fillStyle = ink;
-  ctx.textBaseline = 'alphabetic';
-  const labelPx = Math.max(9, well.w * 0.036);
-  setFont(ctx, { family: 'Barlow Condensed', weight: 600 }, labelPx, 0.16);
-  ctx.textAlign = 'left';
-  ctx.fillText(label, well.x + pad, well.y + pad + labelPx);
-  if (size) {
-    setFont(ctx, { family: 'Barlow Condensed', weight: 500 }, labelPx * 0.87, 0.08);
-    ctx.textAlign = 'right';
-    ctx.fillText(size, well.x + well.w - pad, well.y + pad + labelPx);
-  }
-  if (brief && brief.lines.length) {
-    ctx.textAlign = 'left';
-    setFont(ctx, brief.font, brief.px, brief.ls);
-    const base = well.y + well.h - pad - brief.h + brief.lh * 0.84;
-    brief.lines.forEach((l, i) => ctx.fillText(l, well.x + pad, base + brief.lh * i));
-  }
-  ctx.restore();
-  if ('letterSpacing' in ctx) ctx.letterSpacing = '0px';
-}
-
-/* A bulleted list, with one dot per item rather than one per line of type.
- * `blk.starts` says which rendered line begins an item; every other line is a
- * continuation and hangs under the text, clear of the dot column. */
-function paintBullets(ctx, blk, x, top, dotInk, textInk, dotK, lift) {
-  const dot = Math.max(2, blk.px * dotK);
-  const indent = dot * 5.0;
-  const starts = new Set(blk.starts || blk.lines.map((_, i) => i));
-  setFont(ctx, blk.font, blk.px, blk.ls);
-  blk.lines.forEach((l, i) => {
-    const y = top + blk.lh * (i + 0.84);
-    if (starts.has(i)) {
-      ctx.fillStyle = dotInk;
-      ctx.beginPath();
-      ctx.arc(x + dot, y - blk.px * lift, dot, 0, Math.PI * 2);
-      ctx.fill();
-    }
-    ctx.fillStyle = textInk;
-    ctx.fillText(l, x + indent, y);
-  });
-}
-
-/** GRANITE over GUARANTEE, the programme's wordmark. */
-function paintLockup(ctx, lock, green, navy) {
-  if (!lock) return;
-  ctx.save();
-  ctx.textAlign = 'left';
-  ctx.textBaseline = 'alphabetic';
-  ctx.fillStyle = green;
-  setFont(ctx, { family: 'Barlow Condensed', weight: 600 }, lock.aPx, 0.02);
-  ctx.fillText('GRANITE', lock.x, lock.y + lock.aPx * 0.86);
-  ctx.fillStyle = navy;
-  setFont(ctx, { family: 'Barlow Condensed', weight: 700 }, lock.bPx, 0.10);
-  ctx.fillText('GUARANTEE', lock.x, lock.y + lock.aPx * 0.9 + lock.bPx * 0.88);
-  ctx.restore();
-  if ('letterSpacing' in ctx) ctx.letterSpacing = '0px';
-}
-
-/** The size of a well, written the way a photographer asks for it. */
-const wellSize = (rect) => (rect ? `${rect.w.toFixed(2)} x ${rect.h.toFixed(2)} in` : '');
-
-function paintPromise(ctx, plan, style, theme, assets, bleed = 0) {
-  const g = plan.promise;
-  const accent = style.accent || BRAND.green;
-  const navy = style.plateColor || BRAND.navy;
+/* Two colourways, both derived from the palette rather than written down.
+ *
+ * On a light ground the headline is plain type with an accent rule under it and
+ * the name band is the plate colour. On a dark ground the headline sits in a
+ * solid accent block and the name band is the accent. That is how the
+ * committee's own artwork sets the two versions of this layout, and it is one
+ * rule rather than two designs.
+ */
+function paintSlateBand(ctx, plan, style, theme, assets, bleed = 0) {
+  const b = plan.band;
   const { w, h } = plan.canvas;
   const B = bleed;
-
-  paintGraniteMark(ctx, g.silhouette, accent, 0.05);
-
-  /* The photograph is the whole piece, under a scrim that is heavy where the
-   * words are and light where the card is. A flat wash over the lot kills the
-   * picture; a gradient across it keeps the half you can see. */
-  const shot = assets.hero && g.photo;
-  if (shot) {
-    const img = assets.hero;
-    const rw = w + B * 2;
-    const rh = h + B * 2;
-    const k = Math.max(rw / img.width, rh / img.height);
-    ctx.save();
-    ctx.beginPath();
-    ctx.rect(-B, -B, rw, rh);
-    ctx.clip();
-    ctx.drawImage(img, -B + (rw - img.width * k) / 2, -B + (rh - img.height * k) / 2,
-      img.width * k, img.height * k);
-    const [nr, ng, nb] = hexToRgb(navy);
-    const rgba = (a) => `rgba(${nr},${ng},${nb},${a})`;
-    const leftCard = g.card.x < w / 2;
-    const across = ctx.createLinearGradient(-B, 0, w + B, 0);
-    // Heavy under the words, lighter under the card, so the picture survives.
-    across.addColorStop(leftCard ? 1 : 0, rgba(0.90));
-    across.addColorStop(leftCard ? 0.42 : 0.58, rgba(0.78));
-    across.addColorStop(leftCard ? 0 : 1, rgba(0.28));
-    ctx.fillStyle = across;
-    ctx.fillRect(-B, -B, rw, rh);
-    // And a little more at the foot, where the wordmark sits.
-    const down = ctx.createLinearGradient(0, h * 0.58, 0, h + B);
-    down.addColorStop(0, rgba(0));
-    down.addColorStop(1, rgba(0.34));
-    ctx.fillStyle = down;
-    ctx.fillRect(-B, h * 0.58, rw, h * 0.42 + B);
-    ctx.restore();
-  }
-
-  /* The roster is a card laid on the photograph: a margin round it, a shadow
-   * under it, its caption strip as its own foot. */
-  const stock = theme.light ? BRAND.white : shade(cardStock({ ...style, composition: '' }), 1.12);
-  ctx.fillStyle = style.slatePanel || stock;
-  ctx.fillRect(g.card.x, g.card.y, g.card.w, g.card.h);
-  // An accent edge rather than a shadow and a radius, per the shape rules.
-  ctx.fillStyle = accent;
-  ctx.fillRect(g.card.x, g.card.y, Math.max(3, w * 0.0055), g.card.h);
-
-  if (g.bar) {
-    ctx.fillStyle = navy;
-    ctx.fillRect(g.bar.x, g.bar.y, g.bar.w, g.bar.h);
-    ctx.fillStyle = accent;
-    ctx.fillRect(g.bar.x, g.bar.y, Math.max(3, w * 0.0055), g.bar.h);
-  }
-
-  // The spine runs down the outside edge, over the photograph rather than under
-  // it: full bleed art would otherwise swallow it.
-  ctx.fillStyle = accent;
-  ctx.fillRect(g.spine.x, g.spine.y, g.spine.w, g.spine.h);
-
-  /* On the photograph the words reverse out; on white they stay navy. One
-   * variable rather than a branch at every fillStyle below. */
-  const ink = shot ? BRAND.white : theme.primary;
-  const soft = shot ? 'rgba(255,255,255,.82)' : theme.secondary;
-  const mark = shot ? (style.plateAccent || BRAND.mint) : theme.accent;
-
-  const kickX = g.col.x;
-  ctx.textBaseline = 'alphabetic';
-  ctx.textAlign = 'left';
-  for (const b of g.bands) {
-    const blk = b.block;
-    if (b.role === 'rule') {
-      ctx.fillStyle = mark;
-      ctx.fillRect(g.col.x, b.y, g.ruleW, b.h);
-      continue;
-    }
-    if (b.role === 'kicker') {
-      /* A short bar in front of the kicker. Letterspaced caps floating on their
-       * own read as a label a machine put there; the same caps hung off a rule
-       * read as a masthead. It costs eight pixels. */
-      const barW = blk.px * 1.15;
-      const barH = Math.max(2, blk.px * 0.19);
-      ctx.fillStyle = mark;
-      ctx.fillRect(kickX, b.y + blk.lh * 0.46 - barH / 2, barW, barH);
-      setFont(ctx, blk.font, blk.px, blk.ls);
-      blk.lines.forEach((l, i) => ctx.fillText(l,
-        kickX + barW + blk.px * 0.62, b.y + blk.lh * (i + 0.84)));
-      continue;
-    }
-    if (b.role === 'list') {
-      paintBullets(ctx, blk, g.col.x, b.y, mark, ink, 0.13, 0.30);
-      continue;
-    }
-    ctx.fillStyle = b.role === 'headline' || b.role === 'claim' ? ink : soft;
-    setFont(ctx, blk.font, blk.px, blk.ls);
-    blk.lines.forEach((l, i) => ctx.fillText(l, g.col.x, b.y + blk.lh * (i + 0.84)));
-  }
-
-  // The names, under the group, in ballot order.
-  if (g.names) {
-    const blk = g.names.block;
-    ctx.fillStyle = theme.light ? (style.plateColor || BRAND.navy) : BRAND.white;
-    setFont(ctx, blk.font, blk.px, blk.ls);
-    ctx.textAlign = 'center';
-    blk.lines.forEach((l, i) => ctx.fillText(l, g.names.x, g.names.y + blk.lh * (i + 0.84)));
-    ctx.textAlign = 'left';
-  }
-
-  if (g.caption) {
-    const blk = g.caption.block;
-    ctx.fillStyle = style.plateAccent || BRAND.mint;
-    setFont(ctx, blk.font, blk.px, blk.ls);
-    ctx.textAlign = 'center';
-    blk.lines.forEach((l, i) => ctx.fillText(l, g.caption.x, g.caption.y + blk.lh * (i + 0.84)));
-    ctx.textAlign = 'left';
-  }
-
-  paintLockup(ctx, g.lockup, mark, ink);
-  if ('letterSpacing' in ctx) ctx.letterSpacing = '0px';
-}
-
-function paintProof(ctx, plan, style, theme, assets, bleed = 0) {
-  const g = plan.proof;
-  const accent = theme.accent;
-  // The words follow the ground the palette set, so Navy and Pine reverse
-  // rather than printing navy on navy.
+  const accent = style.accent || BRAND.green;
+  const plate = style.plateColor || BRAND.navy;
   const ink = theme.primary;
+  const dark = b.onDark;
 
-  /* The address side is the same stock as the message side, one shade off, so
-   * the pair reads as two sides of one piece rather than two pieces. Doing it
-   * here rather than pinning a cream in the programme means it still works when
-   * somebody switches to Navy or Pine. */
-  const stock = cardStock({ ...style, composition: '' });
-  /* On light stock the shift is toward the accent rather than toward grey: a
-   * cream back and a white front is the pair the artwork sets, and a grey back
-   * just looks like the press ran low on ink. */
-  ctx.fillStyle = theme.light
-    ? mix(stock, style.accent || BRAND.green, 0.055)
-    : shade(stock, 1.10);
-  ctx.fillRect(-bleed, -bleed, plan.canvas.w + bleed * 2, plan.canvas.h + bleed * 2);
-
-  ctx.fillStyle = theme.band;
-  ctx.fillRect(g.spine.x, g.spine.y, g.spine.w, g.spine.h);
-
-  paintWell(ctx, g.well, g.brief, assets.evidence, theme.light
-    ? { label: 'EVIDENCE IMAGE', size: wellSize(g.wellIn),
-        tint: '#E3ECE7', ink: '#3F6554', dash: '#3F6554' }
-    : { label: 'EVIDENCE IMAGE', size: wellSize(g.wellIn),
-        tint: 'rgba(255,255,255,.09)', ink: 'rgba(255,255,255,.72)',
-        dash: 'rgba(255,255,255,.46)' });
-
-  ctx.textAlign = 'left';
-  ctx.textBaseline = 'alphabetic';
-  for (const b of g.bands) {
-    const blk = b.block;
-    if (b.role === 'body') {
-      paintBullets(ctx, blk, g.col.x, b.y, accent, ink, 0.12, 0.28);
-      continue;
-    }
-    if (b.role === 'quote') {
-      // A rule down the side, so the quotation reads as somebody else talking.
+  /* The headline. In a block on a dark ground, on a rule on a light one. */
+  if (b.head) {
+    const blk = b.head.block;
+    if (dark) {
       ctx.fillStyle = accent;
-      ctx.fillRect(g.col.x, b.y, Math.max(2, plan.s * 0.005), blk.h * 1.02);
-      ctx.fillStyle = ink;
-      setFont(ctx, blk.font, blk.px, blk.ls);
-      blk.lines.forEach((l, i) => ctx.fillText(l, g.col.x + plan.s * 0.022, b.y + blk.lh * (i + 0.84)));
-      continue;
+      ctx.fillRect(b.top.x - b.pad * 0.4, b.head.y, b.top.w + b.pad * 0.8, blk.h + b.head.pad * 2);
     }
-    ctx.fillStyle = b.role === 'kicker' || b.role === 'cta' ? accent
-      : b.role === 'headline' ? ink : theme.secondary;
+    ctx.fillStyle = dark ? BRAND.white : plate;
     setFont(ctx, blk.font, blk.px, blk.ls);
-    const x = b.role === 'source' ? g.col.x + plan.s * 0.022 : g.col.x;
-    blk.lines.forEach((l, i) => ctx.fillText(l, x, b.y + blk.lh * (i + 0.84)));
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'alphabetic';
+    blk.lines.forEach((l, i) =>
+      ctx.fillText(l, b.topCx, b.head.y + b.head.pad + blk.lh * (i + 0.84)));
+    if (b.head.ruleH) {
+      ctx.fillStyle = accent;
+      ctx.fillRect(b.top.x, b.head.ruleY, b.top.w, b.head.ruleH);
+    }
   }
+
+  if (b.sub) {
+    const blk = b.sub.block;
+    ctx.fillStyle = dark ? 'rgba(255,255,255,.86)' : plate;
+    setFont(ctx, blk.font, blk.px, blk.ls);
+    ctx.textAlign = 'center';
+    blk.lines.forEach((l, i) => ctx.fillText(l, b.topCx, b.sub.y + blk.lh * (i + 0.86)));
+  }
+
+  /* The figures. Contained by height and centred on the slot, so a tall
+   * portrait and a short one stand on the same floor, and drawn left to right
+   * so each overlaps the one before: a row of people, not a row of stamps. */
+  for (const f of b.figures) {
+    const img = assets.portraits && assets.portraits[f.candidate.name];
+    const slot = f.slot;
+    if (img) {
+      /* Everybody the same height, standing on the band.
+       *
+       * A wide crop is trimmed at the sides rather than scaled down: shrinking
+       * it to fit the slot left that person shorter than the row and floating
+       * above the band, which reads as a mistake. Cropping keeps the heads the
+       * same size and the shoulders where they belong, which is what a row of
+       * people photographed separately needs in order to look like a row. */
+      const k = slot.h / img.height;
+      const dw = img.width * k;
+      const cx0 = slot.x + slot.w / 2;
+      if (dw > f.maxW) {
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(cx0 - f.maxW / 2, slot.y, f.maxW, slot.h);
+        ctx.clip();
+        ctx.drawImage(img, cx0 - dw / 2, slot.y, dw, slot.h);
+        ctx.restore();
+      } else {
+        ctx.drawImage(img, cx0 - dw / 2, slot.y, dw, slot.h);
+      }
+    } else {
+      // An absence, said plainly, with no box round it: a box here would read
+      // as a design choice and go to press.
+      ctx.save();
+      ctx.fillStyle = dark ? 'rgba(255,255,255,.14)' : 'rgba(18,49,78,.12)';
+      const fw = slot.w * 0.62;
+      const fx = slot.x + (slot.w - fw) / 2;
+      ctx.beginPath();
+      ctx.arc(fx + fw / 2, slot.y + slot.h - fw * 1.30, fw * 0.34, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.moveTo(fx, slot.y + slot.h);
+      ctx.quadraticCurveTo(fx, slot.y + slot.h - fw * 0.86, fx + fw / 2, slot.y + slot.h - fw * 0.86);
+      ctx.quadraticCurveTo(fx + fw, slot.y + slot.h - fw * 0.86, fx + fw, slot.y + slot.h);
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillStyle = dark ? 'rgba(255,255,255,.80)' : 'rgba(18,49,78,.70)';
+      setFont(ctx, { family: 'Barlow Condensed', weight: 700 }, Math.max(8, slot.w * 0.085), 0.06);
+      ctx.textAlign = 'center';
+      ctx.fillText('PHOTO NEEDED', slot.x + slot.w / 2, slot.y + slot.h - fw * 1.78);
+      ctx.restore();
+    }
+  }
+
+  /* The band of names, one under each face. */
+  if (b.bandRect) {
+    const r = b.bandRect;
+    ctx.fillStyle = dark ? accent : plate;
+    ctx.fillRect(r.x - B, r.y, r.w + B * 2, r.h);
+    ctx.textAlign = 'center';
+    ctx.fillStyle = BRAND.white;
+    for (const f of b.figures) {
+      setFont(ctx, { family: 'Barlow Condensed', weight: 700 }, f.name.px, 0.03);
+      ctx.fillText(f.name.text.toUpperCase(),
+        f.nameBox.x + f.nameBox.w / 2, f.nameBox.y + (f.nameBox.h + f.name.px * 0.72) / 2);
+    }
+  }
+
+  // The town and the district, under the band.
+  if (b.seat) {
+    const blk = b.seat.block;
+    ctx.fillStyle = ink;
+    setFont(ctx, blk.font, blk.px, blk.ls);
+    ctx.textAlign = 'center';
+    blk.lines.forEach((l, i) => ctx.fillText(l, b.cx, b.seat.y + blk.lh * (i + 0.84)));
+  }
+
+  /* The call to action: a solid block, square, the width of its own words. A
+   * side of this programme that does not say when to vote has not finished. */
+  if (b.cta) {
+    const blk = b.cta.block;
+    const x = b.cx - b.cta.w / 2;
+    ctx.fillStyle = dark ? accent : (theme.ctaBg || accent);
+    ctx.fillRect(x, b.cta.y, b.cta.w, b.cta.h);
+    ctx.fillStyle = BRAND.white;
+    setFont(ctx, blk.font, blk.px, blk.ls);
+    ctx.textAlign = 'center';
+    ctx.fillText(blk.lines[0], b.cx, b.cta.y + (b.cta.h + blk.px * 0.74) / 2);
+  }
+
   if ('letterSpacing' in ctx) ctx.letterSpacing = '0px';
 }
 
@@ -1705,11 +1550,8 @@ export function paint(ctx, plan, style, assets = {}, copy = {}, bleed = 0) {
   } else if (plan.typeled) {
     for (const tile of plan.tiles) paintTile(ctx, tile, plan, style, assets, theme);
     paintTypeLed(ctx, plan, style, theme);
-  } else if (plan.promise) {
-    paintPromise(ctx, plan, style, theme, assets, bleed);
-    for (const tile of plan.tiles) paintTile(ctx, tile, plan, style, assets, theme);
-  } else if (plan.proof) {
-    paintProof(ctx, plan, style, theme, assets, bleed);
+  } else if (plan.band) {
+    paintSlateBand(ctx, plan, style, theme, assets, bleed);
   } else if (plan.poster) {
     // The figure first: the words sit on the ground it stands on, not on it.
     for (const tile of plan.tiles) paintTile(ctx, tile, plan, style, assets, theme);

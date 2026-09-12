@@ -54,202 +54,107 @@ export const MAIL_PROGRAMS = [{
   id: 'granite-guarantee',
   label: 'Granite Guarantee',
   canvas: 'mail6',
-  note: 'Eight two-sided 11 x 6 mailers. Claim on the front, receipt on the back.',
+  note: 'Eight two-sided 11 x 6 mailers. An issue on each side, the slate on both.',
   pieces: [
     {
-      id: 'contract', art: 'contract', railSide: 'right', n: 1, label: 'The Contract',
+      id: 'contract', art: 'contract', n: 1, label: 'The Contract',
       front: {
-        kicker: 'New Hampshire House Republicans',
         headline: 'We Put It In Writing',
-        subhead: 'Seven promises, signed and mailed before you vote, not after.',
-        record: 'No income tax. No sales tax.\nCap your school tax.\nFree market housing.\n'
-          + 'Lower energy bills.\nLower health care costs.\nParents decide.\nSafe communities.',
-        details: '',
-        footer: ROLE,
-        brief: 'The printed contract held in two hands, or the State House at first light. '
-          + 'New Hampshire, recognizably.',
+        subhead: 'Seven promises, signed and mailed before you vote',
       },
       back: {
-        kicker: 'The contract',
         headline: 'Ask The Other Side For Theirs',
-        record: 'They will not put a number on what they want to spend, or a ceiling on what they want to tax.\n'
-          + 'You cannot hold anyone to a promise they refuse to make.',
-        callout: '',
-        source: '',
-        cta: 'Hold us to every one of them.',
-        brief: 'The seven promises printed as a signed document, photographed flat.',
+        subhead: 'They will not put a number on it, or a ceiling on your taxes',
       },
     },
     {
-      id: 'income-tax', art: 'statehouse', railSide: 'left', n: 2, label: 'No Income Tax',
+      id: 'income-tax', art: 'statehouse', n: 2, label: 'No Income Tax',
       front: {
-        kicker: 'The income tax',
-        headline: 'They Had One Chance To Ban The Income Tax',
-        subhead: 'Republicans voted to write the ban into the state constitution. It failed by 43 votes.',
-        record: '',
-        details: 'Not one of them will ever vote for an income tax or a sales tax. '
-          + 'Not this term. Not ever.',
-        footer: ROLE,
-        brief: 'State House dome against a hard sky, shot from below. Cold light.',
+        headline: 'No Income Tax. No Sales Tax.',
+        subhead: 'Protecting the New Hampshire advantage',
       },
       back: {
-        kicker: 'CACR 12, May 14, 2026',
         headline: '193 Yes. 148 No. 236 Needed.',
-        record: 'CACR 12 would have barred the legislature from ever passing an income tax.\n'
-          + 'It passed the Senate 16 to 8. It died in the House.\n'
-          + 'All but four House Democrats voted against it. {{OPP_LAST}} voted {{OPP_VOTE}}.',
-        callout: 'Why should we handcuff or bind future legislatures?',
-        source: 'Rep. Terry Spahr, D-Hanover, on the income tax ban',
-        cta: '',
-        brief: "Crop of the CACR 12 roll call sheet with the target member's line visible.",
+        subhead: 'CACR 12 would have banned the income tax. It died in the House.',
       },
     },
     {
-      id: 'school-tax', art: 'home', railSide: 'right', n: 3, label: 'Cap Your School Tax',
+      id: 'school-tax', art: 'home', n: 3, label: 'Cap Your School Tax',
       front: {
-        kicker: 'On your ballot November 3',
-        headline: 'Cap Your School Tax',
-        subhead: 'Republicans put a school tax cap on the November 3 ballot in every city and town. '
-          + 'Your vote sets it.',
-        record: '',
-        details: '{{TOWN}} pays {{TAX_RATE}} per thousand. The cap holds school taxes to inflation.',
-        footer: ROLE,
-        brief: 'A modest single family home in {{TOWN}} at golden hour. Not a mansion. Not a stock suburb.',
+        headline: 'Cap The Property Tax',
+        subhead: 'Relief for {{TOWN}} homeowners',
       },
       back: {
-        kicker: 'HB 1300, signed into law',
-        headline: 'We Gave You The Vote. They Fought It.',
-        record: 'HB 1300 caps school taxes at inflation, plus new construction.\n'
-          + 'It passed the House and Senate largely along party lines.\n'
-          + 'Three fifths of your neighbors must vote yes. That is a turnout number.',
-        callout: 'Someone must act, our voters are being taxed out of their homes.',
-        source: 'Rep. Ross Berry, R-Weare',
-        cta: 'Vote yes on the cap. November 3.',
-        brief: 'Crop of a property tax bill, the school line legible, the rate circled in red.',
+        headline: 'We Gave You The Vote',
+        subhead: 'HB 1300 caps school taxes at inflation. It is on your ballot.',
       },
     },
     {
-      id: 'housing', art: 'framing', railSide: 'left', n: 4, label: 'Free Market Housing',
+      id: 'housing', art: 'framing', n: 4, label: 'Free Market Housing',
       front: {
-        kicker: 'Housing',
-        headline: 'We Changed The Law So We Can Build',
-        subhead: 'You cannot bring rents down without more homes. '
-          + 'Fifteen housing reform bills passed in one session.',
-        record: '',
-        details: 'Your Republican {{TEAM}} will keep cutting the rules that price '
-          + 'your kids out of {{TOWN}}.',
-        footer: ROLE,
-        brief: 'A framing crew on a house going up. Daylight, real site, real tools.',
+        headline: 'Build More Homes',
+        subhead: 'So your kids can afford to stay in {{TOWN}}',
       },
       back: {
-        kicker: 'The 2025 housing package',
-        headline: 'Fifteen Bills. One Result: More Homes.',
-        record: 'HB 577 makes a detached accessory dwelling unit legal by right, statewide.\n'
-          + 'Towns can no longer force those units below 750 square feet.\n'
-          + 'Every rule that adds a year to a project adds thousands to the price.',
-        callout: '',
-        source: '',
-        cta: '',
-        brief: 'A stack of permit paperwork, or a for rent sign with the price visible.',
+        headline: 'Fifteen Bills. More Homes.',
+        subhead: 'The 2025 housing package, passed in one session',
       },
     },
     {
-      id: 'energy', art: 'grid', railSide: 'right', n: 5, label: 'Lower Energy Bills',
+      id: 'energy', art: 'grid', n: 5, label: 'Lower Energy Bills',
       front: {
-        kicker: 'Your electric bill',
+        headline: 'Lower Your Electric Bill',
+        subhead: 'More supply, not more mandates on your rate',
+      },
+      back: {
         headline: '26 Cents A Kilowatt',
-        subhead: 'New Hampshire pays about 27 percent more for power than the country does. '
-          + 'Bills come down when we build.',
-        record: '',
-        details: 'More supply. More transmission. Fewer mandates riding on your rate.',
-        footer: ROLE,
-        brief: 'Transmission lines running to the horizon at dusk. Scale and distance.',
-      },
-      back: {
-        kicker: 'Your winter bill',
-        headline: 'Supply Is The Only Thing That Lowers A Bill',
-        record: 'More generation, more transmission, fewer mandates on the rate.\n'
-          + 'Targets do not produce a kilowatt. Plants and lines do.\n'
-          + 'Every program added to the rate shows up on the bill you already cannot pay.',
-        callout: '',
-        source: '',
-        cta: '',
-        brief: 'Crop of an electric bill, the supply rate line legible.',
+        subhead: 'New Hampshire pays about 27 percent over the country',
       },
     },
     {
-      id: 'health', art: 'bill', railSide: 'left', n: 6, label: 'Lower Health Care Costs',
+      id: 'health', art: 'bill', n: 6, label: 'Lower Health Care Costs',
       front: {
-        kicker: 'What it costs',
-        headline: 'Know The Price Before You Pay It',
-        subhead: 'Republicans made hospital and insurer prices public and free to look up.',
-        record: '',
-        details: 'You should not need the bill to learn the cost.',
-        footer: ROLE,
-        brief: 'A hospital billing statement open on a kitchen table, coffee cup at the edge.',
+        headline: 'Know The Price First',
+        subhead: 'Hospital and insurer prices, posted and public',
       },
       back: {
-        kicker: 'HB 705, enacted 2026',
         headline: 'Prices Out In The Open',
-        record: 'HB 705 requires posted in network pricing and maximums for out of network charges.\n'
-          + 'Historical pricing published, free and public.\n'
-          + 'Hidden prices protect the system. Posted prices protect the patient.',
-        callout: '',
-        source: '',
-        cta: '',
-        brief: 'A posted price list or a phone showing the public price lookup.',
+        subhead: 'HB 705, enacted 2026. Hidden prices protect the system.',
       },
     },
     {
-      id: 'parents', art: 'family', railSide: 'right', n: 7, label: 'Parents Decide',
+      id: 'parents', art: 'family', n: 7, label: 'Parents Decide',
       front: {
-        kicker: 'Your child’s school',
-        headline: 'Fund Students, Not Systems',
-        subhead: 'Republicans opened Education Freedom Accounts to every family in New Hampshire, '
-          + 'whatever they earn.',
-        record: '',
-        details: 'Parents pick the school. Parents see the curriculum.',
-        footer: ROLE,
-        brief: 'Parents and children at a kitchen table with schoolwork. Warm light. No classroom stock.',
+        headline: 'Parents Decide',
+        subhead: 'Fund students, not systems',
       },
       back: {
-        kicker: 'HB 115, House roll call, March 13, 2025',
         headline: '198 To 180. Not One Democrat.',
-        record: 'HB 115 removed the income cap on Education Freedom Accounts.\n'
-          + 'No House Democrat voted yes. Ten Republicans voted no.\n'
-          + 'They did not argue about the money. They argued about who decides.',
-        callout: '',
-        source: '',
-        cta: '',
-        brief: 'Crop of the HB 115 roll call sheet, 198 to 180 visible.',
+        subhead: 'HB 115 opened Education Freedom Accounts to every family',
       },
     },
     {
-      id: 'close', art: 'town', railSide: 'left', n: 8, label: 'The Close',
+      id: 'close', art: 'town', n: 8, label: 'The Close',
       front: {
-        kicker: 'Tuesday, November 3',
         headline: 'Seven Promises. In Writing.',
-        subhead: 'No income tax. No sales tax. A cap on your school tax. More homes. '
-          + 'Lower bills. Parents deciding. Police backed up.',
-        record: '',
-        details: 'Vote Republican for State Representative. Every name on this card.',
-        footer: ROLE,
-        brief: 'The {{TEAM}} outdoors in {{TOWN}}, talking with voters. Not a posed line-up.',
+        subhead: 'Hold us to every one of them',
       },
       back: {
-        kicker: 'Tuesday, November 3',
         headline: 'Two Votes. One Ballot.',
-        record: 'Vote Republican for the New Hampshire House. Every name on the card.\n'
-          + 'Vote yes on the school tax cap question. It needs three fifths.\n'
-          + 'Polls open {{POLL_HOURS}} at {{POLL_PLACE}}.',
-        callout: '',
-        source: '',
-        cta: 'Hold us to every one of them.',
-        brief: 'A sample ballot showing the candidate line and the tax cap question together.',
+        subhead: 'Vote the slate, and vote yes on the school tax cap',
       },
     },
   ],
 }];
+
+/* The two lines every side carries, whatever the issue on it is. The district
+ * line names the town first, because that is the word a voter recognises, and
+ * the call to action says when. A side of this programme that does not tell
+ * somebody when to vote has not finished. */
+export const SIDE_COMMON = {
+  footer: '{{PLACE}}',
+  cta: 'Vote Republican November 3',
+};
 
 export const programById = (id) => MAIL_PROGRAMS.find((p) => p.id === id) || null;
 
@@ -285,22 +190,18 @@ export const artUrl = (piece) => (piece && piece.art ? `/art/${piece.art}.webp` 
  * a roll call under a claim is the strongest thing in this programme. */
 export const SHARED_BACK_ART = '/art/portsmouth.webp';
 
+/* One back for the whole drop.
+ *
+ * Eight different backs is eight plate changes and eight chances to bind the
+ * wrong side to the right front. One back gangs, and the only thing on it that
+ * changes district to district is the slate and the carrier's corner. Turn the
+ * shared back off and each piece carries the receipt for its own claim, which
+ * is the version to run when the drop is worth the plates. */
 export const SHARED_BACK = {
-  kicker: 'The Granite Guarantee',
   headline: 'Seven Promises. In Writing.',
-  record: 'No income tax. No sales tax.\nA cap on your school tax, on your ballot November 3.\n'
-    + 'Free market housing, so your kids can afford to stay.\nLower energy bills.\n'
-    + 'Lower health care costs, with the price posted before you pay it.\n'
-    + 'Parents deciding.\nSafe communities.',
-  callout: 'Ask the other side for theirs.',
-  source: '',
-  cta: 'Hold us to every one of them.',
-  brief: '',
+  subhead: 'No income tax. A cap on your school tax. More homes. Lower bills.',
 };
 
-/* The variables the app cannot look up. Every one of these is a fact about a
- * district, an opponent or a polling place, and the app inventing any of them
- * would put a made up number on a piece of mail. */
 export const MAIL_VARS = [
   { key: 'TAX_RATE', label: 'School tax rate', placeholder: '$14.72', hint: 'Per thousand, from the town rate sheet.' },
   { key: 'OPP_LAST', label: 'Opponent surname', placeholder: 'Spahr', hint: 'The member whose vote the piece names.' },
