@@ -588,6 +588,13 @@ The marks are geometry, not photographs and not generated art. A photograph of a
 argument, it costs nothing, it carries no licence, and it is as sharp at 300 dpi
 as at 72.
 
+Nothing on that side is set in a colour that cannot be read on the ground under
+it. The Granite Guarantee green on the Granite Guarantee navy measures 2.6 to 1,
+which is under the floor for text of any size, so accent type on a dark ground
+uses the palette's own light accent, and where a palette has none the accent is
+lifted toward white until it carries. Brand colour that cannot be read is not
+brand colour. A test holds every palette to 4.5 to 1.
+
 Every contrast side ends on a source line: the bill, the roll call, the date. A
 side that attacks a record and does not cite it is a side you cannot defend.
 Where the record is not in the file the line prints empty and the app says so in

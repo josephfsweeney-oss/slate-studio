@@ -13,6 +13,47 @@ function hexToRgb(hex) {
   return m ? [parseInt(m[1], 16), parseInt(m[2], 16), parseInt(m[3], 16)] : [0, 0, 0];
 }
 
+/* How far apart two colours actually are, by the measure a printer and a
+ * building inspector both use. The palette's green on the palette's navy comes
+ * out at 2.5 to 1, which is below the floor for text of any size, and it is why
+ * a kicker set in the accent on a dark ground could not be read. */
+const srgb = (c) => {
+  const v = c / 255;
+  return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
+};
+
+const relLum = ([r, g, b]) => 0.2126 * srgb(r) + 0.7152 * srgb(g) + 0.0722 * srgb(b);
+
+export function contrastRatio(a, b) {
+  const la = relLum(hexToRgb(a));
+  const lb = relLum(hexToRgb(b));
+  return (Math.max(la, lb) + 0.05) / (Math.min(la, lb) + 0.05);
+}
+
+const mixWhite = ([r, g, b], t) => [
+  Math.round(r + (255 - r) * t), Math.round(g + (255 - g) * t), Math.round(b + (255 - b) * t)];
+const toHex = ([r, g, b]) =>
+  `#${[r, g, b].map((v) => v.toString(16).padStart(2, '0')).join('')}`;
+
+/**
+ * The accent, in a form that can be read on a ground.
+ *
+ * The palette's own light accent first, because somebody chose it. If that does
+ * not carry either, the accent is lifted toward white until it does, and white
+ * is where it stops. Brand colour that cannot be read is not brand colour, it is
+ * a mistake with a swatch next to it.
+ */
+export function readableOn(accent, ground, light, min = 4.5) {
+  if (light && contrastRatio(light, ground) >= min) return light;
+  if (contrastRatio(accent, ground) >= min) return accent;
+  const base = hexToRgb(accent);
+  for (let t = 0.1; t <= 1; t += 0.05) {
+    const hex = toHex(mixWhite(base, t));
+    if (contrastRatio(hex, ground) >= min) return hex;
+  }
+  return '#FFFFFF';
+}
+
 /* Lightness and the foot band both live in the engine now: the engine has to
  * reserve the band this file paints, and two copies of the rule had already
  * drifted far enough to bury a source line under it. */
@@ -1665,6 +1706,10 @@ function paintContrast(ctx, plan, style, theme, assets, bleed = 0) {
   const accent = style.accent || BRAND.green;
   const ground = style.contrastGround || style.plateColor || BRAND.navy;
   const ink = BRAND.white;
+  /* Everything set in the accent on this side is set in a version of it that
+   * can be read on this ground. The solid blocks keep the accent itself: white
+   * type on the accent is a different sum and it already carries. */
+  const mark = readableOn(accent, ground, style.plateAccent, 4.5);
 
   ctx.fillStyle = ground;
   ctx.fillRect(-B, -B, w + B * 2, h + B * 2);
@@ -1709,11 +1754,11 @@ function paintContrast(ctx, plan, style, theme, assets, bleed = 0) {
     setFont(ctx, blk.font, blk.px, blk.ls);
     blk.lines.forEach((l, i) => ctx.fillText(l, x, at.y + blk.lh * (i + 0.84)));
   };
-  line(c.kicker, accent, c.col.x);
+  line(c.kicker, mark, c.col.x);
   line(c.head, ink, c.col.x);
-  line(c.number, accent, c.col.x);
+  line(c.number, mark, c.col.x);
   line(c.caption, 'rgba(255,255,255,.86)', c.col.x);
-  line(c.source, 'rgba(255,255,255,.52)', c.inner.x);
+  line(c.source, 'rgba(255,255,255,.66)', c.inner.x);
 
   if (c.cta) {
     const blk = c.cta.block;

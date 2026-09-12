@@ -5,7 +5,7 @@ import path from 'node:path';
 import { ROOT } from '../server/config.js';
 import { solve, bestGrid, PHOTO_AR, PLATE_AR, COMPOSITIONS, CONTRAST_MARKS } from '../public/layout.js';
 import { nameParts, slugify } from '../public/names.js';
-import { fillTokens, CANVASES, TEMPLATES } from '../public/presets.js';
+import { fillTokens, CANVASES, TEMPLATES, PALETTES } from '../public/presets.js';
 import { MAIL_PROGRAMS, SIDE_COMMON, sideStyle, sideCopyFor } from '../public/mailers.js';
 
 /* Stand-in for canvas measureText: width of the string at 100px. Anton is the
@@ -996,6 +996,36 @@ test('the push token stays in the browser and never reaches this app', () => {
 
   // And the panel says what the token is allowed to be.
   assert.match(html, /Contents set to\s*\n?\s*read and write/);
+});
+
+test('nothing is set in a colour that cannot be read on the ground under it', async () => {
+  const { contrastRatio, readableOn } = await import('../public/render.js');
+
+  /* The thing this guards. The Granite Guarantee green on the Granite Guarantee
+   * navy is 2.6 to 1, which is under the floor for text of any size, and it is
+   * why a kicker set in the accent on a dark ground could not be read. */
+  assert.ok(contrastRatio('#2F7C4E', '#12314E') < 3,
+    'the accent on the plate used to be readable; this test has nothing to guard');
+
+  for (const pal of PALETTES) {
+    const ground = pal.plateColor || '#12314E';
+    const where = pal.id || pal.name || 'a palette';
+    const chosen = readableOn(pal.accent, ground, pal.plateAccent, 4.5);
+    assert.ok(contrastRatio(chosen, ground) >= 4.5,
+      `${where}: accent text on the dark ground is ${contrastRatio(chosen, ground).toFixed(2)} to 1`);
+    assert.ok(contrastRatio('#FFFFFF', ground) >= 4.5,
+      `${where}: white on the dark ground is too close`);
+    // White on the solid accent block, which is where the call to action sits.
+    assert.ok(contrastRatio('#FFFFFF', pal.accent) >= 3,
+      `${where}: the call to action is ${contrastRatio('#FFFFFF', pal.accent).toFixed(2)} to 1`);
+  }
+
+  /* And with no light accent to fall back on it lifts the accent itself until
+   * it carries, rather than printing the brand colour and hoping. */
+  const lifted = readableOn('#BF0A30', '#12314E', null, 4.5);
+  assert.notEqual(lifted.toLowerCase(), '#bf0a30', 'the unreadable accent was used as it is');
+  assert.ok(contrastRatio(lifted, '#12314E') >= 4.5,
+    `lifting stopped at ${contrastRatio(lifted, '#12314E').toFixed(2)} to 1`);
 });
 
 test('the issue rounds argue on one side and carry the team on the other', () => {
