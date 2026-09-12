@@ -256,7 +256,7 @@ function idealTile(n, s) {
 
 export const COMPOSITIONS = ['stack', 'banner', 'split', 'slateOnly', 'palmcard',
   'palmback', 'ballot', 'spotlight', 'versus', 'strip', 'stat', 'receipt', 'typeled',
-  'promise', 'proof', 'poster'];
+  'promise', 'proof', 'poster', 'contrast'];
 
 /* The palm card is a designed template rather than a solved one: a fixed stack
  * of bands, in a fixed order, the way a rack card is read top to bottom. The
@@ -2207,6 +2207,123 @@ function solveSlateBand(spec, measure, side) {
   };
 }
 
+/* ------------------------------------------------------------ the contrast
+ *
+ * The message side of an issue round, with nobody's face on it. A slate piece
+ * has two jobs and cannot do both well on one side: this side makes the case,
+ * and the address side carries the team and the ask. It runs on a dark ground
+ * so it does not look like the side with the people on it, and it carries a
+ * drawn mark rather than a photograph, because a photograph of a tax form is a
+ * photograph and a drawing of one is an argument.
+ */
+function solveContrast(spec, measure) {
+  const { w, h } = spec.canvas;
+  const style = spec.style || {};
+  const copy = spec.copy || {};
+  const density = style.density ?? 1;
+  const box = { x: 0, y: 0, w, h };
+  const s = Math.min(w, h);
+
+  const pad = w * 0.042 * density;
+  const inner = { x: pad, y: pad * 1.15, w: w - pad * 2, h: h - pad * 2.3 };
+  const gutter = w * 0.030;
+
+  /* The foot, measured first: the call to action is the one line on this side
+   * that is not an argument, and it never gives up its height. */
+  const ctaBlk = fitInside(measure, copy.cta, ANTON, box.h * 0.062 * density,
+    inner.w * 0.92, 1, 0.005, true);
+  const ctaH = ctaBlk.h ? ctaBlk.px * 1.58 : 0;
+  const srcBlk = fitInside(measure, copy.source, COND_BOLD, box.h * 0.028 * density,
+    inner.w, 2, 0.02, true);
+  const srcH = srcBlk.h ? srcBlk.h + box.h * 0.014 : 0;
+
+  const footTop = inner.y + inner.h - ctaH - srcH;
+
+  /* The mark takes a third on the right. Anything narrower and a drawing reads
+   * as a logo somebody forgot to move. */
+  const markW = inner.w * 0.30;
+  const mark = { id: String(style.mark || ''),
+    rect: { x: inner.x + inner.w - markW, y: inner.y,
+            w: markW, h: Math.max(1, footTop - inner.y - box.h * 0.03) } };
+  const colW = mark.id ? inner.w - markW - gutter : inner.w;
+
+  const kick = fitInside(measure, copy.kicker, COND_BOLD, box.h * 0.038 * density,
+    colW, 2, 0.16, true);
+  const kickH = kick.h ? kick.h + box.h * 0.024 : 0;
+
+  const num = fitInside(measure, copy.number, ANTON,
+    Math.min(box.h * 0.34, colW * 0.62) * density, colW, 1, -0.02, true);
+  const numH = num.h ? num.h + box.h * 0.016 : 0;
+
+  const cap = fitInside(measure, copy.subhead, COND_BOLD, box.h * 0.042 * density,
+    colW, 3, 0.03, true);
+  const capH = cap.h ? cap.h + box.h * 0.018 : 0;
+
+  /* The headline takes what the rest of the column leaves, and never less than
+   * a line it can be read at. */
+  const room = Math.max(box.h * 0.06, footTop - inner.y - kickH - numH - capH - box.h * 0.02);
+  let headPx = Math.min(box.h * 0.135 * density, Math.max(room, box.h * 0.05));
+  let head = fitBlock(measure, copy.headline, ANTON, headPx, colW, 3, -0.012, true);
+  let guard = 0;
+  while (head.h > room && headPx > box.h * 0.05 && guard++ < 60) {
+    headPx *= 0.94;
+    head = fitBlock(measure, copy.headline, ANTON, headPx, colW, 3, -0.012, true);
+  }
+  const headH = head.h ? head.h + box.h * 0.022 : 0;
+
+  // The block sits in the middle of the column it was given.
+  const stackH = kickH + headH + numH + capH;
+  let y = inner.y + Math.max(0, (footTop - inner.y - stackH) / 2);
+  const place = (blk, gapAfter) => {
+    if (!blk.h) return null;
+    const at = { block: blk, y };
+    y += blk.h + gapAfter;
+    return at;
+  };
+
+  const dpi = spec.dpi || 0;
+  return {
+    canvas: { w, h },
+    composition: 'contrast',
+    pad, gap: box.h * 0.02, s, scale: 1,
+    grid: { cols: 0, rows: 0, tileW: 0, tileH: 0 },
+    slateRect: null,
+    tiles: [],
+    deck: null,
+    copy: null,
+    mailPanel: null,
+    qr: null,
+    contrast: {
+      box, inner, col: { x: inner.x, w: colW },
+      kicker: place(kick, box.h * 0.024),
+      head: place(head, box.h * 0.022),
+      number: place(num, box.h * 0.016),
+      caption: place(cap, box.h * 0.018),
+      mark: mark.id ? mark : null,
+      source: srcBlk.lines.length
+        ? { block: srcBlk, y: footTop } : null,
+      cta: ctaBlk.lines.length
+        ? { block: ctaBlk, x: inner.x, y: footTop + srcH, w: inner.w, h: ctaH } : null,
+    },
+    disclaimer: null,
+    warnings: [
+      ...(!String(copy.headline || '').trim()
+        ? ['The contrast side has no headline. It is the whole side.'] : []),
+      ...(!String(copy.cta || '').trim()
+        ? ['No call to action. Every side of this programme tells somebody when to vote.'] : []),
+      ...(!String(copy.source || '').trim()
+        ? ['No source line. A side that attacks a record and does not cite it is a '
+          + 'side you cannot defend. Put the bill number and the roll call on it.'] : []),
+      ...(head.truncated ? ['The headline is longer than three lines will hold.'] : []),
+      ...(dpi && mark.id && !CONTRAST_MARKS.includes(mark.id)
+        ? [`There is no mark called ${mark.id}. The column will print empty.`] : []),
+    ],
+  };
+}
+
+/** The drawings the contrast side can carry. The painter holds the geometry. */
+export const CONTRAST_MARKS = ['form', 'meter', 'sold', 'stairs', 'door', 'redacted'];
+
 function solvePromise(spec, measure) { return solveSlateBand(spec, measure, 'front'); }
 function solveProof(spec, measure) { return solveSlateBand(spec, measure, 'back'); }
 
@@ -2432,6 +2549,7 @@ function solveAll(spec, measure) {
   if (comp === 'promise') return solvePromise(spec, measure);
   if (comp === 'proof') return solveProof(spec, measure);
   if (comp === 'poster') return solvePoster(spec, measure);
+  if (comp === 'contrast') return solveContrast(spec, measure);
   if (!hasCopy) comp = 'slateOnly';
 
   // Reserve the disclaimer strip first. It is required on a finished ad under

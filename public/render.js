@@ -1519,6 +1519,190 @@ function paintSlateBand(ctx, plan, style, theme, assets, bleed = 0) {
  * The ground gets a vignette rather than a flat fill. A social graphic is
  * looked at on a screen next to a hundred other rectangles, and a flat panel of
  * one colour is the one that reads as a placeholder. */
+/* ------------------------------------------------------------- the marks
+ *
+ * Drawings, not photographs. A photograph of a tax form is a photograph. A
+ * drawing of one is an argument, it costs nothing, it has no licence attached,
+ * and it is as sharp at 300 dpi as at 72. Each one is flat geometry so the
+ * printer has nothing to trap.
+ */
+const MARKS = {
+  /* A tax return with the line that matters filled in for you. */
+  form(ctx, r, ink, accent) {
+    const pw = r.w * 0.80;
+    const ph = Math.min(r.h * 0.92, pw * 1.30);
+    const x = r.x + (r.w - pw) / 2;
+    const y = r.y + (r.h - ph) / 2;
+    ctx.globalAlpha = 0.10; ctx.fillStyle = ink; ctx.fillRect(x, y, pw, ph);
+    ctx.globalAlpha = 1;
+    ctx.strokeStyle = ink; ctx.lineWidth = Math.max(2, pw * 0.016);
+    ctx.strokeRect(x, y, pw, ph);
+    const m = pw * 0.10;
+    ctx.fillStyle = ink; ctx.fillRect(x + m, y + m, pw - m * 2, ph * 0.11);
+    for (let i = 0; i < 5; i++) {
+      ctx.globalAlpha = 0.50;
+      ctx.fillRect(x + m, y + ph * 0.28 + i * ph * 0.095,
+        (pw - m * 2) * (i % 2 ? 0.70 : 0.92), Math.max(2, ph * 0.022));
+      ctx.globalAlpha = 1;
+    }
+    const bh = ph * 0.19;
+    const bw = (pw - m * 2) * 0.60;
+    ctx.fillStyle = accent;
+    ctx.fillRect(x + pw - m - bw, y + ph - m - bh, bw, bh);
+  },
+
+  /* A bill that climbs, with the month you are living in on the end of it. */
+  meter(ctx, r, ink, accent) {
+    const n = 6;
+    const bw = r.w * 0.095;
+    const gap = (r.w * 0.82 - bw * n) / (n - 1);
+    const x0 = r.x + r.w * 0.09;
+    const base = r.y + r.h * 0.88;
+    for (let i = 0; i < n; i++) {
+      const t = i / (n - 1);
+      const hgt = r.h * (0.14 + t * t * 0.60);
+      ctx.fillStyle = i === n - 1 ? accent : ink;
+      ctx.globalAlpha = i === n - 1 ? 1 : 0.40;
+      ctx.fillRect(x0 + i * (bw + gap), base - hgt, bw, hgt);
+    }
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = ink;
+    ctx.fillRect(r.x + r.w * 0.06, base, r.w * 0.88, Math.max(2, r.h * 0.012));
+  },
+
+  /* The sign that went up before your kids could put in an offer. */
+  sold(ctx, r, ink, accent) {
+    const bw = r.w * 0.80;
+    const bh = bw * 0.54;
+    const x = r.x + (r.w - bw) / 2;
+    const y = r.y + r.h * 0.24;
+    const pw = Math.max(3, bw * 0.045);
+    ctx.globalAlpha = 0.50; ctx.fillStyle = ink;
+    ctx.fillRect(x + bw * 0.16, y + bh, pw, r.h * 0.34);
+    ctx.fillRect(x + bw * 0.80, y + bh, pw, r.h * 0.34);
+    ctx.globalAlpha = 0.12; ctx.fillRect(x, y, bw, bh);
+    ctx.globalAlpha = 1;
+    ctx.strokeStyle = ink; ctx.lineWidth = Math.max(2, bw * 0.020);
+    ctx.strokeRect(x, y, bw, bh);
+    ctx.fillStyle = accent;
+    ctx.fillRect(x + bw * 0.08, y - bh * 0.29, bw * 0.84, bh * 0.30);
+    ctx.globalAlpha = 0.60; ctx.fillStyle = ink;
+    ctx.fillRect(x + bw * 0.12, y + bh * 0.32, bw * 0.76, Math.max(2, bh * 0.085));
+    ctx.fillRect(x + bw * 0.12, y + bh * 0.56, bw * 0.50, Math.max(2, bh * 0.085));
+    ctx.globalAlpha = 1;
+  },
+
+  /* A tax bill going up a staircase with no top step. */
+  stairs(ctx, r, ink, accent) {
+    const n = 4;
+    const sw = r.w * 0.76 / n;
+    const sh = r.h * 0.68 / (n + 1);
+    const x0 = r.x + r.w * 0.10;
+    const base = r.y + r.h * 0.86;
+    ctx.globalAlpha = 0.40; ctx.fillStyle = ink;
+    for (let i = 0; i < n; i++) ctx.fillRect(x0 + i * sw, base - sh * (i + 1), sw, sh * (i + 1));
+    ctx.globalAlpha = 1;
+    ctx.strokeStyle = accent;
+    ctx.lineWidth = Math.max(3, r.w * 0.022);
+    ctx.lineCap = 'square';
+    ctx.setLineDash([r.w * 0.055, r.w * 0.040]);
+    ctx.beginPath();
+    ctx.moveTo(x0 + (n - 1) * sw, base - sh * n);
+    ctx.lineTo(x0 + n * sw, base - sh * n);
+    ctx.lineTo(x0 + n * sw, base - sh * (n + 1.7));
+    ctx.stroke();
+    ctx.setLineDash([]);
+  },
+
+  /* The schoolhouse door, with somebody standing in it. */
+  door(ctx, r, ink, accent) {
+    const dw = r.w * 0.54;
+    const dh = Math.min(r.h * 0.86, dw * 1.70);
+    const x = r.x + (r.w - dw) / 2;
+    const y = r.y + (r.h - dh) / 2;
+    ctx.globalAlpha = 0.12; ctx.fillStyle = ink; ctx.fillRect(x, y, dw, dh);
+    ctx.globalAlpha = 1;
+    ctx.strokeStyle = ink; ctx.lineWidth = Math.max(3, dw * 0.055);
+    ctx.strokeRect(x, y, dw, dh);
+    ctx.fillStyle = ink;
+    ctx.beginPath();
+    ctx.arc(x + dw * 0.82, y + dh * 0.56, Math.max(3, dw * 0.050), 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = accent;
+    ctx.fillRect(x - dw * 0.18, y + dh * 0.40, dw * 1.36, dh * 0.11);
+  },
+
+  /* The invoice with the prices taken out of it. */
+  redacted(ctx, r, ink, accent) {
+    const pw = r.w * 0.80;
+    const ph = Math.min(r.h * 0.92, pw * 1.24);
+    const x = r.x + (r.w - pw) / 2;
+    const y = r.y + (r.h - ph) / 2;
+    ctx.globalAlpha = 0.10; ctx.fillStyle = ink; ctx.fillRect(x, y, pw, ph);
+    ctx.globalAlpha = 1;
+    ctx.strokeStyle = ink; ctx.lineWidth = Math.max(2, pw * 0.016);
+    ctx.strokeRect(x, y, pw, ph);
+    const m = pw * 0.10;
+    const rows = 5;
+    for (let i = 0; i < rows; i++) {
+      const ly = y + ph * 0.18 + i * ph * 0.150;
+      ctx.globalAlpha = 0.45; ctx.fillStyle = ink;
+      ctx.fillRect(x + m, ly, (pw - m * 2) * 0.40, Math.max(2, ph * 0.028));
+      ctx.globalAlpha = 1;
+      ctx.fillStyle = i === rows - 1 ? accent : 'rgba(6,12,20,.92)';
+      ctx.fillRect(x + pw - m - (pw - m * 2) * 0.40, ly - ph * 0.016,
+        (pw - m * 2) * 0.40, Math.max(3, ph * 0.058));
+    }
+  },
+};
+
+/* The message side of an issue round, with nobody's face on it. Dark on
+ * purpose: it must not look like the side with the people on it. */
+function paintContrast(ctx, plan, style, theme, bleed = 0) {
+  const c = plan.contrast;
+  const { w, h } = plan.canvas;
+  const B = bleed;
+  const accent = style.accent || BRAND.green;
+  const ground = style.contrastGround || style.plateColor || BRAND.navy;
+  const ink = BRAND.white;
+
+  ctx.fillStyle = ground;
+  ctx.fillRect(-B, -B, w + B * 2, h + B * 2);
+
+  if (c.mark && MARKS[c.mark.id]) {
+    ctx.save();
+    MARKS[c.mark.id](ctx, c.mark.rect, ink, accent);
+    ctx.restore();
+  }
+
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'alphabetic';
+  const line = (at, color, x) => {
+    if (!at) return;
+    const blk = at.block;
+    ctx.fillStyle = color;
+    setFont(ctx, blk.font, blk.px, blk.ls);
+    blk.lines.forEach((l, i) => ctx.fillText(l, x, at.y + blk.lh * (i + 0.84)));
+  };
+  line(c.kicker, accent, c.col.x);
+  line(c.head, ink, c.col.x);
+  line(c.number, accent, c.col.x);
+  line(c.caption, 'rgba(255,255,255,.86)', c.col.x);
+  line(c.source, 'rgba(255,255,255,.52)', c.inner.x);
+
+  if (c.cta) {
+    const blk = c.cta.block;
+    ctx.fillStyle = accent;
+    ctx.fillRect(c.cta.x, c.cta.y, c.cta.w, c.cta.h);
+    ctx.fillStyle = BRAND.white;
+    setFont(ctx, blk.font, blk.px, blk.ls);
+    ctx.textAlign = 'center';
+    ctx.fillText(blk.lines[0], c.cta.x + c.cta.w / 2,
+      c.cta.y + (c.cta.h + blk.px * 0.74) / 2);
+  }
+  if ('letterSpacing' in ctx) ctx.letterSpacing = '0px';
+}
+
 function paintPoster(ctx, plan, style, theme, bleed = 0) {
   const g = plan.poster;
   const { w, h } = plan.canvas;
@@ -1619,6 +1803,8 @@ export function paint(ctx, plan, style, assets = {}, copy = {}, bleed = 0) {
   } else if (plan.typeled) {
     for (const tile of plan.tiles) paintTile(ctx, tile, plan, style, assets, theme);
     paintTypeLed(ctx, plan, style, theme);
+  } else if (plan.contrast) {
+    paintContrast(ctx, plan, style, theme, bleed);
   } else if (plan.band) {
     paintSlateBand(ctx, plan, style, theme, assets, bleed);
   } else if (plan.poster) {

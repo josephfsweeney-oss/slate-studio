@@ -3,10 +3,10 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { ROOT } from '../server/config.js';
-import { solve, bestGrid, PHOTO_AR, PLATE_AR, COMPOSITIONS } from '../public/layout.js';
+import { solve, bestGrid, PHOTO_AR, PLATE_AR, COMPOSITIONS, CONTRAST_MARKS } from '../public/layout.js';
 import { nameParts, slugify } from '../public/names.js';
 import { fillTokens, CANVASES, TEMPLATES } from '../public/presets.js';
-import { MAIL_PROGRAMS, SIDE_COMMON, sideStyle } from '../public/mailers.js';
+import { MAIL_PROGRAMS, SIDE_COMMON, sideStyle, sideCopyFor } from '../public/mailers.js';
 
 /* Stand-in for canvas measureText: width of the string at 100px. Anton is the
  * wider face, so the proportions stay roughly honest. */
@@ -958,6 +958,62 @@ test('every mail side puts the slate, a headline and a call to action on the pie
       }
     }
   }
+});
+
+test('the issue rounds argue on one side and carry the team on the other', () => {
+  const c = CANVASES.find((x) => x.id === 'mail6');
+  const list = slate(4);
+  const seen = { contrast: 0, slate: 0 };
+  for (const piece of MAIL_PROGRAMS[0].pieces) {
+    for (const side of ['front', 'back']) {
+      const copy = { ...SIDE_COMMON, ...sideCopyFor(piece, side, true) };
+      const style = sideStyle(piece, side, true);
+      const p = solve({ canvas: { w: c.w, h: c.h }, dpi: c.dpi, slate: list, copy, style }, measure);
+      const where = `${piece.id} ${side}`;
+
+      // The address side always carries the slate. A piece that never shows the
+      // team is not a slate piece.
+      if (side === 'back') {
+        assert.ok(p.band, `${where} dropped the slate off the address side`);
+        assert.equal(p.band.figures.length, 4, `${where} lost somebody`);
+        continue;
+      }
+      if (!piece.contrast) { seen.slate++; assert.ok(p.band, `${where} is not a slate side`); continue; }
+
+      seen.contrast++;
+      const b = p.contrast;
+      assert.ok(b, `${where} did not solve as a contrast side`);
+      // Nobody's face is on it.
+      assert.equal(p.tiles.length, 0, `${where} drew a tile`);
+      assert.equal(p.band, undefined, `${where} still carries the slate`);
+
+      // It says something, it cites it, and it says when to vote.
+      assert.ok(b.head, `${where} has no headline`);
+      assert.ok(b.cta, `${where} has no call to action`);
+      assert.match(b.cta.block.lines[0], /NOVEMBER 3/, `${where} does not say when to vote`);
+      assert.equal(p.disclaimer, null, `${where} printed a disclaimer the print shop sets`);
+
+      // The mark is one the painter can actually draw.
+      assert.ok(b.mark, `${where} has no mark`);
+      assert.ok(CONTRAST_MARKS.includes(b.mark.id), `${where} asks for a mark called ${b.mark.id}`);
+
+      // The words and the mark stay out of each other.
+      assert.ok(b.col.x + b.col.w <= b.mark.rect.x + 1, `${where} the words run under the mark`);
+      assert.ok(b.mark.rect.x + b.mark.rect.w <= c.w, `${where} the mark runs off the paper`);
+      assert.ok(b.mark.rect.y + b.mark.rect.h <= b.cta.y + 1, `${where} the mark sits on the foot`);
+
+      // Nothing in the column lands on the foot.
+      for (const at of [b.kicker, b.head, b.number, b.caption]) {
+        if (at) assert.ok(at.y + at.block.h <= b.cta.y + 1, `${where} the words land on the foot`);
+      }
+      // A side that attacks a record and does not cite it says so out loud.
+      const cited = String(copy.source || '').trim();
+      const warned = p.warnings.some((x) => /source line/.test(x));
+      assert.equal(warned, !cited, `${where} warning and source line disagree`);
+    }
+  }
+  assert.equal(seen.contrast, 6, 'six issue rounds should argue');
+  assert.equal(seen.slate, 2, 'the contract and the close keep the slate on both sides');
 });
 
 test('the slate takes the width it needs and the words take what is left', () => {

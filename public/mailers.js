@@ -69,6 +69,14 @@ export const MAIL_PROGRAMS = [{
     },
     {
       id: 'income-tax', art: 'statehouse', n: 2, label: 'No Income Tax',
+      contrast: {
+        mark: 'form',
+        kicker: 'The income tax ban died in the House',
+        headline: 'They Would Not Close The Door',
+        number: '43',
+        subhead: 'Votes short of banning the income tax in the constitution for good.',
+        source: 'CACR 12. 193 yes, 148 no. 236 needed.',
+      },
       front: {
         headline: 'No Income Tax. Not Ever.',
         subhead: 'It is the reason New Hampshire is still worth living in.',
@@ -80,6 +88,14 @@ export const MAIL_PROGRAMS = [{
     },
     {
       id: 'school-tax', art: 'home', n: 3, label: 'Cap Your School Tax',
+      contrast: {
+        mark: 'stairs',
+        kicker: 'Your school tax has no ceiling',
+        headline: 'It Climbs Every Single Year',
+        number: '',
+        subhead: 'Republicans put a cap at inflation on your ballot. Nothing else stops it.',
+        source: 'HB 1300.',
+      },
       front: {
         headline: 'Your School Tax Gets A Ceiling',
         subhead: 'Capped at inflation. Not at whatever the district asks for.',
@@ -91,6 +107,14 @@ export const MAIL_PROGRAMS = [{
     },
     {
       id: 'housing', art: 'framing', n: 4, label: 'Free Market Housing',
+      contrast: {
+        mark: 'sold',
+        kicker: 'Nothing got built',
+        headline: 'Priced Out Of The Town They Grew Up In',
+        number: '15',
+        subhead: 'Housing bills Republicans passed in one session, with Governor Ayotte.',
+        source: 'The 2025 housing package. Fifteen bills in one session.',
+      },
       front: {
         headline: 'Your Kids Cannot Afford To Live Here',
         subhead: 'Republicans voted to change that. More homes, built faster.',
@@ -102,6 +126,14 @@ export const MAIL_PROGRAMS = [{
     },
     {
       id: 'energy', art: 'grid', n: 5, label: 'Lower Energy Bills',
+      contrast: {
+        mark: 'meter',
+        kicker: 'What you pay for the same electricity',
+        headline: 'Over The Country. Every Month.',
+        number: '27%',
+        subhead: 'Over the national average. That is a policy choice, not the weather.',
+        source: '',
+      },
       front: {
         headline: 'You Pay 27 Percent Over The Country',
         subhead: 'For the same electricity. That is a policy choice, not the weather.',
@@ -113,6 +145,14 @@ export const MAIL_PROGRAMS = [{
     },
     {
       id: 'health', art: 'bill', n: 6, label: 'Lower Health Care Costs',
+      contrast: {
+        mark: 'redacted',
+        kicker: 'They kept the prices out of sight',
+        headline: 'You Were Never Meant To See The Bill',
+        number: '',
+        subhead: 'House Republicans and Governor Ayotte opened the books. The system liked them closed.',
+        source: 'HB 705, enacted 2026.',
+      },
       front: {
         headline: 'Know The Price First',
         subhead: 'You would not buy anything else this way.',
@@ -124,6 +164,14 @@ export const MAIL_PROGRAMS = [{
     },
     {
       id: 'parents', art: 'family', n: 7, label: 'Parents Decide',
+      contrast: {
+        mark: 'door',
+        kicker: 'HB 115, on Education Freedom Accounts',
+        headline: 'Not One Democrat Voted Yes',
+        number: '0',
+        subhead: 'Democrats voted to open Education Freedom Accounts to every family.',
+        source: 'HB 115. Passed 198 to 180.',
+      },
       front: {
         headline: 'Parents Decide. Not Bureaucrats.',
         subhead: 'Every family in New Hampshire, not only the ones who can afford to move.',
@@ -168,13 +216,30 @@ export function pieceById(programId, pieceId) {
 }
 
 /** The style for one side of a piece. */
-export function sideStyle(piece, side) {
+export function sideStyle(piece, side, useContrast) {
+  /* The message side of an issue round can drop the faces and make the case
+   * instead. The address side always carries the slate: a piece that never
+   * shows the team is not a slate piece. */
+  if (useContrast && side !== 'back' && piece && piece.contrast) {
+    return {
+      ...LOOK,
+      composition: 'contrast',
+      mark: piece.contrast.mark || '',
+      mailPanel: 'none',
+    };
+  }
   const base = side === 'back' ? BACK_LOOK : LOOK;
   return {
     ...base,
     railSide: piece.railSide || 'right',
     mailPanel: side === 'back' ? 'right' : 'none',
   };
+}
+
+/** The copy a side carries: the contrast block when it is on, else the issue. */
+export function sideCopyFor(piece, side, useContrast) {
+  if (useContrast && side !== 'back' && piece && piece.contrast) return piece.contrast;
+  return piece[side];
 }
 
 /** The bundled photograph for a piece, or null. */

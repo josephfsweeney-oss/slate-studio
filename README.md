@@ -550,6 +550,43 @@ at the top where the words are and lightest across the middle where the faces
 stand. `public/art/CREDITS.md` says which photograph is which, who took it and
 where it came from. **Background photo** on the Design panel turns it off.
 
+### The contrast side
+
+A slate piece has two jobs and cannot do both well on one side. The six issue
+rounds now split them. **Contrast on the message side** turns it on, and it is
+on by default.
+
+    the message side   the case against them, nobody's face on it
+    the address side   the slate, the district, and the ask
+
+Rounds one and eight keep the slate on both sides. They are the identification
+pieces, and a piece that never shows the team is not a slate piece. The cost of
+the split is real: one side of faces instead of two is half the impressions, and
+in a House race the job is getting six or eight names matched on a ballot. Six
+rounds is the trade worth making. Eight is not.
+
+The contrast side is dark on purpose, so it does not look like the side with the
+people on it, and it carries a drawing rather than a photograph:
+
+| Round | Mark | What it draws |
+|---|---|---|
+| No Income Tax | `form` | A return with the line that matters filled in for you |
+| Cap Your School Tax | `stairs` | A staircase with no top step |
+| Free Market Housing | `sold` | The sign that went up before your kids could bid |
+| Lower Energy Bills | `meter` | A bill that climbs, with this month on the end of it |
+| Lower Health Care Costs | `redacted` | An invoice with the prices taken out |
+| Parents Decide | `door` | The schoolhouse door, with somebody standing in it |
+
+The marks are geometry in `public/render.js`, not photographs and not generated
+art. A photograph of a tax form is a photograph. A drawing of one is an
+argument, it costs nothing, it carries no licence, and it is as sharp at 300 dpi
+as at 72.
+
+Every contrast side ends on a source line: the bill, the roll call, the date. A
+side that attacks a record and does not cite it is a side you cannot defend.
+Where the record is not in the file the line prints empty and the app says so in
+the warnings, which is the point. Fill it before the drop.
+
 The candidates are the lowest thing on the piece. The district line and the call
 to action sit above them, and the name band runs off the bottom of the paper, so
 the slate stands on the floor of the piece rather than a quarter inch above it.

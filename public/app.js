@@ -5,7 +5,7 @@ import {
   CANVASES, TEMPLATES, PALETTES, GROUNDS, TOKENS, TOPPERS,
   fillTokens, buildFilename, buildName, canvasById, topperById,
 } from './presets.js';
-import { MAIL_PROGRAMS, MAIL_VARS, SHARED_BACK, SHARED_BACK_ART, SIDE_COMMON, artUrl,
+import { MAIL_PROGRAMS, MAIL_VARS, SHARED_BACK, SHARED_BACK_ART, SIDE_COMMON, artUrl, sideCopyFor,
   programById, pieceById, sideStyle } from './mailers.js';
 import { makeZip } from './zip.js';
 import * as photos from './photos.js';
@@ -1104,9 +1104,10 @@ function mailPiece() {
 function sideCopy(piece, side) {
   const blank = {
     kicker: '', headline: '', subhead: '', details: '', cta: '', footer: '',
-    values: '', record: '', callout: '', contrast: '', stat: '', source: '', brief: '',
+    values: '', record: '', callout: '', stat: '', source: '', brief: '', number: '',
   };
-  const own = side === 'back' && state.mail.sharedBack ? SHARED_BACK : piece[side];
+  const own = side === 'back' && state.mail.sharedBack
+    ? SHARED_BACK : sideCopyFor(piece, side, state.mail.contrast !== false);
   /* Every side carries the district line and the call to action, and the piece
    * carries the issue. No disclaimer: the print shop sets it with the carrier's
    * corner, which is theirs. RSA 664:14 still applies to the finished piece, so
@@ -1165,7 +1166,7 @@ function applyMailSide() {
   if (!piece) return;
   const side = state.mail.side === 'back' ? 'back' : 'front';
   state.copy = sideCopy(piece, side);
-  Object.assign(state.style, sideStyle(piece, side));
+  Object.assign(state.style, sideStyle(piece, side, state.mail.contrast !== false));
   state.style.ground = 'palette';
   state.style.twoRows = state.mail.twoRows === true;
   // A finished piece has a photograph on it. Loading it with the piece is what
@@ -1477,7 +1478,8 @@ function bothSides() {
   const piece = mailPiece();
   if (piece) {
     return ['front', 'back'].map((side) => ({
-      side, style: sideStyle(piece, side), copy: sideCopy(piece, side),
+      side, style: sideStyle(piece, side, state.mail.contrast !== false),
+      copy: sideCopy(piece, side),
     }));
   }
   const comp = state.style.composition;
@@ -1670,6 +1672,12 @@ function bind() {
     state.mail.art = e.target.checked;
     state.style.mailArt = e.target.checked;
     saveLocal(); draw();
+  });
+
+  $('#mail-contrast').addEventListener('change', (e) => {
+    state.mail.contrast = e.target.checked;
+    applyMailSide();
+    renderMailPanel(); syncControls(); saveLocal(); draw();
   });
 
   for (const [sel, side] of [['#mail-front', 'front'], ['#mail-back', 'back']]) {
