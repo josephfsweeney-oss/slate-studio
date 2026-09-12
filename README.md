@@ -542,3 +542,17 @@ Two things the app will not do for you:
 The copy is transcribed from the Granite Guarantee mailer artwork. Every bill
 number, vote count and quotation in `public/mailers.js` came off that artwork.
 Check them against the journal before a drop goes out.
+
+## Names only
+
+Under **Faces** in the Slate panel, a third option: no photograph anywhere on
+the piece, and the name plate takes the whole tile the face would have had.
+
+A yard sign read at forty miles an hour is names. A road sign is names. And a
+district whose portraits have not come in yet is names today rather than
+placeholders today and a reprint next week.
+
+It applies to the finished plan rather than to one layout, so every composition
+in the app gets it at once: the tile goes short and wide, the grid gives the
+width back to the name, and no warning about a missing photograph fires,
+because on this piece there is no photograph to miss.

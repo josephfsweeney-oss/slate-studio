@@ -839,3 +839,38 @@ test('an unfilled token is left standing rather than quietly dropped', () => {
   assert.equal(fillTokens('Vote {{CAND_LAST}}', d), 'Vote {{CAND_LAST}}');
   assert.equal(fillTokens('Vote {{CAND_LAST}}', d, { lead: slate(1)[0] }), 'Vote Ball');
 });
+
+test('names only takes the photograph off every layout and gives the plate the tile', () => {
+  for (const c of CANVASES) {
+    for (const n of [1, 4, 9]) {
+      const list = slate(n);
+      const p = solve({ canvas: { w: c.w, h: c.h }, dpi: c.dpi || 0, slate: list,
+        copy: COPY, style: { namesOnly: true } }, measure);
+      const where = `${c.id} n=${n}`;
+      for (const t of p.tiles) {
+        assert.equal(t.photo, null, `${where} still has a photo box`);
+        assert.ok(t.plate, `${where} lost the name plate`);
+        // The plate is the tile: a name with nowhere to sit is not a name.
+        assert.ok(t.plate.w === t.w && t.plate.h > t.w * 0.2, `${where} plate too small`);
+        assert.ok(t.plate.y + t.plate.h <= t.y + t.h + 1, `${where} plate off its tile`);
+      }
+      // And the piece still fits: a shorter tile must not push the copy off.
+      for (const t of p.tiles) {
+        assert.ok(t.x >= -1 && t.x + t.w <= c.w + 1, `${where} tile off the canvas`);
+        assert.ok(t.y >= -1 && t.y + t.h <= c.h + 1, `${where} tile off the canvas`);
+      }
+    }
+  }
+});
+
+test('a names only piece is shorter per tile than the same piece with faces', () => {
+  const c = CANVASES.find((x) => x.id === 'sign');
+  const spec = (style) => solve({ canvas: { w: c.w, h: c.h }, dpi: c.dpi, slate: slate(9),
+    copy: COPY, style }, measure);
+  const faces = spec({});
+  const names = spec({ namesOnly: true });
+  assert.ok(names.grid.tileH < faces.grid.tileH,
+    'a plate on its own is shorter than a face over a plate');
+  assert.ok(names.grid.tileW >= faces.grid.tileW,
+    'and the width it gives back goes into the name');
+});

@@ -180,7 +180,9 @@ function paintTile(ctx, tile, plan, style, assets, theme) {
   const img = assets.portraits && assets.portraits[c.name];
   const tw = tile.w;
 
-  if (img) {
+  // Names only: there is no photo box on the tile at all, so nothing is drawn
+  // where a face would have been and nothing says a face is missing.
+  if (img && tile.photo) {
     // Bottom-anchored and contained, matching the transparent decks: the cutout
     // stands on the plate rather than floating or cropping at the chin.
     const boxH = tile.photo.h;
@@ -195,7 +197,7 @@ function paintTile(ctx, tile, plan, style, assets, theme) {
     ctx.drawImage(img, dx, dy, dw, dh);
     ctx.restore();
     clearShadow(ctx);
-  } else {
+  } else if (tile.photo) {
     paintSilhouette(ctx, tile.photo, theme);
   }
 
@@ -221,9 +223,16 @@ function paintTile(ctx, tile, plan, style, assets, theme) {
 
   const first = firstLine(c, style);
   const last = (c.last || '').toUpperCase();
-  const firstPx = tw * 0.082;
+  /* With no face above it the plate is the whole tile, so the name is sized off
+   * the box it is actually in. Sized off the tile width instead, a name plate
+   * four times its usual height would still set the surname at its usual size
+   * and sit in an inch of empty navy. */
+  const bare = !tile.photo;
+  const firstPx = bare ? Math.min(p.h * 0.17, p.w * 0.13) : tw * 0.082;
   // Long surnames step down so they never overflow the plate.
-  let lastPx = tw * 0.150 * Math.pow(Math.min(1, 9 / Math.max(last.length, 1)), 0.55);
+  let lastPx = bare
+    ? Math.min(p.h * 0.38, p.w * 0.32)
+    : tw * 0.150 * Math.pow(Math.min(1, 9 / Math.max(last.length, 1)), 0.55);
   ctx.textAlign = 'center';
   ctx.textBaseline = 'alphabetic';
   const cx = p.x + p.w / 2;

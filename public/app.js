@@ -335,6 +335,7 @@ function unfilledTokens(d) {
 function buildPlan(d, size, slate) {
   const style = { ...state.style };
   if (style.align === 'auto') delete style.align;
+  style.namesOnly = style.faceSource === 'names';
   if (style.faceSource === 'deck') {
     const pick = pickDeck(d, size);
     // Nominal aspect, so the layout is right before the image finishes loading.
@@ -391,7 +392,8 @@ function paintWarnings(d, slate) {
   // Deck mode only really applies when a deck exists; otherwise the piece has
   // already fallen back to the cutout rebuild and reads normally.
   const usingDeck = state.style.faceSource === 'deck' && Boolean(assets.deck);
-  const gaps = usingDeck ? [] : slate.filter((n) => !assets.portraits[n.name]);
+  const namesOnly = state.style.faceSource === 'names';
+  const gaps = usingDeck || namesOnly ? [] : slate.filter((n) => !assets.portraits[n.name]);
   if (gaps.length) {
     const why = state.catalog.source === 'manifest'
       ? 'Connect Drive to load the portraits.'
@@ -520,11 +522,15 @@ function renderSlatePanel() {
   if (!d) { $('#slate-list').innerHTML = ''; $('#slate-note').textContent = ''; $('#face-note').textContent = ''; return; }
   const pick = pickDeck(d, canvasSize());
   const usingDeck = state.style.faceSource === 'deck' && Boolean(pick);
-  $('#face-note').textContent = state.style.faceSource === 'deck'
-    ? (pick
-      ? `Placing the built ${pick.key} ${pick.variant} deck as one layer. Switching candidates off or reordering them does not apply to it.`
-      : 'No deck was built for this district, so it falls back to the cutouts. The controls below apply.')
-    : 'Rebuilt from the cutouts with the same grid and plate maths as make_decks.py, so it matches the built decks and also fits canvases no deck exists for.';
+  $('#face-note').textContent = state.style.faceSource === 'names'
+    ? 'Names only. The plate takes the whole tile and no photo is placed, so a '
+      + 'district with portraits still out can go to print today. This is what a '
+      + 'yard sign and a road sign want anyway: a name read at forty miles an hour.'
+    : state.style.faceSource === 'deck'
+      ? (pick
+        ? `Placing the built ${pick.key} ${pick.variant} deck as one layer. Switching candidates off or reordering them does not apply to it.`
+        : 'No deck was built for this district, so it falls back to the cutouts. The controls below apply.')
+      : 'Rebuilt from the cutouts with the same grid and plate maths as make_decks.py, so it matches the built decks and also fits canvases no deck exists for.';
   $('#slate-list').style.display = usingDeck ? 'none' : '';
   const dropped = state.drop[d.id] || new Set();
   const list = activeSlate(d);

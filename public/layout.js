@@ -235,6 +235,18 @@ export function bestGrid(n, W, H, gap, plate, tileAROverride) {
   return best || { tileW: 0, cols: 1, rows: n };
 }
 
+/* A tile with no face on it is a name plate and nothing else, so it is short
+ * and wide rather than tall. Kept taller than PLATE_AR because on its own the
+ * plate carries both lines of the name with air around them, where under a
+ * portrait it only had to sit on the chin. */
+export const NAME_TILE_AR = 0.46;
+
+/** The aspect of one tile on this piece: a face over a plate, or a plate alone. */
+export function tileAspect(style = {}, plate = true, extra = 0) {
+  if (style.namesOnly) return NAME_TILE_AR + extra;
+  return PHOTO_AR + (plate ? PLATE_AR : 0) + extra;
+}
+
 /** The tile width a slate of `n` wants before it starts to look cramped. */
 function idealTile(n, s) {
   return s * Math.min(0.34, Math.max(0.105, 0.62 / Math.sqrt(n)));
@@ -319,7 +331,7 @@ function solvePalmCard(spec, measure) {
 
   // Faces inside the panel, with room under each for a name plate and a tagline.
   const hasTags = slate.some((c) => (c.tag || '').trim());
-  const tileAR = PHOTO_AR + PLATE_AR + (hasTags ? 0.22 : 0);
+  const tileAR = tileAspect(style, true, hasTags ? 0.22 : 0);
   const pin = panel.h - gap * 1.2;
   const g = bestGrid(n, panel.w - gap * 1.2, pin, gap, false, tileAR);
   const tileW = Math.min(g.tileW, panel.w * 0.46);
@@ -1704,8 +1716,8 @@ function solvePromise(spec, measure) {
    * way, so the programme looks like one programme across 174 districts. */
   const plate = style.plate !== false;
   const pgap = well.w * 0.045 * density;
-  const tileAR = PHOTO_AR + (plate ? PLATE_AR : 0);
-  const g = n ? bestGrid(n, well.w - pgap * 2, well.h - pgap * 2, pgap, plate)
+  const tileAR = tileAspect(style, plate);
+  const g = n ? bestGrid(n, well.w - pgap * 2, well.h - pgap * 2, pgap, plate, tileAR)
     : { tileW: 0, cols: 1, rows: 1 };
   const tileW = Math.min(g.tileW, well.w * 0.86);
   const tileH = tileW * tileAR;
@@ -2015,7 +2027,34 @@ function shiftPlan(node, dy, seen = new Set()) {
   return node;
 }
 
+/* Names only.
+ *
+ * No photograph anywhere on the piece: the name plate takes the whole tile the
+ * face would have had. A yard sign read at forty miles an hour is names, a road
+ * sign is names, and a district whose portraits have not come in yet is names
+ * today rather than placeholders today and a reprint next week.
+ *
+ * It is done to the finished plan rather than inside eight solvers that each
+ * build a tile, so every layout in the app gets it at once and none of them can
+ * disagree about it. The transform is idempotent: a plan with no photographs
+ * left in it comes back unchanged.
+ */
+function namesOnlyPlan(plan) {
+  if (!plan || !plan.tiles || !plan.tiles.length) return plan;
+  plan.tiles = plan.tiles.map((t) => {
+    // A tagline keeps its line under the plate; the plate takes the rest.
+    const bottom = t.tag ? t.tag.y - t.w * 0.02 : t.y + t.h;
+    return { ...t, photo: null, plate: { x: t.x, y: t.y, w: t.w, h: Math.max(1, bottom - t.y) } };
+  });
+  return plan;
+}
+
 export function solve(spec, measure) {
+  const plan = solveAll(spec, measure);
+  return (spec.style || {}).namesOnly ? namesOnlyPlan(plan) : plan;
+}
+
+function solveAll(spec, measure) {
   // The die is geometry, not decoration, so it is settled before anything is
   // laid out and the solve simply never sees that part of the card.
   if (spec.die === 'hanger') {
@@ -2044,7 +2083,9 @@ export function solve(spec, measure) {
   // With a deck aspect set, the slate is the pre-built deck PNG dropped in as a
   // single layer, not a grid this app composes. Everything else is unchanged.
   const deckAR = style.deckAspect || 0;
-  const gridOf = (W, H) => (deckAR ? bestGrid(1, W, H, gap, false, deckAR) : bestGrid(n, W, H, gap, plate));
+  const gridOf = (W, H) => (deckAR
+    ? bestGrid(1, W, H, gap, false, deckAR)
+    : bestGrid(n, W, H, gap, plate, tileAspect(style, plate)));
 
   const density = style.density ?? 1;          // user nudge, 0.8 tight to 1.2 airy
   const pad = 0.045 * s * density;
@@ -2212,7 +2253,7 @@ function finish(spec, r) {
 
   const deckAR = style.deckAspect || 0;
   const tileW = deckAR ? grid.tileW : Math.min(grid.tileW, s * 0.52);
-  const tileH = tileW * (deckAR || PHOTO_AR + (plate ? PLATE_AR : 0));
+  const tileH = tileW * (deckAR || tileAspect(style, plate));
   const gridW = grid.cols * tileW + (grid.cols - 1) * gap;
   const gridH = grid.rows * tileH + (grid.rows - 1) * gap;
   const copyH = r.copyRect ? r.copyLayout.height : 0;
