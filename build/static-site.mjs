@@ -24,8 +24,23 @@ fs.mkdirSync(path.join(OUT, 'fonts'), { recursive: true });
 for (const f of fs.readdirSync('public/fonts')) {
   fs.copyFileSync(`public/fonts/${f}`, path.join(OUT, 'fonts', f));
 }
-for (const f of ['layout.js', 'render.js', 'presets.js', 'names.js', 'zip.js', 'app.css', 'fonts.css']) {
+// Copy every module and stylesheet, rather than a hand-kept list. A list goes
+// stale the moment app.js imports something new, and the page then dies on a
+// failed import with no options in any menu and nothing in the console but a
+// module error.
+for (const f of fs.readdirSync('public')) {
+  if (f === 'app.js' || f === 'index.html') continue;      // patched, or the page itself
+  if (!/\.(js|css)$/.test(f)) continue;
   fs.copyFileSync(`public/${f}`, path.join(OUT, f));
+}
+
+// Every relative module app.js imports has to have landed.
+const patched = fs.readFileSync('public/app.js', 'utf8');
+for (const m of patched.matchAll(/^import[^'"]*['"]\.\/([^'"]+)['"]/gm)) {
+  if (!fs.existsSync(path.join(OUT, m[1]))) {
+    console.error(`static build: app.js imports ./${m[1]}, which is not in ${OUT}`);
+    process.exit(1);
+  }
 }
 
 let app = fs.readFileSync('public/app.js', 'utf8');

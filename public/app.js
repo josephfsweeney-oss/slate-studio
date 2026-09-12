@@ -727,7 +727,14 @@ function bind() {
   });
   const styleBind = [['#composition', 'composition'], ['#align', 'align'], ['#logo-pos', 'logoPos']];
   for (const [sel, key] of styleBind) {
-    $(sel).addEventListener('change', (e) => { state.style[key] = e.target.value; saveLocal(); draw(); });
+    $(sel).addEventListener('change', (e) => {
+      state.style[key] = e.target.value;
+      // The composition decides which fields are even relevant, so re-sync
+      // rather than leaving the palm card's own field hidden.
+      syncControls();
+      saveLocal();
+      draw();
+    });
   }
   $('#density').addEventListener('input', (e) => { state.style.density = +e.target.value; scheduleDraw(); });
   for (const [sel, key] of [['#plate', 'plate'], ['#flagbar', 'flagBar'], ['#hshadow', 'headlineShadow'], ['#twotone', 'twoTone']]) {
