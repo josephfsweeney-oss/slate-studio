@@ -1328,6 +1328,12 @@ function paintSlateBand(ctx, plan, style, theme, assets, bleed = 0) {
   const ink = theme.primary;
   const dark = b.onDark;
 
+  /* Left in the column beside a short slate, centred over a full one. The
+   * words are a column there, and a centred column of three lines against a
+   * left hand edge of faces reads as neither one thing nor the other. */
+  const left = b.align === 'left';
+  const anchor = left ? b.top.x : b.topCx;
+
   /* The headline. In a block on a dark ground, on a rule on a light one. */
   if (b.head) {
     const blk = b.head.block;
@@ -1337,10 +1343,10 @@ function paintSlateBand(ctx, plan, style, theme, assets, bleed = 0) {
     }
     ctx.fillStyle = dark ? BRAND.white : plate;
     setFont(ctx, blk.font, blk.px, blk.ls);
-    ctx.textAlign = 'center';
+    ctx.textAlign = left ? 'left' : 'center';
     ctx.textBaseline = 'alphabetic';
     blk.lines.forEach((l, i) =>
-      ctx.fillText(l, b.topCx, b.head.y + b.head.pad + blk.lh * (i + 0.84)));
+      ctx.fillText(l, anchor, b.head.y + b.head.pad + blk.lh * (i + 0.84)));
     if (b.head.ruleH) {
       ctx.fillStyle = accent;
       ctx.fillRect(b.top.x, b.head.ruleY, b.top.w, b.head.ruleH);
@@ -1351,8 +1357,8 @@ function paintSlateBand(ctx, plan, style, theme, assets, bleed = 0) {
     const blk = b.sub.block;
     ctx.fillStyle = dark ? 'rgba(255,255,255,.86)' : plate;
     setFont(ctx, blk.font, blk.px, blk.ls);
-    ctx.textAlign = 'center';
-    blk.lines.forEach((l, i) => ctx.fillText(l, b.topCx, b.sub.y + blk.lh * (i + 0.86)));
+    ctx.textAlign = left ? 'left' : 'center';
+    blk.lines.forEach((l, i) => ctx.fillText(l, anchor, b.sub.y + blk.lh * (i + 0.86)));
   }
 
   /* The figures. Contained by height and centred on the slot, so a tall
@@ -1406,10 +1412,40 @@ function paintSlateBand(ctx, plan, style, theme, assets, bleed = 0) {
     }
   }
 
+  /* What the slate leaves over. A small district frees most of the piece and
+   * the words move into it; a middling one frees a block, and the block says
+   * when to vote and how many to mark; a full one frees a strip, and the strip
+   * is an accent bar with the date beside it. A full slate frees nothing and
+   * there is nothing here to paint. */
+  if (b.aside && b.aside.tier !== 'words') {
+    const a = b.aside;
+    const r = a.rect;
+    const barW = Math.max(3, r.w * 0.085);
+    const deep = r.h + (a.bleedFoot ? B : 0);
+    if (a.tier === 'plate') {
+      ctx.fillStyle = dark ? accent : plate;
+      ctx.fillRect(r.x, r.y, r.w, deep);
+    } else {
+      ctx.fillStyle = accent;
+      ctx.fillRect(r.x, r.y, barW, deep);
+    }
+    const tx = a.tier === 'plate' ? r.x + r.w / 2 : r.x + barW + (r.w - barW) / 2;
+    ctx.textAlign = 'center';
+    for (const part of [a.kicker, a.date, a.note]) {
+      if (!part) continue;
+      const blk = part.block;
+      ctx.fillStyle = a.tier === 'plate' ? BRAND.white : (dark ? BRAND.white : plate);
+      setFont(ctx, blk.font, blk.px, blk.ls);
+      blk.lines.forEach((l, i) => ctx.fillText(l, tx, part.y + blk.lh * (i + 0.84)));
+    }
+  }
+
   /* A band of names under each row of faces. */
   for (const row of b.rows || []) {
+    if (!row.band) continue;            // a montage has one band, under the group
     ctx.fillStyle = dark ? accent : plate;
-    ctx.fillRect(row.band.x - B, row.band.y, row.band.w + B * 2, row.band.h);
+    ctx.fillRect(row.band.x - B, row.band.y, row.band.w + B * 2,
+      row.band.h + (row.bleedFoot ? B : 0));
   }
   if (b.rows && b.rows.length) {
     ctx.textAlign = 'center';
@@ -1426,8 +1462,9 @@ function paintSlateBand(ctx, plan, style, theme, assets, bleed = 0) {
     const blk = b.seat.block;
     ctx.fillStyle = ink;
     setFont(ctx, blk.font, blk.px, blk.ls);
-    ctx.textAlign = 'center';
-    blk.lines.forEach((l, i) => ctx.fillText(l, b.footCx, b.seat.y + blk.lh * (i + 0.84)));
+    ctx.textAlign = left ? 'left' : 'center';
+    blk.lines.forEach((l, i) =>
+      ctx.fillText(l, left ? b.top.x : b.footCx, b.seat.y + blk.lh * (i + 0.84)));
   }
 
   /* The call to action: a solid block, square, the width of its own words. A

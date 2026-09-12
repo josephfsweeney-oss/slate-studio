@@ -522,30 +522,46 @@ Content panel. Pick the programme and the app sets the canvas, both layouts and
 both sides' copy; pick a piece and switch sides with the two buttons. **Both
 sides** exports the pair with crop marks and a handoff note.
 
-Both sides are the same stack:
+One rule sets both sides, from a district with one candidate to a district with
+eight: **the slate takes the width it needs and the words take what is left.**
+Nothing is keyed to the size of the slate, because one district's four faces and
+another's are not the same width. The row is measured, and what is left over
+decides the shape.
 
-    headline on the issue, big
-    one line saying who it is for
-    the whole slate, cut out, shoulder to shoulder, no boxes
-    a band of names, one under each face
-    the town and the district
-    VOTE REPUBLICAN NOVEMBER 3
-    the paid-for line
+    a small slate leaves most of the piece
+        the faces hold the left at full height
+        the headline, the line under it, the district and the call to action
+        stand beside them in the column they leave
 
-No card, no tile, no plate. A face in a box is a database record; a row of
-faces at the same height standing on the same band is a team, and the band
-labels them once instead of six times. Everybody fills the same height, and a
-wide crop is trimmed at the sides rather than scaled down, so nobody ends up
-shorter than the row and floating above the band.
+    a middling slate leaves a block
+        the words go back over the top of the faces
+        the block beside them carries the supporting line, the date and
+        VOTE FOR ALL FOUR
 
-The message side is a column: headline at the top, the slate under it, the foot
-at the bottom, eleven inches wide.
+    a full slate leaves nothing
+        the row is centred and the words are over the top, which is where
+        this started
 
-The address side is an L. The carrier owns the bottom two and a quarter inches
-of the right hand four and nothing else, so the slate takes the width above that
-line and the words go under it on the left. Six or more faces there go in two
-rows: eight across seven inches is a row of thumbnails, four over four is two
-rows of people. **Two rows of faces on the address side** turns that off.
+The candidates are the lowest thing on the piece. The district line and the call
+to action sit above them, and the name band runs off the bottom of the paper, so
+the slate stands on the floor of the piece rather than a quarter inch above it.
+
+No card, no tile, no plate. A face in a box is a database record; a row of faces
+at the same height standing on the same band is a team, and the band labels them
+once instead of six times. Everybody fills the same height, and a wide crop is
+trimmed at the sides rather than scaled down, so nobody ends up shorter than the
+row and floating above the band. One face on its own may stand taller than the
+rest, because it has no neighbour to crowd.
+
+The message side is eleven inches wide with nothing in the way. The address side
+is an L: the carrier owns the bottom two and a quarter inches of the right hand
+four and nothing else, so the slate takes the full width above that line and the
+words go under it on the left. Eight faces run across that line in one row.
+
+**Montage six or more on the address side** stacks them instead: two rows, the
+back row offset half a face so its people stand in the gaps of the front row,
+and one name band under the whole group carrying a line of names for each row.
+It is off by default, because one row across eleven inches is bigger.
 
 No disclaimer on either side. The print shop sets the paid-for line with the
 indicia, the address block and the barcode, because they are all one job and it
@@ -553,7 +569,7 @@ is theirs. RSA 664:14 still applies to the finished piece, so the handoff note
 says so and the work order has to as well.
 
 The stack is measured from the foot up, so a longer headline costs the faces
-height rather than pushing the paid-for line off the bottom.
+height rather than pushing the call to action off the bottom.
 
 Two colourways, both derived from the palette rather than written down. On a
 light ground the headline is plain type with an accent rule under it and the
@@ -572,8 +588,7 @@ Two things the app will not do for you:
   "Salem Rockingham District 25", which is true and less useful.
 
 The carrier's corner prints blank: the mail house sets the indicia, the return
-address, the address block and the barcode. The paid-for line is on the artwork,
-at the foot of both sides.
+address, the address block and the barcode.
 
 The copy is transcribed from the Granite Guarantee mailer artwork. Every bill
 number, vote count and quotation in `public/mailers.js` came off that artwork.

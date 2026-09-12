@@ -154,6 +154,9 @@ export const MAIL_PROGRAMS = [{
 export const SIDE_COMMON = {
   footer: '{{PLACE}}',
   cta: 'Vote Republican November 3',
+  /* The date on its own, for the block that stands beside a short slate. The
+   * call to action carries it in a sentence; the block carries it big. */
+  voteDate: 'November 3',
 };
 
 export const programById = (id) => MAIL_PROGRAMS.find((p) => p.id === id) || null;

@@ -78,7 +78,7 @@ const state = {
   waiveDisclaimer: false,
   ticked: new Set(),
   // The mail programme: which piece of it is open, and which side of that piece.
-  mail: { program: '', piece: '', side: 'front', sharedBack: true, twoRows: true },
+  mail: { program: '', piece: '', side: 'front', sharedBack: true, twoRows: false },
   // Facts the app cannot look up, typed once per district and kept there.
   mailVars: {},
 };
@@ -1126,7 +1126,7 @@ function renderMailPanel() {
   }
   if (prog) {
     $('#mail-shared-back').checked = state.mail.sharedBack !== false;
-    $('#mail-two-rows').checked = state.mail.twoRows !== false;
+    $('#mail-two-rows').checked = state.mail.twoRows === true;
   }
   $('#mail-front').classList.toggle('on', state.mail.side !== 'back');
   $('#mail-back').classList.toggle('on', state.mail.side === 'back');
@@ -1158,7 +1158,7 @@ function applyMailSide() {
   state.copy = sideCopy(piece, side);
   Object.assign(state.style, sideStyle(piece, side));
   state.style.ground = 'palette';
-  state.style.twoRows = state.mail.twoRows !== false;
+  state.style.twoRows = state.mail.twoRows === true;
   // A finished piece has a photograph on it. Loading it with the piece is what
   // makes the programme a programme rather than eight blank image wells.
   loadProgrammeArt(piece);
