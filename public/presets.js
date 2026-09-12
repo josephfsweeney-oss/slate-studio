@@ -347,8 +347,14 @@ export const TOPPERS = [
 
 export const topperById = (id) => TOPPERS.find((t) => t.id === id) || null;
 
-/** Fill {{TOKENS}} from a district record. */
-export function fillTokens(str, district) {
+/* Fill {{TOKENS}} from a district record.
+ *
+ * `vars` carries the two kinds of thing the district record cannot: the lead
+ * candidate on the piece, which comes off the slate somebody built, and the
+ * facts a person has to type in because no file in this repository holds them.
+ * An unknown token is left standing on purpose, so it shows up on the artwork
+ * and in the warnings rather than quietly resolving to nothing. */
+export function fillTokens(str, district, vars = {}) {
   if (!str || !district) return str || '';
   const surnames = district.nominees.map((n) => n.last.replace(/\b\w+/g, (w) => w[0] + w.slice(1).toLowerCase()));
   /* Towns come off the district record. With none listed the tokens fall back
@@ -393,6 +399,20 @@ export function fillTokens(str, district) {
       ? surnames.join(surnames.length === 2 ? ' and ' : ', ').replace(/, ([^,]*)$/, ' and $1')
       : `${surnames.slice(0, 2).join(', ')} and ${surnames.length - 2} more`,
   };
+  /* The lead candidate is whoever is first on the slate as built. A piece that
+   * names one person names the one at the top of it, which is the same person
+   * whose face sits first in the strip. */
+  const lead = vars.lead || null;
+  if (lead) {
+    const title = (t) => String(t || '').replace(/\b[A-Z]+\b/g, (x) => x[0] + x.slice(1).toLowerCase());
+    map['{{CAND_NAME}}'] = lead.name || `${title(lead.first)} ${title(lead.last)}`.trim();
+    map['{{CAND_FIRST}}'] = title(lead.first);
+    map['{{CAND_LAST}}'] = title(lead.last);
+  }
+  for (const [k, v] of Object.entries(vars.typed || {})) {
+    const text = String(v ?? '').trim();
+    if (text) map[`{{${k}}}`] = text;
+  }
   return String(str).replace(/\{\{[A-Z_]+\}\}/g, (m) => (m in map ? map[m] : m));
 }
 

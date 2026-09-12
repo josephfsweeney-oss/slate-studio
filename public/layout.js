@@ -16,6 +16,7 @@
  */
 
 import { encode as encodeQr } from './qr.js';
+import { firstLine } from './names.js';
 
 /* Sampled off the Granite Guarantee sheet: the navy is 9.7% of that artwork and
  * the green 6.9%, so these are the two the brand actually runs on. */
@@ -242,7 +243,8 @@ function idealTile(n, s) {
 /* ----------------------------------------------------------------- the solve */
 
 const COMPOSITIONS = ['stack', 'banner', 'split', 'slateOnly', 'palmcard',
-  'palmback', 'ballot', 'spotlight', 'versus', 'strip', 'stat', 'receipt', 'typeled'];
+  'palmback', 'ballot', 'spotlight', 'versus', 'strip', 'stat', 'receipt', 'typeled',
+  'promise', 'proof'];
 
 /* The palm card is a designed template rather than a solved one: a fixed stack
  * of bands, in a fixed order, the way a rack card is read top to bottom. The
@@ -1548,6 +1550,322 @@ function pairUp(values) {
   return out.join('\n');
 }
 
+/* ------------------------------------------------- the Granite Guarantee pair
+ *
+ * Two compositions that together make one mail piece. `promise` is the message
+ * side: a claim in the campaign's own voice, with the candidate on it. `proof`
+ * is the address side: the receipt for that claim, with the carrier's corner
+ * left alone. They are a pair on purpose. A claim with no receipt behind it is
+ * a slogan, and a receipt with no claim in front of it is a spreadsheet.
+ *
+ * Proportions come off the Granite Guarantee mailer artwork, an 11 x 6.
+ *
+ * Both sides hold a right hand rail four inches wide, because four inches is
+ * what the mail panel takes on the back. Holding the same rail on the front
+ * means the image well is the same box on every piece in the programme, and it
+ * means the two sides line up when they print head to head.
+ */
+const GG = {
+  spine: 0.01326,     // fractions of the canvas width: the coloured bar at the left
+  padX: 0.04545,      // 48 / 1056
+  railFront: 0.39110, // 413 / 1056
+  railBack: 0.36364,  // 384 / 1056, which is the mail panel width
+  barH: 0.22569,      // fractions of the canvas height: the candidate strip
+  wellTop: 0.04167,
+  wellH: 0.39236,
+};
+
+/* Fit a copy column to the room it has, in both directions.
+ *
+ * Shrinking to fit is the half everybody writes. Growing into slack is the half
+ * that matters on an 11 x 6: the same eight pieces carry between twenty and
+ * eighty words, and a column sized for the longest one leaves the shortest
+ * sitting in the top third of the piece with five inches of nothing under it.
+ * The cap keeps a four word piece from turning into a poster. */
+function fitColumn(build, density, room, { min = 0.42, max = 1.6, fill = 0.92 } = {}) {
+  let built = build(density);
+  for (let guard = 0; built.height > room && built.k > min && guard < 60; guard++) {
+    built = build(built.k * 0.95);
+  }
+  if (built.height > room * 0.82) return built;
+  for (let guard = 0; guard < 60; guard++) {
+    const next = build(Math.min(max, built.k * 1.04));
+    if (next.height > room * fill || next.k >= max) {
+      return next.height <= room ? next : built;
+    }
+    built = next;
+  }
+  return built;
+}
+
+/** A zero-width block that still takes a turn in the stack, for painted rules. */
+const solidBlock = (h) => (h > 0
+  ? { lines: [''], px: h, h, w: 0, widths: [0], rule: true }
+  : { lines: [], h: 0, px: 0, w: 0, widths: [] });
+
+/* One line per item. A line break is the separator, because these lists carry
+ * sentences and a sentence is allowed to have a comma in it. A single line with
+ * commas and no break is taken as a comma list, so the shorter fields still
+ * work the way the rest of the app's list fields do. */
+function listLines(raw) {
+  const text = String(raw || '').trim();
+  if (!text) return [];
+  const parts = text.includes('\n') ? text.split('\n') : text.split(',');
+  return parts.map((t) => t.trim()).filter(Boolean);
+}
+
+/** The name line for the candidate strip: one person, or the surnames. */
+function barName(slate, style) {
+  if (!slate.length) return '';
+  if (slate.length === 1) {
+    const c = slate[0];
+    return `${firstLine(c, style)} ${c.last}`.trim();
+  }
+  const last = slate.map((c) => c.last);
+  /* A raised dot between two names wraps onto its own line the moment the
+   * strip is tight, and a line that starts with a dot is not a name line. */
+  if (last.length === 2) return `${last[0]} & ${last[1]}`;
+  return last.join(', ');
+}
+
+/* ------------------------------------------------------ promise: message side */
+
+function solvePromise(spec, measure) {
+  const { w, h } = spec.canvas;
+  const slate = spec.slate || [];
+  const n = slate.length;
+  const style = spec.style || {};
+  const copy = spec.copy || {};
+  const s = Math.min(w, h);
+  const density = style.density ?? 1;
+
+  const spine = Math.max(3, w * GG.spine);
+  const padX = w * GG.padX;
+  const railW = w * GG.railFront;
+  const railX = w - railW;
+  const colX = padX;
+  const colW = Math.max(s * 0.2, railX - colX - w * 0.033);
+
+  /* The rail is the district: this piece's whole right hand side is the people
+   * on the ballot in it, with their names under them. A caption strip under the
+   * panel says what office they are running for, once, rather than once per
+   * face. With no caption the panel takes the strip's height as well. */
+  const caption = String(copy.footer || '').trim();
+  const barH = caption ? h * 0.115 : 0;
+  const bar = caption ? { x: railX, y: h - barH, w: railW, h: barH } : null;
+  const well = { x: railX, y: 0, w: railW, h: h - barH };
+
+  /* The wordmark sits in the bottom left corner and never moves, so the copy
+   * column stops above it rather than running through it. */
+  const lockA = Math.max(9, s * 0.04514);
+  const lockB = Math.max(7, s * 0.03125);
+  const lockH = lockA * 0.9 + lockB * 0.95 + s * 0.007;
+  const lockup = style.lockup === false ? null
+    : { x: colX, w: colW, aPx: lockA, bPx: lockB, h: lockH, y: h - h * 0.045 - lockH };
+
+  const top = h * 0.06944;
+  const floorY = (lockup ? lockup.y : h - padX * 0.5) - s * 0.030;
+  const room = Math.max(s * 0.20, floorY - top);
+
+  const badge = String(style.badge ?? '').trim();
+  const listText = listLines(copy.record).join('\n');
+
+  /* Everything is measured at one scale, and the scale comes down until the
+   * column fits between the top margin and the wordmark. Shrinking the whole
+   * column together is what keeps the hierarchy: a headline that shrinks on its
+   * own ends up the same size as the deck under it. */
+  const build = (k) => {
+    const badgeSize = badge ? s * 0.07639 * k : 0;
+    const kickW = colW - (badge ? badgeSize + s * 0.024 * k : 0);
+    const kick = fitBlock(measure, copy.kicker, COND_SEMI, s * 0.02778 * k, Math.max(20, kickW), 2, 0.20, true);
+    const head = fitBlock(measure, copy.headline, ANTON, s * 0.13194 * k, colW, 4, -0.01, true);
+    const ruleH = head.lines.length ? Math.max(2, s * 0.01042 * k) : 0;
+    const deck = fitBlock(measure, copy.subhead, COND_MED, s * 0.03993 * k, colW, 4, 0.004, false);
+    const list = fitBlock(measure, listText, COND_MED, s * 0.03646 * k, colW * 0.93, 9, 0.02, true);
+    const claim = fitBlock(measure, copy.details, COND_SEMI, s * 0.03472 * k, colW, 3, 0.006, false);
+    const entries = [
+      { role: 'kicker', block: kick, gap: 0, h: Math.max(badgeSize, kick.h) },
+      { role: 'headline', block: head, gap: s * 0.0243 * k },
+      { role: 'rule', block: solidBlock(ruleH), gap: s * 0.0243 * k, h: ruleH },
+      { role: 'deck', block: deck, gap: s * 0.0243 * k },
+      { role: 'list', block: list, gap: s * 0.0304 * k },
+      { role: 'claim', block: claim, gap: s * 0.0304 * k },
+    ];
+    return { entries, badgeSize, height: stackBlocks(entries, 0).height, k };
+  };
+
+  const built = fitColumn(build, density, room);
+  const bands = stackBlocks(built.entries, top);
+  const ruleW = w * 0.14205;
+
+  /* The faces, gridded inside the panel with their name plates, the same way
+   * every other layout in this app sets a slate. One candidate gets one big
+   * portrait, nine get a grid of nine, and the panel is the same box either
+   * way, so the programme looks like one programme across 174 districts. */
+  const plate = style.plate !== false;
+  const pgap = well.w * 0.045 * density;
+  const tileAR = PHOTO_AR + (plate ? PLATE_AR : 0);
+  const g = n ? bestGrid(n, well.w - pgap * 2, well.h - pgap * 2, pgap, plate)
+    : { tileW: 0, cols: 1, rows: 1 };
+  const tileW = Math.min(g.tileW, well.w * 0.86);
+  const tileH = tileW * tileAR;
+  const gridH = g.rows * tileH + Math.max(0, g.rows - 1) * pgap;
+  const gy = well.y + (well.h - gridH) / 2;
+  const tiles = slate.map((c, i) => {
+    const col = i % g.cols;
+    const row = Math.floor(i / g.cols);
+    const inRow = Math.min(g.cols, n - row * g.cols);
+    const rowW = inRow * tileW + (inRow - 1) * pgap;
+    const x = well.x + (well.w - rowW) / 2 + col * (tileW + pgap);
+    const ty = gy + row * (tileH + pgap);
+    const photoH = tileW * PHOTO_AR;
+    return {
+      candidate: c, x, y: ty, w: tileW, h: tileH,
+      photo: { x, y: ty, w: tileW, h: photoH },
+      plate: plate ? { x, y: ty + photoH + tileW * 0.03, w: tileW, h: tileW * PLATE_AR } : null,
+    };
+  });
+
+  const capBlk = caption
+    ? fitBlock(measure, caption, COND_SEMI, barH * 0.30, bar.w * 0.90, 1, 0.14, true)
+    : { lines: [], h: 0, px: 0 };
+
+  const dpi = spec.dpi || 0;
+  return {
+    canvas: { w, h },
+    composition: 'promise',
+    pad: padX, gap: s * 0.03, s, scale: built.k,
+    grid: { cols: g.cols, rows: g.rows, tileW, tileH },
+    slateRect: bar,
+    tiles,
+    deck: null,
+    copy: null,
+    mailPanel: null,
+    qr: null,
+    promise: {
+      spine: { x: 0, y: 0, w: spine, h },
+      col: { x: colX, y: top, w: colW, h: room },
+      bands: bands.items,
+      badge: badge ? { text: badge, size: built.badgeSize, x: colX, y: top } : null,
+      ruleW,
+      lockup,
+      bar,
+      well,
+      caption: capBlk.lines.length
+        ? { block: capBlk, x: bar.x + bar.w / 2, y: bar.y + (bar.h - capBlk.h) / 2 }
+        : null,
+      /* The state, ghosted, in the gutter between the column and the rail. It
+       * is painted before the rail, so whatever runs past the rail's edge is
+       * covered rather than trimmed: the shape keeps its own proportions. */
+      silhouette: style.silhouette === false ? null
+        : { x: railX - w * 0.14, y: 0, w: w * 0.2784, h },
+    },
+    disclaimer: null,
+    warnings: [
+      ...(!String(copy.headline || '').trim() ? ['The message side has no headline.'] : []),
+      ...(built.k < 0.62 ? ['The copy column shrank past two thirds to fit. Cut words rather than shrink type.'] : []),
+      ...(n === 0 ? ['No candidate on the message side. The panel is empty.'] : []),
+      ...(dpi && tileW / dpi < 0.9 && n > 0
+        ? [`${n} faces put each portrait under an inch wide. This programme reads as a `
+          + 'one candidate piece, so run it per candidate or drop the district to its top name.'] : []),
+    ],
+  };
+}
+
+/* -------------------------------------------------------- proof: address side */
+
+function solveProof(spec, measure) {
+  const { w, h } = spec.canvas;
+  const style = spec.style || {};
+  const copy = spec.copy || {};
+  const s = Math.min(w, h);
+  const density = style.density ?? 1;
+
+  const spine = Math.max(3, w * GG.spine);
+  const padX = w * GG.padX;
+
+  /* The rail is the mail panel's own width, so the evidence above it and the
+   * address block below it share one edge. */
+  const panel = mailPanelRect({ ...spec, style: { ...style, mailPanel: 'right' } }, w, h);
+  const railW = panel ? panel.w : w * GG.railBack;
+  const railX = w - railW;
+  const colX = padX;
+  const colW = Math.max(s * 0.2, railX - colX - w * 0.021);
+
+  const well = { x: railX, y: h * GG.wellTop, w: railW, h: h * GG.wellH };
+
+  const disc = (copy.disclaimer || '').trim();
+  const discPx = Math.max(11, s * 0.02257);
+  const discH = disc ? discPx * 1.9 : 0;
+  const top = h * 0.05903;
+  const floorY = h - discH - s * 0.02;
+  const room = Math.max(s * 0.2, floorY - top);
+
+  const bullets = listLines(copy.record).join('\n');
+
+  const build = (k) => {
+    const kick = fitBlock(measure, copy.kicker, COND_SEMI, s * 0.02604 * k, colW, 2, 0.20, true);
+    const head = fitBlock(measure, copy.headline, ANTON, s * 0.07292 * k, colW, 3, -0.005, true);
+    const body = fitBlock(measure, bullets, COND_MED, s * 0.03646 * k, colW * 0.92, 8, 0.004, false);
+    const quote = fitBlock(measure, copy.callout ? `“${String(copy.callout).replace(/^[“"]|[”"]$/g, '')}”` : '',
+      COND_SEMI, s * 0.03819 * k, colW, 3, 0.01, false);
+    const src = fitBlock(measure, copy.source, COND_MED, s * 0.02257 * k, colW, 2, 0.02, false);
+    const cta = fitBlock(measure, copy.cta, ANTON, s * 0.03819 * k, colW, 2, 0.02, true);
+    const entries = [
+      { role: 'kicker', block: kick, gap: 0 },
+      { role: 'headline', block: head, gap: s * 0.0226 * k },
+      { role: 'body', block: body, gap: s * 0.0260 * k },
+      { role: 'quote', block: quote, gap: s * 0.0330 * k },
+      { role: 'source', block: src, gap: s * 0.0087 * k },
+      { role: 'cta', block: cta, gap: s * 0.0295 * k },
+    ];
+    return { entries, height: stackBlocks(entries, 0).height, k };
+  };
+
+  const built = fitColumn(build, density, room);
+  const bands = stackBlocks(built.entries, top);
+
+  const briefPx = Math.max(10, s * 0.0295);
+  const brief = fitBlock(measure, copy.brief || style.brief || '', COND_MED, briefPx, well.w - s * 0.055, 4, 0.004, false);
+
+  const dpi = spec.dpi || 0;
+  const clash = panel && bands.items.some((b) => {
+    const right = colX + colW;
+    return right > panel.x && b.y + b.h > panel.y;
+  });
+  return {
+    canvas: { w, h },
+    composition: 'proof',
+    pad: padX, gap: s * 0.03, s, scale: built.k,
+    grid: { cols: 1, rows: 1, tileW: 0, tileH: 0 },
+    slateRect: null,
+    tiles: [],
+    deck: null,
+    copy: null,
+    mailPanel: panel,
+    qr: null,
+    proof: {
+      spine: { x: 0, y: 0, w: spine, h },
+      col: { x: colX, y: top, w: colW, h: room },
+      bands: bands.items,
+      well,
+      brief,
+      wellIn: dpi ? { w: well.w / dpi, h: well.h / dpi } : null,
+    },
+    disclaimer: disc
+      ? { text: disc, px: discPx, x: colX, y: h - discPx * 0.9, w: colW, centreOn: colX + colW / 2 }
+      : null,
+    warnings: [
+      ...(!disc ? ['No disclaimer. A finished political ad needs one under RSA 664:14.'] : []),
+      ...(!String(copy.headline || '').trim() ? ['The address side has no headline.'] : []),
+      ...(!bullets ? ['The address side is the proof. With no evidence lines it is only a second front.'] : []),
+      ...(built.k < 0.62 ? ['The copy column shrank past two thirds to fit. Cut words rather than shrink type.'] : []),
+      ...(clash ? ['Copy reaches into the mail panel. Shorten it or the carrier will reject the piece.'] : []),
+      ...(dpi && !style.heroImage ? ['The evidence well is still a brief. Drop the document photo in before print.'] : []),
+    ],
+  };
+}
+
 /* ------------------------------------------------------------- the foot band */
 
 /** Perceived lightness, 0 black to 1 white. */
@@ -1599,19 +1917,30 @@ function fitBlock(measure, text, font, px, maxW, maxLines, ls, upper) {
   const paras = raw.split('\n').map((t) => (upper ? t.toUpperCase() : t));
   let size = px;
   let lines;
+  /* Which rendered line each source line starts on. A bullet belongs to an
+   * item, not to a line of type: without this a two line item gets two bullets,
+   * and the second one reads as a separate promise that starts mid sentence. */
+  let starts;
   const floor = px * 0.5;
   for (;;) {
     lines = [];
-    for (const p of paras) lines.push(...balancedWrap(measure, p, font, size, ls, maxW));
+    starts = [];
+    for (const p of paras) {
+      starts.push(lines.length);
+      lines.push(...balancedWrap(measure, p, font, size, ls, maxW));
+    }
     if (lines.length <= maxLines || size <= floor) break;
     size *= 0.94;
   }
   const truncated = lines.length > maxLines;
-  if (truncated) lines = lines.slice(0, maxLines);
+  if (truncated) {
+    lines = lines.slice(0, maxLines);
+    starts = starts.filter((i) => i < lines.length);
+  }
   const lh = size * (font === ANTON ? 0.98 : 1.2);
   const widths = lines.map((l) => widthAt(measure, l, font, size, ls));
   return { lines, px: size, lh, h: lh * lines.length, font, ls, truncated,
-           w: Math.max(0, ...widths, 0), widths };
+           starts, w: Math.max(0, ...widths, 0), widths };
 }
 
 function autoComposition(w, h, n, hasCopy) {
@@ -1738,6 +2067,8 @@ export function solve(spec, measure) {
   if (comp === 'stat') return solveStat(spec, measure);
   if (comp === 'receipt') return solveReceipt(spec, measure);
   if (comp === 'typeled') return solveTypeLed(spec, measure);
+  if (comp === 'promise') return solvePromise(spec, measure);
+  if (comp === 'proof') return solveProof(spec, measure);
   if (!hasCopy) comp = 'slateOnly';
 
   // Reserve the disclaimer strip first. It is required on a finished ad under

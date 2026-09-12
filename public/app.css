@@ -203,3 +203,12 @@ button,.ghost{cursor:pointer;border-radius:8px;padding:8px 13px;border:1px solid
   .stage{overflow:visible}
   .canvas-wrap{height:62vh}
 }
+
+/* The mail programme sits above the copy boxes because it owns them: pick a
+   piece and both sides are written for you, so the boxes below become the
+   place you edit that piece rather than the place you start one. */
+.mailprog{border:1px solid var(--line);border-radius:8px;padding:10px 12px 12px;margin:0 0 14px}
+.mailprog legend{font-weight:600;font-size:11px;letter-spacing:.10em;text-transform:uppercase;
+  color:var(--muted);padding:0 6px}
+.mailprog .row.sides{gap:6px;margin:8px 0}
+.mailprog .hint.bad{color:var(--red);margin:8px 0 0}

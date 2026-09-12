@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { solve, bestGrid, PHOTO_AR, PLATE_AR } from '../public/layout.js';
 import { nameParts, slugify } from '../public/names.js';
 import { fillTokens, CANVASES, TEMPLATES } from '../public/presets.js';
+import { MAIL_PROGRAMS, sideStyle } from '../public/mailers.js';
 
 /* Stand-in for canvas measureText: width of the string at 100px. Anton is the
  * wider face, so the proportions stay roughly honest. */
@@ -757,4 +758,84 @@ test('a manifest with neither column reads exactly as it did before', async () =
   assert.deepEqual(d.towns, []);
   assert.equal(d.nominees[0].incumbent, false);
   assert.deepEqual(d.strayIncumbents, []);
+});
+
+/* ------------------------------------------------- the Granite Guarantee pair */
+
+test('every Granite Guarantee piece lays out on both sides without collision', () => {
+  const c = CANVASES.find((x) => x.id === 'mail6');
+  const prog = MAIL_PROGRAMS[0];
+  const typed = { TAX_RATE: '$14.72', OPP_LAST: 'Spahr', OPP_VOTE: 'no',
+    POLL_HOURS: '7 AM to 7 PM', POLL_PLACE: 'Salem High School' };
+  for (const piece of prog.pieces) {
+    for (const n of [1, 2, 5, 9]) {
+      const list = slate(n);
+      const d = { id: 'r25', county: 'Rockingham', district: 25, seats: n,
+                  towns: ['Salem'], nominees: list };
+      for (const side of ['front', 'back']) {
+        const raw = { ...piece[side], disclaimer: COPY.disclaimer };
+        const copy = {};
+        for (const [k, v] of Object.entries(raw)) {
+          copy[k] = fillTokens(v, d, { lead: list[0], typed });
+        }
+        const p = solve({ canvas: { w: c.w, h: c.h }, dpi: c.dpi, slate: list, copy,
+          style: sideStyle(piece, side) }, measure);
+        const where = `${piece.id} ${side} n=${n}`;
+        assert.equal(p.composition, side === 'front' ? 'promise' : 'proof', where);
+
+        const g = p.promise || p.proof;
+        // Nothing typed may leave the column it was measured into.
+        for (const b of g.bands) {
+          assert.ok(b.y >= 0 && b.y + b.h <= c.h + 1, `${where} ${b.role} off the piece`);
+          assert.ok(b.block.w <= g.col.w + 1, `${where} ${b.role} wider than its column`);
+        }
+        // Nor may it reach the carrier's corner.
+        if (p.mailPanel) {
+          const right = g.col.x + g.col.w;
+          const low = g.bands.some((b) => b.y + b.h > p.mailPanel.y);
+          assert.ok(!(right > p.mailPanel.x && low), `${where} copy in the mail panel`);
+        }
+        // The faces stay inside the panel that holds them.
+        for (const t of p.tiles) {
+          assert.ok(t.x >= g.well.x - 1 && t.x + t.w <= g.well.x + g.well.w + 1, `${where} face off the panel`);
+          assert.ok(t.y >= g.well.y - 1 && t.y + t.h <= g.well.y + g.well.h + 1, `${where} face off the panel`);
+        }
+        if (side === 'back') {
+          assert.ok(p.disclaimer, `${where} lost the disclaimer`);
+          assert.ok(!p.warnings.some((x) => /needs one under RSA/.test(x)), where);
+        }
+      }
+    }
+  }
+});
+
+test('a bulleted item gets one dot however many lines it wraps to', () => {
+  const c = CANVASES.find((x) => x.id === 'mail6');
+  const d = { id: 'r25', county: 'Rockingham', district: 25, seats: 1, towns: ['Salem'], nominees: slate(1) };
+  const items = [
+    'A short one.',
+    'A much longer item that has no chance of fitting on a single line of type at this size, and so wraps.',
+    'Another short one.',
+  ];
+  const p = solve({ canvas: { w: c.w, h: c.h }, dpi: c.dpi, slate: slate(1),
+    copy: { kicker: 'Proof', headline: 'The record', record: items.join('\n'),
+            disclaimer: COPY.disclaimer },
+    style: { composition: 'proof' } }, measure);
+  const body = p.proof.bands.find((b) => b.role === 'body');
+  assert.ok(body, 'the evidence lines are on the piece');
+  assert.ok(body.block.lines.length > items.length, 'the long item really did wrap');
+  assert.equal(body.block.starts.length, items.length, 'one dot per item, not per line');
+  assert.equal(body.block.starts[0], 0);
+});
+
+test('an unfilled token is left standing rather than quietly dropped', () => {
+  const d = { id: 'r25', county: 'Rockingham', district: 25, seats: 1, towns: ['Salem'], nominees: slate(1) };
+  assert.equal(fillTokens('{{TOWN}} pays {{TAX_RATE}}', d), 'Salem pays {{TAX_RATE}}');
+  assert.equal(fillTokens('{{TOWN}} pays {{TAX_RATE}}', d, { typed: { TAX_RATE: '$14.72' } }),
+    'Salem pays $14.72');
+  // A blank typed value is not an answer, so the token stays up.
+  assert.equal(fillTokens('pays {{TAX_RATE}}', d, { typed: { TAX_RATE: '  ' } }), 'pays {{TAX_RATE}}');
+  // And the piece only names somebody once somebody is named.
+  assert.equal(fillTokens('Vote {{CAND_LAST}}', d), 'Vote {{CAND_LAST}}');
+  assert.equal(fillTokens('Vote {{CAND_LAST}}', d, { lead: slate(1)[0] }), 'Vote Ball');
 });

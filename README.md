@@ -514,3 +514,31 @@ to looking the folder up by name.
 - Photos added in the browser live in that browser. A different machine, a
   different profile or a cleared site data and they are gone. Make them the
   default, or download them, the moment they are right.
+
+## The Granite Guarantee mail programme
+
+Eight two-sided 11 x 6 mailers, under **Mail program** at the top of the
+Content panel. Pick the programme and the app sets the canvas, both layouts and
+both sides' copy; pick a piece and switch sides with the two buttons. **Both
+sides** exports the pair with crop marks and a handoff note.
+
+Each piece is a claim on the message side and the receipt for it on the address
+side. The message side puts the district's candidates down the right hand rail
+with their name plates, the office under them once, and the wordmark bottom
+left. The address side carries the evidence, leaves the carrier its four by two
+and a quarter corner, and puts the disclaimer at the foot.
+
+Two things the app will not do for you:
+
+- **Who the piece names.** Five of the eight pieces say `{{CAND_NAME}}` or
+  `{{CAND_LAST}}`. In a district with one nominee that is settled. In a district
+  with nine it is not, so pick the person under **This piece is for**. Until you
+  do, the token stays on the artwork and the warning stays up. It will not guess.
+- **The facts it does not hold.** `{{TAX_RATE}}`, `{{OPP_LAST}}`, `{{OPP_VOTE}}`,
+  `{{POLL_HOURS}}` and `{{POLL_PLACE}}` are facts about one district, one
+  opponent or one polling place. Type them in the Mail variables fields. They are
+  kept per district, so Salem's rate never travels to Keene.
+
+The copy is transcribed from the Granite Guarantee mailer artwork. Every bill
+number, vote count and quotation in `public/mailers.js` came off that artwork.
+Check them against the journal before a drop goes out.

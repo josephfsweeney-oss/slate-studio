@@ -5,6 +5,7 @@ import {
   CANVASES, TEMPLATES, PALETTES, GROUNDS, TOKENS, TOPPERS,
   fillTokens, buildFilename, buildName, canvasById, topperById,
 } from './presets.js';
+import { MAIL_PROGRAMS, MAIL_VARS, programById, pieceById, sideStyle } from './mailers.js';
 import { makeZip } from './zip.js';
 import * as photos from './photos.js';
 import { printSheet, slugLine, drawSlug, inchesOf } from './print.js';
@@ -75,9 +76,14 @@ const state = {
   },
   waiveDisclaimer: false,
   ticked: new Set(),
+  // The mail programme: which piece of it is open, and which side of that piece.
+  mail: { program: '', piece: '', side: 'front' },
+  // Facts the app cannot look up, typed once per district and kept there.
+  mailVars: {},
 };
 
-const assets = { portraits: {}, bgImage: null, logo: null, deck: null };
+const assets = { portraits: {}, bgImage: null, logo: null, deck: null,
+                 hero: null, evidence: null };
 let measure = null;
 let plan = null;
 
@@ -102,6 +108,7 @@ const saveLocal = () => {
       drop: Object.fromEntries(Object.entries(state.drop).map(([k, v]) => [k, [...v]])),
       order: state.order, tags: state.tags,
       reps: Object.fromEntries(Object.entries(state.reps).map(([k, v]) => [k, [...v]])),
+      mail: state.mail, mailVars: state.mailVars,
     }));
   } catch { /* private window, no harm */ }
 };
@@ -116,6 +123,8 @@ function loadLocal() {
       copy: { ...state.copy, ...(s.copy || {}) },
       style: { ...state.style, ...(s.style || {}) },
       waiveDisclaimer: Boolean(s.waiveDisclaimer),
+      mail: { ...state.mail, ...(s.mail || {}) },
+      mailVars: s.mailVars || {},
       order: s.order || {}, tags: s.tags || {},
       drop: Object.fromEntries(Object.entries(s.drop || {}).map(([k, v]) => [k, new Set(v)])),
       reps: Object.fromEntries(Object.entries(s.reps || {}).map(([k, v]) => [k, new Set(v)])),
@@ -288,10 +297,39 @@ function scheduleDraw() {
   pending = setTimeout(draw, 110);
 }
 
+/* The typed variables for this district. They are kept per district because a
+ * school tax rate and a polling place are facts about one town, and carrying
+ * Salem's rate onto a Keene piece is how a wrong number gets printed. */
+const varsFor = (d) => (d ? state.mailVars[d.id] || {} : {});
+
+/* Who a piece that says "{{CAND_NAME}}" is about.
+ *
+ * A district with one nominee has one answer. A district with nine does not,
+ * and picking the first name off the list is how "Vote Ball for State
+ * Representative" gets printed for a slate of nine. With nobody picked the
+ * token is left standing, so the warning fires and somebody chooses. */
+function leadFor(d) {
+  if (!d) return null;
+  const list = activeSlate(d);
+  const picked = list.find((n) => n.name === state.style.spotlight);
+  if (picked) return picked;
+  return list.length === 1 ? list[0] : null;
+}
+
 function resolvedCopy(d) {
   const c = {};
-  for (const [k, v] of Object.entries(state.copy)) c[k] = fillTokens(v, d);
+  const vars = { lead: leadFor(d), typed: varsFor(d) };
+  for (const [k, v] of Object.entries(state.copy)) c[k] = fillTokens(v, d, vars);
   return c;
+}
+
+/** Tokens still standing in the copy after everything that can fill one has. */
+function unfilledTokens(d) {
+  const seen = new Set();
+  for (const v of Object.values(resolvedCopy(d))) {
+    for (const m of String(v || '').match(/\{\{[A-Z_]+\}\}/g) || []) seen.add(m);
+  }
+  return [...seen];
 }
 
 function buildPlan(d, size, slate) {
@@ -338,6 +376,14 @@ function draw() {
 
 function paintWarnings(d, slate) {
   const out = [];
+  /* A token that reached the canvas is a blank hole in a finished piece. It is
+   * the loudest thing in this list because it is the one that gets noticed at
+   * the mail house rather than here. */
+  const left = unfilledTokens(d);
+  if (left.length) {
+    out.push({ bad: true, text: `${left.join(' ')} is still on the artwork. `
+      + 'Fill it in under Mail program, or take it out of the copy. The app will not guess it.' });
+  }
   const noDisc = !state.copy.disclaimer.trim() && !state.waiveDisclaimer;
   if (noDisc) {
     out.push({ bad: true, text: 'No disclaimer. A finished political ad needs one under RSA 664:14. Add it, or tick "asset layer" if this is a layer somebody else will finish.' });
@@ -456,7 +502,9 @@ async function selectDistrict(id) {
   assets.portraits = d ? await loadPortraits(d) : {};
   assets.deck = d && state.style.faceSource === 'deck' ? await loadDeck(d, canvasSize()) : null;
   renderSlatePanel();
-  // A new district is a new slate, so the spotlight picker is out of date.
+  // A new district is a new slate, so the spotlight picker is out of date, and
+  // so are the typed variables: a school rate belongs to one town.
+  renderMailPanel();
   if (state.style.composition === 'spotlight') fillSpotlightPicker();
   saveLocal();
   draw();
@@ -983,11 +1031,86 @@ function download(blob, name) {
   setTimeout(() => URL.revokeObjectURL(a.href), 4000);
 }
 
-/** The programme name for the filename: whatever template is selected. */
-const programNow = () => $('#template').selectedOptions[0]?.textContent || 'Build';
+/* ------------------------------------------------------------ mail programme */
+
+/** The programme piece currently open, or null when none is. */
+function mailPiece() {
+  return state.mail.program ? pieceById(state.mail.program, state.mail.piece) : null;
+}
+
+/* One side's copy. The fields a piece owns come off the piece; the fields that
+ * belong to the committee rather than to the piece (the disclaimer, the return
+ * address, the indicia) stay as they are set, because they are the same on
+ * every piece in the drop. */
+function sideCopy(piece, side) {
+  const blank = {
+    kicker: '', headline: '', subhead: '', details: '', cta: '', footer: '',
+    values: '', record: '', callout: '', contrast: '', stat: '', source: '', brief: '',
+  };
+  return { ...state.copy, ...blank, ...piece[side] };
+}
+
+/** The programme picker, the piece list and the variables, redrawn from state. */
+function renderMailPanel() {
+  const prog = programById(state.mail.program);
+  const piece = mailPiece();
+  $('#mail-prog-body').hidden = !prog;
+  if (prog) {
+    $('#mail-piece').innerHTML = prog.pieces
+      .map((x) => `<option value="${x.id}">${x.n}. ${esc(x.label)}</option>`).join('');
+    $('#mail-piece').value = piece ? piece.id : prog.pieces[0].id;
+  }
+  if (prog) {
+    const list = district() ? activeSlate(district()) : [];
+    $('#mail-lead').innerHTML = '<option value="">Nobody picked yet</option>'
+      + list.map((n) => `<option value="${esc(n.name)}">${esc(n.name)}</option>`).join('');
+    $('#mail-lead').value = list.some((n) => n.name === state.style.spotlight)
+      ? state.style.spotlight : '';
+    $('#mail-lead-wrap').hidden = list.length < 2;
+  }
+  $('#mail-front').classList.toggle('on', state.mail.side !== 'back');
+  $('#mail-back').classList.toggle('on', state.mail.side === 'back');
+
+  const d = district();
+  const typed = varsFor(d);
+  $('#mail-vars').innerHTML = !prog ? '' : MAIL_VARS.map((v) => `
+    <label class="f">${esc(v.label)} <span class="hint">${esc(v.hint)}</span>
+      <input data-mailvar="${v.key}" placeholder="${esc(v.placeholder)}"
+        value="${esc(typed[v.key] || '')}"></label>`).join('');
+
+  /* A token still standing on the artwork is a blank the app could not fill.
+   * Saying which one, and that nobody here is allowed to guess it, is the whole
+   * point of the panel. */
+  const left = d ? unfilledTokens(d) : [];
+  const note = $('#mail-missing');
+  note.hidden = !left.length;
+  note.textContent = left.length
+    ? `Still empty on the artwork: ${left.join(' ')}. Fill them in above. `
+      + 'These are facts about your district and nobody here is going to guess them.'
+    : '';
+}
+
+/** Put a side of the open piece into the boxes and on the canvas. */
+function applyMailSide() {
+  const piece = mailPiece();
+  if (!piece) return;
+  const side = state.mail.side === 'back' ? 'back' : 'front';
+  state.copy = sideCopy(piece, side);
+  Object.assign(state.style, sideStyle(piece, side));
+  state.style.ground = 'palette';
+}
+
+/** The programme name for the filename: the piece, or whatever template is on. */
+const programNow = () => {
+  const piece = mailPiece();
+  if (piece) return `${programById(state.mail.program).label} ${piece.n} ${piece.label}`;
+  return $('#template').selectedOptions[0]?.textContent || 'Build';
+};
 
 /** Which physical side this is, when the layout says. */
 function sideNow(styleOverride = state.style) {
+  if (styleOverride.composition === 'promise') return 'front';
+  if (styleOverride.composition === 'proof') return 'back';
   if (styleOverride.composition === 'palmback') return 'back';
   if (styleOverride.composition === 'palmcard') return 'front';
   if (styleOverride.mailPanel === 'right') return 'back';
@@ -1011,15 +1134,21 @@ async function exportPng(scale) {
 }
 
 /** One print-ready side: trim plus bleed, crop marks and a slug line. */
-async function printSide(d, styleOverride = {}, side = '') {
+async function printSide(d, styleOverride = {}, side = '', copyOverride = null) {
   const size = canvasSize();
   const style = { ...state.style, ...styleOverride };
-  const was = state.style;
+  const wasStyle = state.style;
+  const wasCopy = state.copy;
   state.style = style;                   // buildPlan reads state.style
+  if (copyOverride) state.copy = { ...state.copy, ...copyOverride };
   let plan;
-  try { plan = buildPlan(d, size, activeSlate(d)); } finally { state.style = was; }
+  let copy;
+  try {
+    plan = buildPlan(d, size, activeSlate(d));
+    copy = resolvedCopy(d);
+  } finally { state.style = wasStyle; state.copy = wasCopy; }
   const dpi = canvasRec().dpi || 300;
-  const sheet = printSheet({ plan, style, assets, copy: resolvedCopy(d), dpi });
+  const sheet = printSheet({ plan, style, assets, copy, dpi });
   drawSlug(sheet.canvas.getContext('2d'), sheet.sheet,
     slugLine(plan, dpi, `${d.county} ${d.district}${side ? ' ' + side : ''}`), dpi);
   const blob = await new Promise((r) => sheet.canvas.toBlob(r, 'image/png'));
@@ -1057,7 +1186,7 @@ async function exportBothSides() {
     const files = [];
     const built = [];
     for (const s of sides) {
-      const out = await printSide(d, s.style, s.side);
+      const out = await printSide(d, s.style, s.side, s.copy || null);
       files.push({ name: out.name, data: new Uint8Array(await out.blob.arrayBuffer()) });
       built.push(out);
     }
@@ -1237,6 +1366,16 @@ async function runBatch() {
 /** Which two sides this canvas and layout make a pair of, or null. */
 function bothSides() {
   if (!isPrintCanvas()) return null;
+  /* A programme piece is two different designs, not one design twice: the
+   * message side and the address side carry their own copy. Building them from
+   * the piece rather than from whatever is in the boxes is what stops a drop
+   * going out with side two from last week. */
+  const piece = mailPiece();
+  if (piece) {
+    return ['front', 'back'].map((side) => ({
+      side, style: sideStyle(piece, side), copy: sideCopy(piece, side),
+    }));
+  }
   const comp = state.style.composition;
   const c = canvasRec();
   if (['palmcard', 'palmback'].includes(comp) || c.id === 'palm' || c.id === 'hanger') {
@@ -1256,6 +1395,8 @@ function bothSides() {
 function fillSelects() {
   $('#canvas').innerHTML = CANVASES.map((c) => `<option value="${c.id}">${c.label} — ${c.w}x${c.h}</option>`).join('')
     + '<option value="custom">Custom size</option>';
+  $('#mail-program').innerHTML = '<option value="">None, use the templates below</option>'
+    + MAIL_PROGRAMS.map((p) => `<option value="${p.id}">${esc(p.label)} — ${esc(p.note)}</option>`).join('');
   $('#template').innerHTML = '<option value="">Start blank</option>'
     + TEMPLATES.map((t) => `<option value="${t.id}">${t.label}</option>`).join('');
   $('#palettes').innerHTML = PALETTES.map((b) => `<button class="sw" data-pal="${b.id}">${b.label}</button>`).join('');
@@ -1382,9 +1523,76 @@ function bind() {
     saveLocal(); scheduleDraw();
   });
 
+  /* Picking a programme takes the piece over: the canvas, the two layouts and
+   * both sides' copy come from the piece, not from whatever is in the boxes.
+   * Picking "None" hands the boxes back without wiping them. */
+  $('#mail-program').addEventListener('change', async (e) => {
+    state.mail.program = e.target.value;
+    const prog = programById(state.mail.program);
+    if (prog) {
+      state.mail.piece = prog.pieces[0].id;
+      state.mail.side = 'front';
+      state.canvasId = prog.canvas;
+      Object.assign(state, { cw: canvasSize().w, ch: canvasSize().h });
+      applyMailSide();
+      await refreshDeck();
+    }
+    renderMailPanel(); syncControls(); renderSlatePanel(); saveLocal(); draw();
+  });
+
+  $('#mail-piece').addEventListener('change', (e) => {
+    state.mail.piece = e.target.value;
+    applyMailSide();
+    renderMailPanel(); syncControls(); saveLocal(); draw();
+  });
+
+  for (const [sel, side] of [['#mail-front', 'front'], ['#mail-back', 'back']]) {
+    $(sel).addEventListener('click', () => {
+      state.mail.side = side;
+      applyMailSide();
+      renderMailPanel(); syncControls(); saveLocal(); draw();
+    });
+  }
+
+  $('#mail-lead').addEventListener('change', (e) => {
+    state.style.spotlight = e.target.value;
+    renderMailPanel(); syncControls(); saveLocal(); draw();
+  });
+
+  $('#mail-vars').addEventListener('input', (e) => {
+    const key = e.target.dataset.mailvar;
+    const d = district();
+    if (!key || !d) return;
+    (state.mailVars[d.id] ||= {})[key] = e.target.value;
+    saveLocal();
+    scheduleDraw();
+    // Only the standing-token line moves, so the field keeps focus as you type.
+    const left = unfilledTokens(d);
+    const note = $('#mail-missing');
+    note.hidden = !left.length;
+    note.textContent = left.length
+      ? `Still empty on the artwork: ${left.join(' ')}. Fill them in above. `
+        + 'These are facts about your district and nobody here is going to guess them.'
+      : '';
+  });
+
+  for (const [sel, key, what] of [['#hero-file', 'hero', 'hero'], ['#evidence-file', 'evidence', 'evidence']]) {
+    $(sel).addEventListener('change', async (e) => {
+      const f = e.target.files[0];
+      if (!f) { assets[key] = null; return draw(); }
+      const { img, error } = await decodeFile(f);
+      if (error) { e.target.value = ''; return notice(error, true); }
+      assets[key] = img;
+      notice(`${what === 'hero' ? 'Hero' : 'Evidence'} photo in. It fills the well, cropped from the centre.`);
+      draw();
+    });
+  }
+
   $('#template').addEventListener('change', (e) => {
     const t = TEMPLATES.find((x) => x.id === e.target.value);
     if (!t) return;
+    // A template and a programme piece cannot both own the copy boxes.
+    if (state.mail.program) { state.mail.program = ''; renderMailPanel(); }
     // Every field a template can fill is cleared first. Otherwise the record
     // from the palm card back is still sitting in the box when you pick the
     // absentee chase, and it comes back the next time a layout paints it.
@@ -1706,6 +1914,7 @@ async function boot() {
   if (st.disclaimer && !state.copy.disclaimer.trim()) state.copy.disclaimer = st.disclaimer;
   fillSelects();
   syncControls();
+  renderMailPanel();
   bind();
   showSource();
   renderDistrictList();
