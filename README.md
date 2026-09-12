@@ -239,6 +239,31 @@ then `npm run token` and set the result as `GOOGLE_REFRESH_TOKEN`. This is what
 you want for a private copy that also writes finished graphics back to Drive.
 A public copy cannot write in either case.
 
+## Running it with no server at all
+
+```
+npm run build:static        # -> dist/
+```
+
+Produces a copy that needs nothing behind it: the district catalog is inlined
+into the page and the portraits are packed into thirteen texture atlases, which
+the page slices at load time. Serve `dist/` from anywhere, or publish it.
+
+Two constraints shaped that. A published Artifact holds at most **256 files**,
+and there are 301 portraits, so one file each is impossible; atlases are packed
+in district order, so opening a district usually pulls one file rather than ten.
+And a sandboxed page cannot start a download by itself, so saving a graphic goes
+through the host's download capability, with a confirmation the viewer sees.
+
+This build step is the one thing here that needs a dependency, a browser to
+encode WebP and draw the atlases:
+
+```
+npm install --no-save playwright && npx playwright install chromium
+```
+
+`npm start`, `npm test` and `npm run verify` still need nothing.
+
 ## A note on the Drive folder id
 
 `server/config.js` defaults to the id of the `2026 Slate Decks` folder so the
