@@ -16,14 +16,14 @@
  * is not finished.
  */
 
-/** Held on both sides so the two halves of a piece cannot drift apart. */
+/* Held on both sides so the two halves of a piece cannot drift apart.
+ *
+ * Colour is not in here. The palette owns colour, and a programme that pinned
+ * its own white ground meant switching to Navy or Pine did nothing to a mail
+ * piece. What the programme owns is structure: which composition, which side
+ * the rail is on, and the two devices it does without. */
 const LOOK = {
   composition: 'promise',
-  bgType: 'solid',
-  bgColor: '#FFFFFF',
-  accent: '#2F7C4E',
-  plateColor: '#12314E',
-  plateAccent: '#9FC7B0',
   flagBar: false,
   twoTone: false,
   silhouette: false,
@@ -32,7 +32,6 @@ const LOOK = {
 const BACK_LOOK = {
   ...LOOK,
   composition: 'proof',
-  bgColor: '#EEF4F0',
   /* The carrier's corner prints blank. The mail house sets the indicia, the
    * return address, the address block and the barcode, and they set the paid
    * for line with them. Nothing of ours goes in there, not even a guide.

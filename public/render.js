@@ -41,23 +41,45 @@ function clearShadow(ctx) {
   ctx.shadowOffsetY = 0;
 }
 
-/** Theme derived from whatever sits behind the copy. */
-/* Card layouts paint their own bands on a white stock, so the copy on them is
- * always dark whatever the palette's ground is set to. */
+/** Mix two colours, t of 0 being all of `a`. */
+function mix(a, b, t) {
+  const [ar, ag, ab] = hexToRgb(a);
+  const [br, bg, bb] = hexToRgb(b);
+  const f = (x, y) => Math.round(x + (y - x) * t);
+  return `rgb(${f(ar, br)},${f(ag, bg)},${f(ab, bb)})`;
+}
+
+/** Mix a colour toward black (k below 1) or toward white (k above 1). */
+function shade(hex, k) {
+  const [r, g, b] = hexToRgb(hex);
+  const f = (v) => Math.max(0, Math.min(255, Math.round(k <= 1 ? v * k : v + (255 - v) * (k - 1))));
+  return `rgb(${f(r)},${f(g)},${f(b)})`;
+}
+
 const CARD_COMPS = new Set(['palmcard', 'palmback']);
 
+/* The stock a card prints on.
+ *
+ * A rack card is a physical thing with a colour, and that colour is the
+ * palette's ground: white on the light schemes, the palette's own colour on
+ * Navy and Pine. It used to be white whatever the palette said, so switching to
+ * Navy changed nothing on a palm card and the type stayed dark on dark paper
+ * that never arrived. */
+export function cardStock(style) {
+  if (style.cardGround) return style.cardGround;
+  if (style.bgType === 'transparent') return BRAND.ground;
+  const bg = style.bgColor || BRAND.ground;
+  return luminance(bg) > 0.45 ? BRAND.ground : bg;
+}
+
+/** Theme derived from whatever actually sits behind the copy. */
 export function themeFor(style) {
-  if (CARD_COMPS.has(style.composition)) {
-    const accent = style.accent || BRAND.green;
-    return {
-      light: true, primary: BRAND.navy, secondary: 'rgba(18,49,78,.80)',
-      headline2: accent, accent, ctaBg: accent, ctaText: BRAND.white,
-      rule: 'rgba(18,49,78,.18)', disclaimer: 'rgba(18,49,78,.70)',
-    };
-  }
-  const bg = style.bgType === 'transparent' ? '#FFFFFF' : (style.bgColor || BRAND.navyDeep);
+  const card = CARD_COMPS.has(style.composition);
+  const bg = card ? cardStock(style)
+    : (style.bgType === 'transparent' ? '#FFFFFF' : (style.bgColor || BRAND.navyDeep));
   const light = luminance(bg) > 0.45;
   const accent = style.accent || BRAND.green;
+  const plate = style.plateColor || BRAND.navy;
   return {
     light,
     primary: light ? BRAND.navy : BRAND.white,
@@ -72,6 +94,13 @@ export function themeFor(style) {
     ctaText: BRAND.white,
     rule: light ? 'rgba(18,49,78,.18)' : 'rgba(255,255,255,.22)',
     disclaimer: light ? 'rgba(18,49,78,.72)' : 'rgba(255,255,255,.62)',
+    /* Blocks and tints, which have to move with the ground as well. On dark
+     * stock a navy masthead on navy paper is not a masthead, so the band
+     * becomes a deeper cut of the stock itself rather than a fixed colour. */
+    band: light ? plate : shade(bg, 0.58),
+    panel: light ? 'rgba(47,124,78,.07)' : 'rgba(255,255,255,.07)',
+    cell: light ? 'rgba(47,124,78,.10)' : 'rgba(255,255,255,.10)',
+    step: light ? 'rgba(18,49,78,.055)' : 'rgba(255,255,255,.06)',
   };
 }
 
@@ -295,10 +324,13 @@ function paintDeck(ctx, plan, assets, theme) {
 function paintPalmCard(ctx, plan, style, theme, assets, bleed) {
   const p = plan.palm;
   const { w, h } = plan.canvas;
-  const accent = style.accent || BRAND.green;
-  const ink = style.plateColor || BRAND.navy;
+  const accent = theme.accent;
+  // The blocks take the band colour, the words take the ink. On white stock
+  // both are navy, which is where the one variable came from; on Navy or Pine
+  // they have to part company or the card prints a navy word on navy paper.
+  const ink = theme.band;
 
-  // Masthead: a full-bleed navy block behind the headline.
+  // Masthead: a full-bleed block behind the headline.
   const mastBottom = p.mast.y + p.mast.h - plan.pad * 0.3;
   ctx.fillStyle = ink;
   ctx.fillRect(-bleed, -bleed, w + bleed * 2, mastBottom + bleed);
@@ -326,14 +358,14 @@ function paintPalmCard(ctx, plan, style, theme, assets, bleed) {
   // The ask.
   if (p.ask.block.lines.length) {
     const a = p.ask.block;
-    ctx.fillStyle = ink;
+    ctx.fillStyle = theme.primary;
     setFont(ctx, a.font, a.px, a.ls);
     ctx.textAlign = 'center';
     a.lines.forEach((l, i) => ctx.fillText(l, w / 2, p.ask.y + a.lh * (i + 0.9)));
   }
 
-  // The faces sit on a quiet tint, not on white: it groups them as one slate.
-  ctx.fillStyle = theme.light ? 'rgba(47,124,78,.07)' : 'rgba(255,255,255,.07)';
+  // The faces sit on a quiet tint, not on bare stock: it groups them as one slate.
+  ctx.fillStyle = theme.panel;
   roundRect(ctx, p.panel.x, p.panel.y, p.panel.w, p.panel.h, w * 0.020);
   ctx.fill();
 
@@ -615,10 +647,12 @@ function paintOval(ctx, o, ink, filled) {
   ctx.strokeStyle = ink;
   ctx.stroke();
   if (!filled) return;
-  // Nearly to the edge. A small dot in the middle of a thick ring reads as a
-  // target; a marked ballot oval is almost solid.
+  /* Solid to the ring. A pen mark fills the oval; it does not leave a ring of
+   * paper inside one. At 0.80 of the radius it left a gap that read as white
+   * space on white stock and as a bright halo on Navy and Pine, which is an
+   * unmarked oval on a card whose whole instruction is to mark it. */
   ctx.beginPath();
-  ctx.ellipse(o.cx, o.cy, o.rx * 0.80, o.ry * 0.74, 0, 0, Math.PI * 2);
+  ctx.ellipse(o.cx, o.cy, o.rx, o.ry, 0, 0, Math.PI * 2);
   ctx.fillStyle = ink;
   ctx.fill();
 }
@@ -762,8 +796,9 @@ function widthOf(ctx, blk, line) {
 function paintPalmBack(ctx, plan, style, theme, assets, bleed) {
   const p = plan.palmback;
   const { w, h } = plan.canvas;
-  const accent = style.accent || BRAND.green;
-  const ink = style.plateColor || BRAND.navy;
+  const accent = theme.accent;
+  const ink = theme.band;          // blocks
+  const text = theme.primary;      // words
 
   // Masthead, the same navy block the front wears, so the two sides match.
   const mastBottom = p.mast.y + p.mast.h - plan.pad * 0.3;
@@ -795,7 +830,7 @@ function paintPalmBack(ctx, plan, style, theme, assets, bleed) {
     const cx = p.record.x + p.record.px * 0.42;
     for (const row of p.record.rows) {
       paintCheck(ctx, cx, ry + row.h * 0.42, p.record.px * 0.40, accent);
-      ctx.fillStyle = ink;
+      ctx.fillStyle = text;
       ctx.textAlign = 'left';
       setFont(ctx, row.font, row.px, row.ls);
       row.lines.forEach((l, i) => ctx.fillText(l, p.record.x + p.record.px * 1.05, ry + row.lh * (i + 0.86)));
@@ -805,13 +840,13 @@ function paintPalmBack(ctx, plan, style, theme, assets, bleed) {
 
   // The issues, boxed, two across.
   for (const cell of p.grid.cells) {
-    ctx.fillStyle = 'rgba(47,124,78,.10)';
+    ctx.fillStyle = theme.cell;
     roundRect(ctx, cell.x, cell.y, cell.w, cell.h, w * 0.016);
     ctx.fill();
     ctx.fillStyle = accent;
     ctx.fillRect(cell.x, cell.y, Math.max(2, w * 0.006), cell.h);
     const blk = cell.block;
-    ctx.fillStyle = ink;
+    ctx.fillStyle = text;
     ctx.textAlign = 'left';
     setFont(ctx, blk.font, blk.px, blk.ls);
     blk.lines.forEach((l, i) => ctx.fillText(l, cell.x + w * 0.024,
@@ -823,7 +858,7 @@ function paintPalmBack(ctx, plan, style, theme, assets, bleed) {
     const c = p.callout.block;
     ctx.fillStyle = accent;
     ctx.fillRect(p.callout.x, p.callout.y, Math.max(3, w * 0.008), c.h * 1.04);
-    ctx.fillStyle = ink;
+    ctx.fillStyle = text;
     ctx.textAlign = 'left';
     setFont(ctx, c.font, c.px, c.ls);
     c.lines.forEach((l, i) => ctx.fillText(l, p.callout.x + w * 0.034, p.callout.y + c.lh * (i + 0.84)));
@@ -832,17 +867,19 @@ function paintPalmBack(ctx, plan, style, theme, assets, bleed) {
   // The ovals: the instruction, then the names, on a tint so it reads as a step
   // rather than more argument.
   const ov = p.ovals;
-  ctx.fillStyle = 'rgba(18,49,78,.055)';
+  ctx.fillStyle = theme.step;
   ctx.fillRect(-bleed, ov.y, w + bleed * 2, ov.h + bleed);
   ctx.fillStyle = accent;
   ctx.fillRect(-bleed, ov.y, w + bleed * 2, Math.max(2, w * 0.005));
   const rb = ov.rule;
-  ctx.fillStyle = ink;
+  ctx.fillStyle = text;
   ctx.textAlign = 'center';
   setFont(ctx, rb.font, rb.px, rb.ls);
   rb.lines.forEach((l, i) => ctx.fillText(l, w / 2, ov.y + h * 0.016 + rb.lh * (i + 0.86)));
   paintBallotRows(ctx, ov.rows, style, {
-    ink, quiet: 'rgba(18,49,78,.60)', party: false, rule: false, stripe: false,
+    ink: text,
+    quiet: theme.light ? 'rgba(18,49,78,.60)' : 'rgba(255,255,255,.66)',
+    party: false, rule: false, stripe: false,
   });
   if ('letterSpacing' in ctx) ctx.letterSpacing = '0px';
 }
@@ -1357,45 +1394,69 @@ function paintLockup(ctx, lock, green, navy) {
 /** The size of a well, written the way a photographer asks for it. */
 const wellSize = (rect) => (rect ? `${rect.w.toFixed(2)} x ${rect.h.toFixed(2)} in` : '');
 
-function paintPromise(ctx, plan, style, theme, assets) {
+function paintPromise(ctx, plan, style, theme, assets, bleed = 0) {
   const g = plan.promise;
   const accent = style.accent || BRAND.green;
   const navy = style.plateColor || BRAND.navy;
+  const { w, h } = plan.canvas;
+  const B = bleed;
 
   paintGraniteMark(ctx, g.silhouette, accent, 0.05);
 
-  /* The photograph takes the words' side, full bleed, under a scrim heavy
-   * enough that a headline sits on it rather than in it. The scrim is deepest
-   * where the small type is, because that is what goes first. */
+  /* The photograph is the whole piece, under a scrim that is heavy where the
+   * words are and light where the card is. A flat wash over the lot kills the
+   * picture; a gradient across it keeps the half you can see. */
   const shot = assets.hero && g.photo;
   if (shot) {
     const img = assets.hero;
-    const r = g.photo;
-    const k = Math.max(r.w / img.width, r.h / img.height);
+    const rw = w + B * 2;
+    const rh = h + B * 2;
+    const k = Math.max(rw / img.width, rh / img.height);
     ctx.save();
     ctx.beginPath();
-    ctx.rect(r.x, r.y, r.w, r.h);
+    ctx.rect(-B, -B, rw, rh);
     ctx.clip();
-    ctx.drawImage(img, r.x + (r.w - img.width * k) / 2, r.y + (r.h - img.height * k) / 2,
+    ctx.drawImage(img, -B + (rw - img.width * k) / 2, -B + (rh - img.height * k) / 2,
       img.width * k, img.height * k);
     const [nr, ng, nb] = hexToRgb(navy);
-    const scrim = ctx.createLinearGradient(r.x, r.y, r.x, r.y + r.h);
-    scrim.addColorStop(0, `rgba(${nr},${ng},${nb},.70)`);
-    scrim.addColorStop(0.46, `rgba(${nr},${ng},${nb},.82)`);
-    scrim.addColorStop(1, `rgba(${nr},${ng},${nb},.93)`);
-    ctx.fillStyle = scrim;
-    ctx.fillRect(r.x, r.y, r.w, r.h);
+    const rgba = (a) => `rgba(${nr},${ng},${nb},${a})`;
+    const leftCard = g.card.x < w / 2;
+    const across = ctx.createLinearGradient(-B, 0, w + B, 0);
+    // Heavy under the words, lighter under the card, so the picture survives.
+    across.addColorStop(leftCard ? 1 : 0, rgba(0.90));
+    across.addColorStop(leftCard ? 0.42 : 0.58, rgba(0.78));
+    across.addColorStop(leftCard ? 0 : 1, rgba(0.28));
+    ctx.fillStyle = across;
+    ctx.fillRect(-B, -B, rw, rh);
+    // And a little more at the foot, where the wordmark sits.
+    const down = ctx.createLinearGradient(0, h * 0.58, 0, h + B);
+    down.addColorStop(0, rgba(0));
+    down.addColorStop(1, rgba(0.34));
+    ctx.fillStyle = down;
+    ctx.fillRect(-B, h * 0.58, rw, h * 0.42 + B);
     ctx.restore();
   }
 
-  // The roster keeps a clean ground, so a cutout reads as a cutout.
-  ctx.fillStyle = style.slatePanel || '#DFE9E3';
-  ctx.fillRect(g.well.x, g.well.y, g.well.w, g.well.h);
+  /* The roster is a card laid on the photograph: a margin round it, a shadow
+   * under it, its caption strip as its own foot. */
+  const stock = theme.light ? BRAND.white : shade(cardStock({ ...style, composition: '' }), 1.12);
+  ctx.save();
+  ctx.shadowColor = 'rgba(0,0,0,.42)';
+  ctx.shadowBlur = w * 0.012;
+  ctx.shadowOffsetY = w * 0.004;
+  ctx.fillStyle = style.slatePanel || stock;
+  roundRect(ctx, g.card.x, g.card.y, g.card.w, g.card.h, g.card.r);
+  ctx.fill();
+  ctx.restore();
+  clearShadow(ctx);
 
-  // The caption strip under the panel: the office, said once.
   if (g.bar) {
+    ctx.save();
+    roundRect(ctx, g.card.x, g.card.y, g.card.w, g.card.h, g.card.r);
+    ctx.clip();
     ctx.fillStyle = navy;
     ctx.fillRect(g.bar.x, g.bar.y, g.bar.w, g.bar.h);
+    ctx.restore();
   }
 
   // The spine runs down the outside edge, over the photograph rather than under
@@ -1405,9 +1466,9 @@ function paintPromise(ctx, plan, style, theme, assets) {
 
   /* On the photograph the words reverse out; on white they stay navy. One
    * variable rather than a branch at every fillStyle below. */
-  const ink = shot ? BRAND.white : navy;
+  const ink = shot ? BRAND.white : theme.primary;
   const soft = shot ? 'rgba(255,255,255,.82)' : theme.secondary;
-  const mark = shot ? (style.plateAccent || BRAND.mint) : accent;
+  const mark = shot ? (style.plateAccent || BRAND.mint) : theme.accent;
 
   const kickX = g.col.x;
   ctx.textBaseline = 'alphabetic';
@@ -1420,11 +1481,16 @@ function paintPromise(ctx, plan, style, theme, assets) {
       continue;
     }
     if (b.role === 'kicker') {
+      /* A short bar in front of the kicker. Letterspaced caps floating on their
+       * own read as a label a machine put there; the same caps hung off a rule
+       * read as a masthead. It costs eight pixels. */
+      const barW = blk.px * 1.15;
+      const barH = Math.max(2, blk.px * 0.19);
       ctx.fillStyle = mark;
+      ctx.fillRect(kickX, b.y + blk.lh * 0.46 - barH / 2, barW, barH);
       setFont(ctx, blk.font, blk.px, blk.ls);
-      const mid = g.badge ? g.badge.y + g.badge.size / 2 : b.y + blk.h / 2;
       blk.lines.forEach((l, i) => ctx.fillText(l,
-        kickX, mid - blk.h / 2 + blk.lh * (i + 0.84)));
+        kickX + barW + blk.px * 0.62, b.y + blk.lh * (i + 0.84)));
       continue;
     }
     if (b.role === 'list') {
@@ -1449,39 +1515,55 @@ function paintPromise(ctx, plan, style, theme, assets) {
   if ('letterSpacing' in ctx) ctx.letterSpacing = '0px';
 }
 
-function paintProof(ctx, plan, style, theme, assets) {
+function paintProof(ctx, plan, style, theme, assets, bleed = 0) {
   const g = plan.proof;
-  const accent = style.accent || BRAND.green;
-  const navy = style.plateColor || BRAND.navy;
+  const accent = theme.accent;
+  // The words follow the ground the palette set, so Navy and Pine reverse
+  // rather than printing navy on navy.
+  const ink = theme.primary;
 
-  ctx.fillStyle = navy;
+  /* The address side is the same stock as the message side, one shade off, so
+   * the pair reads as two sides of one piece rather than two pieces. Doing it
+   * here rather than pinning a cream in the programme means it still works when
+   * somebody switches to Navy or Pine. */
+  const stock = cardStock({ ...style, composition: '' });
+  /* On light stock the shift is toward the accent rather than toward grey: a
+   * cream back and a white front is the pair the artwork sets, and a grey back
+   * just looks like the press ran low on ink. */
+  ctx.fillStyle = theme.light
+    ? mix(stock, style.accent || BRAND.green, 0.055)
+    : shade(stock, 1.10);
+  ctx.fillRect(-bleed, -bleed, plan.canvas.w + bleed * 2, plan.canvas.h + bleed * 2);
+
+  ctx.fillStyle = theme.band;
   ctx.fillRect(g.spine.x, g.spine.y, g.spine.w, g.spine.h);
 
-  paintWell(ctx, g.well, g.brief, assets.evidence, {
-    label: 'EVIDENCE IMAGE', size: wellSize(g.wellIn),
-    tint: '#E3ECE7', ink: '#3F6554', dash: '#3F6554',
-  });
+  paintWell(ctx, g.well, g.brief, assets.evidence, theme.light
+    ? { label: 'EVIDENCE IMAGE', size: wellSize(g.wellIn),
+        tint: '#E3ECE7', ink: '#3F6554', dash: '#3F6554' }
+    : { label: 'EVIDENCE IMAGE', size: wellSize(g.wellIn),
+        tint: 'rgba(255,255,255,.09)', ink: 'rgba(255,255,255,.72)',
+        dash: 'rgba(255,255,255,.46)' });
 
   ctx.textAlign = 'left';
   ctx.textBaseline = 'alphabetic';
   for (const b of g.bands) {
     const blk = b.block;
     if (b.role === 'body') {
-      paintBullets(ctx, blk, g.col.x, b.y, accent, navy, 0.12, 0.28);
+      paintBullets(ctx, blk, g.col.x, b.y, accent, ink, 0.12, 0.28);
       continue;
     }
     if (b.role === 'quote') {
       // A rule down the side, so the quotation reads as somebody else talking.
       ctx.fillStyle = accent;
       ctx.fillRect(g.col.x, b.y, Math.max(2, plan.s * 0.005), blk.h * 1.02);
-      ctx.fillStyle = navy;
+      ctx.fillStyle = ink;
       setFont(ctx, blk.font, blk.px, blk.ls);
       blk.lines.forEach((l, i) => ctx.fillText(l, g.col.x + plan.s * 0.022, b.y + blk.lh * (i + 0.84)));
       continue;
     }
-    ctx.fillStyle = b.role === 'kicker' ? accent
-      : b.role === 'headline' ? navy
-        : b.role === 'cta' ? accent : 'rgba(18,49,78,.62)';
+    ctx.fillStyle = b.role === 'kicker' || b.role === 'cta' ? accent
+      : b.role === 'headline' ? ink : theme.secondary;
     setFont(ctx, blk.font, blk.px, blk.ls);
     const x = b.role === 'source' ? g.col.x + plan.s * 0.022 : g.col.x;
     blk.lines.forEach((l, i) => ctx.fillText(l, x, b.y + blk.lh * (i + 0.84)));
@@ -1497,7 +1579,7 @@ export function paint(ctx, plan, style, assets = {}, copy = {}, bleed = 0) {
   // The card layouts paint their own ground: they are bands, not one background.
   if (plan.palm || plan.palmback) {
     ctx.clearRect(-bleed, -bleed, plan.canvas.w + bleed * 2, plan.canvas.h + bleed * 2);
-    ctx.fillStyle = style.cardGround || BRAND.ground;
+    ctx.fillStyle = cardStock(style);
     ctx.fillRect(-bleed, -bleed, plan.canvas.w + bleed * 2, plan.canvas.h + bleed * 2);
     if (plan.palm) {
       paintPalmCard(ctx, plan, style, theme, assets, bleed);
@@ -1541,10 +1623,10 @@ export function paint(ctx, plan, style, assets = {}, copy = {}, bleed = 0) {
     for (const tile of plan.tiles) paintTile(ctx, tile, plan, style, assets, theme);
     paintTypeLed(ctx, plan, style, theme);
   } else if (plan.promise) {
-    paintPromise(ctx, plan, style, theme, assets);
+    paintPromise(ctx, plan, style, theme, assets, bleed);
     for (const tile of plan.tiles) paintTile(ctx, tile, plan, style, assets, theme);
   } else if (plan.proof) {
-    paintProof(ctx, plan, style, theme, assets);
+    paintProof(ctx, plan, style, theme, assets, bleed);
   } else {
     for (const tile of plan.tiles) paintTile(ctx, tile, plan, style, assets, theme);
     paintCopy(ctx, plan, style, theme);

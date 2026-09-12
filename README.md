@@ -576,3 +576,20 @@ It applies to the finished plan rather than to one layout, so every composition
 in the app gets it at once: the tile goes short and wide, the grid gives the
 width back to the name, and no warning about a missing photograph fires,
 because on this piece there is no photograph to miss.
+
+## The palettes reach the type
+
+Granite Guarantee, Navy, Pine and Granite set the ground, and everything on the
+piece follows it. On Navy and Pine a palm card prints on navy or green stock
+with the type reversed out, the mastheads become a deeper cut of that stock
+rather than a fixed navy, and the tints behind the faces and the issue cells
+lift off it instead of sinking into it.
+
+That was not true before. The card layouts forced white stock whatever the
+palette said, so switching to Navy changed nothing on a palm card and the words
+stayed dark on paper that never arrived.
+
+Two things stay light on purpose. A ballot card is printed on paper and has to
+read as paper, so the ballot layout keeps its white card whatever the ground is.
+And a marked oval is now solid: a pen mark fills the oval, it does not leave a
+ring of paper inside one.

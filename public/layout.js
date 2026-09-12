@@ -1653,39 +1653,44 @@ function solvePromise(spec, measure) {
 
   const spine = Math.max(3, w * GG.spine);
   const padX = w * GG.padX;
-  const railW = w * GG.railFront;
 
-  /* The rail changes sides down the programme. Eight pieces with the picture in
-   * the same corner every time read as eight printings of one piece; alternating
-   * is what makes a series look like somebody laid it out. The spine always runs
-   * down the outside edge, away from the rail. */
+  /* The picture runs the whole piece and the roster is a card laid on it.
+   *
+   * The first pass split the piece down the middle: photograph on one half,
+   * roster on the other, edge to edge. Two rectangles meeting on a hard seam is
+   * what a program produces when nobody has looked at it. A card with a margin
+   * round it and a shadow under it is what somebody produces who has. It also
+   * makes the picture worth buying, because you can see it.
+   *
+   * The card changes sides down the programme. Eight pieces with it in the same
+   * corner every time read as eight printings of one piece. */
   const left = style.railSide === 'left';
-  const railX = left ? 0 : w - railW;
-  const colX = left ? railW + w * 0.033 : padX;
-  const colW = Math.max(s * 0.2, (left ? w - padX : railX) - colX - (left ? 0 : w * 0.033));
+  const margin = w * 0.026;
+  const cardW = w * 0.352;
+  const cardX = left ? margin : w - margin - cardW;
+  const cardY = h * 0.062;
+  const cardH = h - cardY * 2;
+  const gutter = w * 0.030;
+  const colX = left ? cardX + cardW + gutter : padX;
+  const colW = Math.max(s * 0.2, (left ? w - padX : cardX - gutter) - colX);
   const spineRect = left
     ? { x: w - spine, y: 0, w: spine, h }
     : { x: 0, y: 0, w: spine, h };
 
-  /* The photograph is the ground of the copy side, full bleed, with the words
-   * reversed out of it. It used to sit behind the faces, and a cutout on a
-   * photograph fights it every time: on the schools piece the stock family's
-   * own children showed through between the candidates. Type over a scrimmed
-   * photograph is a treatment everybody knows how to read. A face over one is
-   * a mistake. So the picture takes the words' side and the roster keeps a
-   * clean ground. */
-  const photoRect = left
-    ? { x: railW, y: 0, w: w - railW, h }
-    : { x: 0, y: 0, w: railX, h };
+  // The photograph is the whole piece. The scrim and the card do the rest.
+  const photoRect = { x: 0, y: 0, w, h };
 
   /* The rail is the district: this piece's whole right hand side is the people
    * on the ballot in it, with their names under them. A caption strip under the
    * panel says what office they are running for, once, rather than once per
    * face. With no caption the panel takes the strip's height as well. */
+  /* The caption strip is the foot of the card, not a band under it, so the card
+   * stays one object. */
   const caption = String(copy.footer || '').trim();
-  const barH = caption ? h * 0.115 : 0;
-  const bar = caption ? { x: railX, y: h - barH, w: railW, h: barH } : null;
-  const well = { x: railX, y: 0, w: railW, h: h - barH };
+  const card = { x: cardX, y: cardY, w: cardW, h: cardH, r: w * 0.009 };
+  const barH = caption ? cardH * 0.128 : 0;
+  const bar = caption ? { x: cardX, y: cardY + cardH - barH, w: cardW, h: barH } : null;
+  const well = { x: cardX, y: cardY, w: cardW, h: cardH - barH };
 
   /* The wordmark sits in the bottom left corner and never moves, so the copy
    * column stops above it rather than running through it. */
@@ -1699,7 +1704,6 @@ function solvePromise(spec, measure) {
   const floorY = (lockup ? lockup.y : h - padX * 0.5) - s * 0.030;
   const room = Math.max(s * 0.20, floorY - top);
 
-  const badge = String(style.badge ?? '').trim();
   const listText = listLines(copy.record).join('\n');
 
   /* Everything is measured at one scale, and the scale comes down until the
@@ -1707,23 +1711,25 @@ function solvePromise(spec, measure) {
    * column together is what keeps the hierarchy: a headline that shrinks on its
    * own ends up the same size as the deck under it. */
   const build = (k) => {
-    const badgeSize = badge ? s * 0.07639 * k : 0;
-    const kickW = colW - (badge ? badgeSize + s * 0.024 * k : 0);
-    const kick = fitBlock(measure, copy.kicker, COND_SEMI, s * 0.02778 * k, Math.max(20, kickW), 2, 0.20, true);
+    // The painted rule in front of the kicker comes out of its measure, or a
+    // long kicker runs under the card.
+    const kickPx = s * 0.02778 * k;
+    const kickW = colW - kickPx * 1.77;
+    const kick = fitBlock(measure, copy.kicker, COND_SEMI, kickPx, Math.max(20, kickW), 2, 0.20, true);
     const head = fitBlock(measure, copy.headline, ANTON, s * 0.13194 * k, colW, 4, -0.01, true);
     const ruleH = head.lines.length ? Math.max(2, s * 0.01042 * k) : 0;
     const deck = fitBlock(measure, copy.subhead, COND_MED, s * 0.03993 * k, colW, 4, 0.004, false);
     const list = fitBlock(measure, listText, COND_MED, s * 0.03646 * k, colW * 0.93, 9, 0.02, true);
     const claim = fitBlock(measure, copy.details, COND_SEMI, s * 0.03472 * k, colW, 3, 0.006, false);
     const entries = [
-      { role: 'kicker', block: kick, gap: 0, h: Math.max(badgeSize, kick.h) },
+      { role: 'kicker', block: kick, gap: 0 },
       { role: 'headline', block: head, gap: s * 0.0243 * k },
       { role: 'rule', block: solidBlock(ruleH), gap: s * 0.0243 * k, h: ruleH },
       { role: 'deck', block: deck, gap: s * 0.0243 * k },
       { role: 'list', block: list, gap: s * 0.0304 * k },
       { role: 'claim', block: claim, gap: s * 0.0304 * k },
     ];
-    return { entries, badgeSize, height: stackBlocks(entries, 0).height, k };
+    return { entries, height: stackBlocks(entries, 0).height, k };
   };
 
   const built = fitColumn(build, density, room);
@@ -1779,10 +1785,10 @@ function solvePromise(spec, measure) {
       railSide: left ? 'left' : 'right',
       col: { x: colX, y: top, w: colW, h: room },
       bands: bands.items,
-      badge: badge ? { text: badge, size: built.badgeSize, x: colX, y: top } : null,
       ruleW,
       lockup,
       bar,
+      card,
       well,
       photo: photoRect,
       caption: capBlk.lines.length
@@ -1792,7 +1798,7 @@ function solvePromise(spec, measure) {
        * is painted before the rail, so whatever runs past the rail's edge is
        * covered rather than trimmed: the shape keeps its own proportions. */
       silhouette: style.silhouette === false ? null
-        : { x: left ? railW - w * 0.14 : railX - w * 0.14, y: 0, w: w * 0.2784, h },
+        : { x: left ? cardX + cardW - w * 0.14 : cardX - w * 0.14, y: 0, w: w * 0.2784, h },
     },
     disclaimer: null,
     warnings: [

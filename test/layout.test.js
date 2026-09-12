@@ -874,3 +874,68 @@ test('a names only piece is shorter per tile than the same piece with faces', ()
   assert.ok(names.grid.tileW >= faces.grid.tileW,
     'and the width it gives back goes into the name');
 });
+
+test('the roster card floats: a margin of photograph on every side, and the copy clear of it', () => {
+  const c = CANVASES.find((x) => x.id === 'mail6');
+  const prog = MAIL_PROGRAMS[0];
+  for (const piece of prog.pieces) {
+    for (const n of [1, 4, 9]) {
+      const list = slate(n);
+      const p = solve({ canvas: { w: c.w, h: c.h }, dpi: c.dpi, slate: list,
+        copy: { ...piece.front, disclaimer: COPY.disclaimer },
+        style: sideStyle(piece, 'front') }, measure);
+      const g = p.promise;
+      const where = `${piece.id} n=${n}`;
+      // Inset on all four sides: a card edge to edge is the seam this replaced.
+      assert.ok(g.card.x > 0 && g.card.x + g.card.w < c.w, `${where} card touches a side`);
+      assert.ok(g.card.y > 0 && g.card.y + g.card.h < c.h, `${where} card touches top or foot`);
+      // The words never run under it.
+      const colRight = g.col.x + g.col.w;
+      const cardRight = g.card.x + g.card.w;
+      assert.ok(colRight <= g.card.x + 1 || g.col.x >= cardRight - 1,
+        `${where} the copy column overlaps the card`);
+      for (const b of g.bands) {
+        assert.ok(b.block.w <= g.col.w + 1, `${where} ${b.role} wider than its column`);
+      }
+      // And the faces stay on the card, clear of its caption strip.
+      const footTop = g.bar ? g.bar.y : g.card.y + g.card.h;
+      for (const t of p.tiles) {
+        assert.ok(t.x >= g.card.x - 1 && t.x + t.w <= cardRight + 1, `${where} face off the card`);
+        assert.ok(t.y >= g.card.y - 1 && t.y + t.h <= footTop + 1, `${where} face under the caption`);
+      }
+      // The photograph is the whole piece, so it can bleed.
+      assert.equal(g.photo.w, c.w, `${where} the photograph is not full bleed`);
+      assert.equal(g.photo.h, c.h, `${where} the photograph is not full bleed`);
+    }
+  }
+});
+
+/* Switching to Navy or Pine has to reach the type. The card layouts used to
+ * force white stock whatever the palette said, so the palette did nothing to a
+ * palm card and the words stayed navy on paper that never arrived. */
+test('a dark palette turns the type white, on cards as well as on pages', async () => {
+  const { themeFor, cardStock } = await import('../public/render.js');
+  const dark = { bgType: 'solid', bgColor: '#12314E', accent: '#2F7C4E', plateColor: '#0D2740' };
+  const pine = { bgType: 'gradient', bgColor: '#2F7C4E', accent: '#12314E', plateColor: '#12314E' };
+  const paper = { bgType: 'solid', bgColor: '#FFFFFF', accent: '#2F7C4E', plateColor: '#12314E' };
+
+  for (const comp of ['palmcard', 'palmback', 'promise', 'proof', 'stack', 'ballot']) {
+    for (const [name, pal] of [['navy', dark], ['pine', pine]]) {
+      const t = themeFor({ ...pal, composition: comp });
+      assert.equal(t.light, false, `${comp} on ${name} still thinks it is on paper`);
+      assert.equal(t.primary, '#FFFFFF', `${comp} on ${name} is not setting white type`);
+      assert.notEqual(t.band, t.primary, `${comp} on ${name} paints its blocks in the text colour`);
+    }
+    const t = themeFor({ ...paper, composition: comp });
+    assert.equal(t.light, true, `${comp} on the light scheme changed`);
+    assert.equal(t.primary, '#12314E', `${comp} on the light scheme changed`);
+  }
+
+  // The stock itself follows: white on the light schemes, the palette on the dark.
+  assert.equal(cardStock(paper), '#FFFFFF');
+  assert.equal(cardStock(dark), '#12314E');
+  assert.equal(cardStock(pine), '#2F7C4E');
+  // An explicit stock still wins, and a transparent asset layer stays white.
+  assert.equal(cardStock({ ...dark, cardGround: '#ABCDEF' }), '#ABCDEF');
+  assert.equal(cardStock({ ...dark, bgType: 'transparent' }), '#FFFFFF');
+});
