@@ -588,8 +588,10 @@ function syncEditor() {
   $('#photo-default').hidden = !canWrite || (!picking && !mine);
   $('#photo-remove').hidden = !(mine || (n?.cutout && canWrite));
   $('#photo-remove').textContent = mine ? 'Remove my photo' : 'Remove the default';
-  $('#photo-pick').textContent = picking || (n && hasFace(n)) ? 'Choose another file' : 'Choose a photo';
-  $('#photo-pick').className = picking ? 'ghost' : 'primary';
+  // The label's text, not the label's contents: the file input lives in there
+  // and replacing textContent would throw it away.
+  $('#photo-pick-label').textContent = picking || (n && hasFace(n)) ? 'Choose another file' : 'Choose a photo';
+  $('#photo-pick').className = picking ? 'pick ghost' : 'pick primary';
 
   $('#photo-sub').textContent = picking
     ? 'Drag to move it, scroll or use the slider to zoom. The frame is the 4:5 tile the slate uses.'
@@ -669,11 +671,62 @@ function setZoom(mult) {
   schedulePreview();
 }
 
+/* Decode a file the browser will admit to understanding.
+ *
+ * Two goes at it. An <img> handles jpeg, png, webp and avif everywhere.
+ * createImageBitmap reaches a few formats <img> will not, and on Safari that
+ * includes HEIC, which is what an iPhone shoots by default. */
+async function decodeFile(file) {
+  const url = URL.createObjectURL(file);
+  try {
+    const img = await loadImage(url);
+    if (img && img.width) return { img };
+    if (typeof createImageBitmap === 'function') {
+      try {
+        const bmp = await createImageBitmap(file);
+        if (bmp && bmp.width) return { img: bmp };
+      } catch { /* fall through to the message below */ }
+    }
+    return { error: whyNot(file) };
+  } finally {
+    setTimeout(() => URL.revokeObjectURL(url), 8000);
+  }
+}
+
+/** Why this browser could not read it, and what to do about it. */
+function whyNot(file) {
+  const name = (file.name || '').toLowerCase();
+  if (/\.(heic|heif)$/.test(name) || /heic|heif/.test(file.type || '')) {
+    return 'This is a HEIC photo, which is what an iPhone shoots by default, and '
+      + 'Chrome cannot read it. On a Mac open it in Preview and File, Export as JPEG. '
+      + 'On the phone, Settings, Camera, Formats, Most Compatible. Or paste it here: '
+      + 'copying out of Photos converts it.';
+  }
+  if (/\.(pdf|ai|psd|eps|indd|tif|tiff)$/.test(name)) {
+    return `A ${name.split('.').pop().toUpperCase()} is not something a browser can open. `
+      + 'Export a JPEG or a PNG first.';
+  }
+  if (file.size > 30 * 1024 * 1024) {
+    return `That file is ${Math.round(file.size / 1048576)} MB, which is too big for the `
+      + 'browser to decode. Export it smaller.';
+  }
+  if (!file.size) return 'That file is empty.';
+  // A format the browser does support that still would not decode is a damaged
+  // file, and saying "a JPEG will work" about a JPEG is no help to anybody.
+  if (/^image\/(jpeg|png|webp|avif|gif)$/.test(file.type || '')
+      || /\.(jpe?g|png|webp|avif|gif)$/.test(name)) {
+    return 'That looks like a damaged or incomplete file. Open it somewhere else '
+      + 'to check it, then export it again.';
+  }
+  return `This browser cannot read ${file.type || 'that kind of file'}. `
+    + 'A JPEG or a PNG will work.';
+}
+
 async function pickPhotoFile(file) {
   if (!file) return;
-  edStatus('Opening...');
-  const img = await loadImage(URL.createObjectURL(file));
-  if (!img || !img.width) return edStatus('That file would not open as an image.', true);
+  edStatus(`Opening ${file.name || 'the photo'}...`);
+  const { img, error } = await decodeFile(file);
+  if (error) return edStatus(error, true);
   ed.img = img;
   ed.sourceName = file.name;
   ed.base = photos.minScale(img);
@@ -1432,8 +1485,39 @@ function bind() {
     syncEditor();
   });
   $('#photo-tol').addEventListener('input', (e) => { ed.tol = Number(e.target.value); schedulePreview(); });
-  $('#photo-pick').addEventListener('click', () => $('#photo-file').click());
-  $('#photo-file').addEventListener('change', (e) => pickPhotoFile(e.target.files[0]));
+  /* No click handler on the label. The browser takes a tap on a label straight
+   * to the input it wraps, which is the one path that works inside an iframe. */
+  $('#photo-file').addEventListener('change', (e) => {
+    pickPhotoFile(e.target.files[0]);
+    // Cleared so choosing the same file twice still fires a change.
+    e.target.value = '';
+  });
+
+  /* Two more ways in, because a file dialog is the thing most likely to be
+   * blocked or awkward: on a locked-down browser, on a tablet, or on a phone
+   * where the photo is already in the clipboard. */
+  for (const ev of ['dragenter', 'dragover']) {
+    wrap.addEventListener(ev, (e) => { e.preventDefault(); wrap.classList.add('over'); });
+  }
+  for (const ev of ['dragleave', 'dragend']) {
+    wrap.addEventListener(ev, () => wrap.classList.remove('over'));
+  }
+  wrap.addEventListener('drop', (e) => {
+    e.preventDefault();
+    wrap.classList.remove('over');
+    // Anything dropped goes through the same door. Deciding here that a file is
+    // not an image loses the chance to say what it is and what to do instead.
+    const f = [...(e.dataTransfer?.files || [])][0];
+    if (f) pickPhotoFile(f);
+    else edStatus('Nothing came with that drop. Try the button.', true);
+  });
+  document.addEventListener('paste', (e) => {
+    if ($('#photo').hidden) return;
+    const item = [...(e.clipboardData?.items || [])].find((x) => x.type.startsWith('image/'));
+    if (!item) return;
+    const f = item.getAsFile();
+    if (f) { e.preventDefault(); pickPhotoFile(f); }
+  });
   $('#photo-use').addEventListener('click', usePhoto);
   $('#photo-default').addEventListener('click', makeDefault);
   $('#photo-download').addEventListener('click', downloadForRepo);

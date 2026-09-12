@@ -150,6 +150,16 @@ button,.ghost{cursor:pointer;border-radius:8px;padding:8px 13px;border:1px solid
 .photo-bank{margin-top:10px;padding-top:10px;border-top:1px solid var(--line)}
 .photo-bank-actions{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
 
+/* The file control is the input itself, wearing a button. Nothing here calls
+   .click() on a hidden input: that is blocked inside an iframe, and the
+   published Artifact is an iframe. The oversized font on the input is the old
+   trick that makes the whole control tappable on iOS. */
+.pick{position:relative;overflow:hidden;display:inline-block;cursor:pointer;
+  text-align:center;line-height:normal}
+.pick input[type=file]{position:absolute;top:0;right:0;margin:0;padding:0;
+  font-size:200px;opacity:0;cursor:pointer;height:100%}
+.photo-stage-wrap.over{outline:3px dashed var(--red);outline-offset:-3px}
+
 .modal-box.wide{width:min(720px,94vw)}
 .photo-grid{display:grid;grid-template-columns:1fr 200px;gap:16px;align-items:start;margin:12px 0}
 .photo-stage-wrap{position:relative;width:340px;max-width:100%;aspect-ratio:4/5;

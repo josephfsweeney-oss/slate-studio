@@ -243,6 +243,7 @@
           <canvas id="photo-stage" width="340" height="425"></canvas>
           <div class="photo-hint" id="photo-hint">No photo yet</div>
         </div>
+        <div class="sub" id="photo-ways">Or drag a photo onto the frame, or paste one.</div>
         <label class="f" id="photo-zoom-wrap">Zoom
           <input type="range" id="photo-zoom" min="1" max="4" step="0.01" value="1">
         </label>
@@ -257,10 +258,21 @@
         <div class="sub" id="photo-knock-note"></div>
       </div>
     </div>
-    <input type="file" id="photo-file" accept="image/*" hidden>
     <div id="photo-status" class="sub"></div>
     <div class="actions">
-      <button id="photo-pick" class="primary">Choose a photo</button>
+      <!-- A real label wrapping a real input. A hidden input clicked from
+           script is blocked inside an iframe, which is exactly where the
+           published Artifact runs, so the button did nothing there. A tap on
+           the label reaches the input with no JavaScript at all. -->
+      <label id="photo-pick" class="pick primary">
+        <span id="photo-pick-label">Choose a photo</span>
+        <!-- HEIC and HEIF are named explicitly. On macOS the file dialog maps a
+             bare image/* to a type list that leaves HEIC greyed out and
+             unselectable, and an iPhone shoots HEIC by default, so the most
+             likely photo anybody has could not be picked at all. -->
+        <input type="file" id="photo-file"
+          accept="image/*,.heic,.heif,.HEIC,.HEIF,.jpg,.jpeg,.png,.webp,.avif">
+      </label>
       <button id="photo-use" class="primary" hidden>Use this photo</button>
       <button id="photo-default" class="ghost" hidden>Make it the default</button>
       <button id="photo-download" class="ghost" hidden>Download for the repo</button>
