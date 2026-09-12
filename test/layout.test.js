@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { solve, bestGrid, PHOTO_AR, PLATE_AR } from '../public/layout.js';
+import { solve, bestGrid, PHOTO_AR, PLATE_AR, COMPOSITIONS } from '../public/layout.js';
 import { nameParts, slugify } from '../public/names.js';
 import { fillTokens, CANVASES, TEMPLATES } from '../public/presets.js';
 import { MAIL_PROGRAMS, sideStyle } from '../public/mailers.js';
@@ -474,8 +474,11 @@ test('every template asks for a layout that exists and fills what it paints', ()
     palmback: ['record', 'values', 'callout'],   // at least one of these
     palmcard: ['values'],
   };
-  const known = new Set(['auto', 'stack', 'banner', 'split', 'slateOnly', 'palmcard',
-    'palmback', 'ballot', 'spotlight', 'versus', 'strip']);
+  /* Read off the engine rather than kept here. A hand-kept copy of this list
+   * goes stale the moment a composition is added, and then the test that is
+   * supposed to catch a template asking for a layout that does not exist starts
+   * failing on templates that are fine. */
+  const known = new Set(['auto', ...COMPOSITIONS]);
   const ids = new Set();
   for (const t of TEMPLATES) {
     assert.ok(!ids.has(t.id), `two templates share the id ${t.id}`);
@@ -615,14 +618,25 @@ test('filenames sort by client, then programme, then surface', async () => {
   assert.equal(name, 'nhgop-ballot-guide-palm-4.25x11-rockingham-25-back-v01.png');
 
   // A print surface carries its trim size in inches, which is what a printer
-  // asks for. A screen surface carries pixels, which is what a platform asks.
+  // asks for. A screen surface carries no size at all: a screen size in a
+  // filename is an ad size in a filename, and EasyList blocks those URLs.
   assert.match(buildName({ program: 'x', surface: 'mail11', canvas: canvasById('mail11') }), /-11x5\.5-/);
-  assert.match(buildName({ program: 'x', surface: '1x1', canvas: canvasById('1x1') }), /-1080x1080-/);
+  for (const c of CANVASES.filter((x) => !x.dpi)) {
+    const n = buildName({ program: 'x', surface: c.id, canvas: c, audience: 'r-25' });
+    assert.ok(!new RegExp(`\\b${c.w}x${c.h}\\b`).test(n), `${c.id} put its pixel size in ${n}`);
+    assert.ok(!/\d{3,4}x\d{2,4}/.test(n), `${c.id} looks like an ad size: ${n}`);
+  }
+  // Nor may an ad-ish path word get in, for the same reason.
+  for (const c of CANVASES) {
+    const n = buildName({ program: 'Display banner ad', surface: c.id, canvas: c });
+    assert.ok(!/\b(ads?|banner|social|display)\b/.test(n.replace(/-/g, ' ')) || !/\d+x\d+/.test(n),
+      `${c.id} produced a blockable name: ${n}`);
+  }
 
   // Lower case, hyphens, nothing else, and every field optional but the shape.
   const messy = buildName({ program: 'Vote  for ALL the Seats!', surface: 'story',
     canvas: canvasById('story'), audience: 'Coös 2' });
-  assert.match(messy, /^nhgop-vote-for-all-the-seats-story-1080x1920-co-s-2-v01\.png$/,
+  assert.match(messy, /^nhgop-vote-for-all-the-seats-story-co-s-2-v01\.png$/,
     `got ${messy}`);
   assert.ok(!/[A-Z_ ]/.test(messy), 'a filename with a capital or a space in it');
 

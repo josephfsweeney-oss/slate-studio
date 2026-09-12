@@ -515,7 +515,7 @@ async function selectDistrict(id) {
   // A new district is a new slate, so the spotlight picker is out of date, and
   // so are the typed variables: a school rate belongs to one town.
   renderMailPanel();
-  if (state.style.composition === 'spotlight') fillSpotlightPicker();
+  if (ONE_FACE.has(state.style.composition)) fillSpotlightPicker();
   saveLocal();
   draw();
 }
@@ -1078,14 +1078,6 @@ function renderMailPanel() {
       .map((x) => `<option value="${x.id}">${x.n}. ${esc(x.label)}</option>`).join('');
     $('#mail-piece').value = piece ? piece.id : prog.pieces[0].id;
   }
-  if (prog) {
-    const list = district() ? activeSlate(district()) : [];
-    $('#mail-lead').innerHTML = '<option value="">Nobody picked yet</option>'
-      + list.map((n) => `<option value="${esc(n.name)}">${esc(n.name)}</option>`).join('');
-    $('#mail-lead').value = list.some((n) => n.name === state.style.spotlight)
-      ? state.style.spotlight : '';
-    $('#mail-lead-wrap').hidden = list.length < 2;
-  }
   if (prog) $('#mail-shared-back').checked = state.mail.sharedBack !== false;
   $('#mail-front').classList.toggle('on', state.mail.side !== 'back');
   $('#mail-back').classList.toggle('on', state.mail.side === 'back');
@@ -1464,6 +1456,10 @@ function fillSelects() {
 }
 
 /** The candidates on this district's slate, for the spotlight picker. */
+/* The layouts that put one person on the piece. Both need somebody chosen, and
+ * both leave the choice to a person rather than taking the first name. */
+const ONE_FACE = new Set(['spotlight', 'poster']);
+
 function fillSpotlightPicker() {
   const list = activeSlate();
   const cur = state.style.spotlight;
@@ -1492,7 +1488,7 @@ function syncControls() {
   $('#stat-wrap').hidden = !['stat', 'receipt'].includes(comp);
   $('#source-wrap').hidden = !['stat', 'receipt'].includes(comp);
   $('#spotlight-wrap').hidden = comp !== 'spotlight';
-  if (comp === 'spotlight') fillSpotlightPicker();
+  if (ONE_FACE.has(comp)) fillSpotlightPicker();
 
   // The record field does two jobs, so it says which one it is doing.
   $('#record-wrap').querySelector('.hint').textContent = comp === 'receipt'
@@ -1612,11 +1608,6 @@ function bind() {
       renderMailPanel(); syncControls(); saveLocal(); draw();
     });
   }
-
-  $('#mail-lead').addEventListener('change', (e) => {
-    state.style.spotlight = e.target.value;
-    renderMailPanel(); syncControls(); saveLocal(); draw();
-  });
 
   $('#mail-vars').addEventListener('input', (e) => {
     const key = e.target.dataset.mailvar;

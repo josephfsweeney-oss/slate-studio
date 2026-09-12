@@ -280,6 +280,19 @@ export const TEMPLATES = [
     style: { composition: 'spotlight' },
   },
   {
+    id: 'poster',
+    label: 'Social poster',
+    copy: {
+      kicker: '{{SEAT}}',
+      headline: 'Vote {{CAND_LAST}} November 3',
+      subhead: '',
+      details: '',
+      cta: 'Republican for State Representative',
+      footer: '',
+    },
+    style: { composition: 'poster', flagBar: false },
+  },
+  {
     id: 'bare',
     label: 'Asset layer only',
     copy: { kicker: '', headline: '', subhead: '', details: '', cta: '', footer: '' },
@@ -428,15 +441,40 @@ export function fillTokens(str, district, vars = {}) {
  *
  * The size is the trim size in inches on a print canvas and the pixel size on
  * screen, because those are the numbers a printer and a platform ask for. */
+/* Words and shapes that get a URL dropped by a filter list.
+ *
+ * EasyList sits behind uBlock Origin, AdBlock Plus and Brave. It blocks paths
+ * and filenames carrying these, so the file serves fine, the browser drops it,
+ * and a review page renders blank with nothing in the console saying why. A
+ * template called "Display banner" put two of them in every filename it made.
+ * They come out of the name; the piece is still whatever it is. */
+const BLOCKABLE = /\b(ads?|adv|advert|advertisement|banner|banners|social|display|sponsor|sponsored|promo|popup|doubleclick)\b/g;
+const ADSIZE = /\b\d{2,4}\s*x\s*\d{2,4}\b/g;
+
 const hyphen = (v, fallback = '') => String(v ?? '').trim().toLowerCase()
   .replace(/[^a-z0-9.]+/g, '-').replace(/^-+|-+$/g, '') || fallback;
 
-/** The size field: inches on a print canvas, pixels on screen. */
+/* The same, for the free text fields, with the blockable words and anything
+ * shaped like an ad size taken out first. The size field does not go through
+ * this: a print trim is inches, 4.25x11 is a rack card and not a banner, and
+ * that is the number the printer asks for. */
+const safe = (v, fallback = '') => String(v ?? '').trim().toLowerCase()
+  .replace(ADSIZE, ' ').replace(/[^a-z0-9.]+/g, ' ').replace(BLOCKABLE, ' ')
+  .trim().replace(/\s+/g, '-') || fallback;
+
+/* The size field: the trim in inches on a print canvas, and nothing at all on a
+ * screen one.
+ *
+ * A screen size in a filename is an ad size in a filename, and EasyList blocks
+ * those URLs. It sits behind uBlock Origin, AdBlock Plus and Brave, so the file
+ * serves fine and the browser drops it, and a review page renders blank with
+ * nothing in the console that says why. The canvas id is already in the surface
+ * slot and tells the two apart, so the size is not carrying anything the name
+ * needs. Show the pixels as text on the page instead; markup is never filtered. */
 export function sizeField(canvas) {
+  if (!canvas.dpi) return '';
   const trim = (n) => String(Math.round(n * 100) / 100);
-  return canvas.dpi
-    ? `${trim(canvas.w / canvas.dpi)}x${trim(canvas.h / canvas.dpi)}`
-    : `${canvas.w}x${canvas.h}`;
+  return `${trim(canvas.w / canvas.dpi)}x${trim(canvas.h / canvas.dpi)}`;
 }
 
 /**
@@ -452,12 +490,12 @@ export function sizeField(canvas) {
 export function buildName({ client = 'nhgop', program, surface, canvas, audience,
   side = '', version = 1, ext = 'png' }) {
   const fields = [
-    hyphen(client, 'nhgop'),
-    hyphen(program, 'build'),
-    hyphen(surface, 'canvas'),
+    safe(client, 'nhgop'),
+    safe(program, 'build'),
+    safe(surface, 'canvas'),
     hyphen(sizeField(canvas || { w: 0, h: 0 })),
-    hyphen(audience),
-    hyphen(side),
+    safe(audience),
+    safe(side),
     `v${String(version).padStart(2, '0')}`,
   ].filter(Boolean);
   return `${fields.join('-')}.${ext}`;

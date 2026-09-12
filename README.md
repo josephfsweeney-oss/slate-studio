@@ -593,3 +593,49 @@ Two things stay light on purpose. A ballot card is printed on paper and has to
 read as paper, so the ballot layout keeps its white card whatever the ground is.
 And a marked oval is now solid: a pen mark fills the oval, it does not leave a
 ring of paper inside one.
+
+## The CTEHR rules, and where this app stands against them
+
+**Shape.** No pills anywhere. Four pixels is the maximum radius, which on a
+3300 pixel 300 dpi sheet is a hundredth of an inch, so everything here is
+square. The one thing that was a pill, the call to action, is a clipped block:
+two corners cut on the diagonal, the same treatment the buttons on the sites
+wear. The roster card is square with an accent edge down its side rather than
+the rounded corner, drop shadow and border pattern.
+
+**Filenames.** No ad size and no ad word ever reaches a filename. A screen
+canvas contributes no size field at all, and the free text fields are scrubbed
+of `ad`, `banner`, `social`, `display`, `sponsor`, `promo` and anything shaped
+like `300x250`. EasyList blocks those URLs, the file serves fine, the browser
+drops it, and a review page renders blank with nothing in the console saying
+why. A print trim in inches is not an ad size and stays: `4.25x11` is a rack
+card. The canvas id is in the name and tells the surfaces apart on its own.
+
+**Ad sizes.** The three placement canvases match: Square feed is 1080 x 1080,
+Story is 1080 x 1920, Link card is 1200 x 628. Nothing is squashed: a canvas
+change re-solves the layout at the new size rather than scaling a finished
+render.
+
+**Three things this app does not do yet, and cannot decide on its own.**
+
+*Norwester.* Headings here are Anton. Norwester is not in the repository and I
+will not substitute a lookalike and call it Norwester. Send the licensed woff2
+and it becomes the display face, set at one weight and uppercase, the way the
+rule says.
+
+*Real New Hampshire photography.* Nine photographs ship with the mail
+programme. Four are genuinely New Hampshire: the State House in Concord,
+Portsmouth, Dover, a New England cape. Five are generic stock: a framing crew,
+a family at a table, transmission towers, a medical bill, a signed contract.
+They are not colour blocks standing in for a photograph, but they are not
+Granite State imagery either. Point me at the committee's photo library and
+they get replaced.
+
+*Generated graphics.* The rule says every graphic is generated with
+gpt-image-2, and that hand assembly and headless Chrome were both tried and
+rejected. This app is headless Chrome. That is not an oversight to route
+around: a generator cannot place Susan Vandecasteele's cutout above her own
+name, in ballot order, in 174 districts, and be right every time. Deterministic
+layout is the whole reason this exists. Read the rule as covering illustrative
+graphics for the sites, and this as a different tool, or tell me otherwise and
+we will talk about what that means.

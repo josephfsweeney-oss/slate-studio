@@ -10,6 +10,12 @@
  * about real votes by real people, so check them against the journal before a
  * drop goes out. Nothing in this file was written by the app.
  *
+ * This programme is a slate piece. The roster on it is the whole district, so
+ * the copy speaks for the whole district: "not one of them", "your Republican
+ * team", "every name on this card". It named one person once, which put one
+ * name over nine faces and read as a piece nobody had looked at. A piece about
+ * one candidate is a different job, and the social poster is that job.
+ *
  * Tokens fill per district. {{TAX_RATE}}, {{OPP_LAST}}, {{OPP_VOTE}},
  * {{POLL_HOURS}} and {{POLL_PLACE}} are facts the app does not hold: they are
  * typed in the Mail variables panel, and a piece that still shows one of them
@@ -81,7 +87,7 @@ export const MAIL_PROGRAMS = [{
         headline: 'They Had One Chance To Ban The Income Tax',
         subhead: 'Republicans voted to write the ban into the state constitution. It failed by 43 votes.',
         record: '',
-        details: '{{CAND_NAME}} will never vote for an income tax or a sales tax. '
+        details: 'Not one of them will ever vote for an income tax or a sales tax. '
           + 'Not this term. Not ever.',
         footer: ROLE,
         brief: 'State House dome against a hard sky, shot from below. Cold light.',
@@ -130,7 +136,8 @@ export const MAIL_PROGRAMS = [{
         subhead: 'You cannot bring rents down without more homes. '
           + 'Fifteen housing reform bills passed in one session.',
         record: '',
-        details: '{{CAND_NAME}} will keep cutting the rules that price your kids out of {{TOWN}}.',
+        details: 'Your Republican {{TEAM}} will keep cutting the rules that price '
+          + 'your kids out of {{TOWN}}.',
         footer: ROLE,
         brief: 'A framing crew on a house going up. Daylight, real site, real tools.',
       },
@@ -225,14 +232,14 @@ export const MAIL_PROGRAMS = [{
         subhead: 'No income tax. No sales tax. A cap on your school tax. More homes. '
           + 'Lower bills. Parents deciding. Police backed up.',
         record: '',
-        details: 'Vote {{CAND_LAST}} for State Representative.',
+        details: 'Vote Republican for State Representative. Every name on this card.',
         footer: ROLE,
-        brief: '{{CAND_NAME}} full frame, outdoors in the district, talking with voters.',
+        brief: 'The {{TEAM}} outdoors in {{TOWN}}, talking with voters. Not a posed line-up.',
       },
       back: {
         kicker: 'Tuesday, November 3',
         headline: 'Two Votes. One Ballot.',
-        record: 'Vote {{CAND_LAST}} for the New Hampshire House.\n'
+        record: 'Vote Republican for the New Hampshire House. Every name on the card.\n'
           + 'Vote yes on the school tax cap question. It needs three fifths.\n'
           + 'Polls open {{POLL_HOURS}} at {{POLL_PLACE}}.',
         callout: '',

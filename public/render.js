@@ -18,6 +18,31 @@ function hexToRgb(hex) {
  * drifted far enough to bury a source line under it. */
 export { luminance, flagBand } from './layout.js';
 
+/* CTEHR shape rules, in canvas terms.
+ *
+ * No pills, and four pixels is the maximum radius anywhere. On a piece that is
+ * 3300 across at 300 dpi, four pixels is a hundredth of an inch: no press holds
+ * it and no eye sees it, so the honest reading of the rule on this surface is a
+ * square corner. Everything here is square.
+ *
+ * The one thing that was a pill, the call to action, is a clipped block now:
+ * two corners cut on the diagonal, which is the clip-path treatment the buttons
+ * on the sites wear. */
+const CORNER = 0;
+
+/** A block with the top left and bottom right corners cut on the diagonal. */
+function clipBlock(ctx, x, y, w, h, cut) {
+  const c = Math.min(cut, w / 2, h / 2);
+  ctx.beginPath();
+  ctx.moveTo(x + c, y);
+  ctx.lineTo(x + w, y);
+  ctx.lineTo(x + w, y + h - c);
+  ctx.lineTo(x + w - c, y + h);
+  ctx.lineTo(x, y + h);
+  ctx.lineTo(x, y + c);
+  ctx.closePath();
+}
+
 function roundRect(ctx, x, y, w, h, r) {
   const rr = Math.min(r, w / 2, h / 2);
   ctx.beginPath();
@@ -193,7 +218,7 @@ function paintSilhouette(ctx, r, theme) {
   ctx.strokeStyle = theme.light ? 'rgba(18,49,78,.52)' : 'rgba(255,255,255,.52)';
   ctx.setLineDash([r.w * 0.05, r.w * 0.04]);
   ctx.lineWidth = Math.max(2, r.w * 0.014);
-  roundRect(ctx, r.x + r.w * 0.06, r.y + r.h * 0.10, r.w * 0.88, r.h * 0.88, r.w * 0.05);
+  roundRect(ctx, r.x + r.w * 0.06, r.y + r.h * 0.10, r.w * 0.88, r.h * 0.88, CORNER);
   ctx.stroke();
   ctx.setLineDash([]);
   ctx.fillStyle = theme.light ? 'rgba(18,49,78,.88)' : 'rgba(255,255,255,.92)';
@@ -237,14 +262,14 @@ function paintTile(ctx, tile, plan, style, assets, theme) {
   ctx.shadowBlur = tw * 0.030;
   ctx.shadowOffsetY = tw * 0.010;
   ctx.fillStyle = style.plateColor || BRAND.navyDeep;
-  roundRect(ctx, p.x, p.y, p.w, p.h, tw * 0.035);
+  roundRect(ctx, p.x, p.y, p.w, p.h, CORNER);
   ctx.fill();
   ctx.restore();
   clearShadow(ctx);
 
   // Red cap along the top edge of the plate.
   ctx.save();
-  roundRect(ctx, p.x, p.y, p.w, p.h, tw * 0.035);
+  roundRect(ctx, p.x, p.y, p.w, p.h, CORNER);
   ctx.clip();
   ctx.fillStyle = style.accent || BRAND.green;
   ctx.fillRect(p.x, p.y, p.w, Math.max(3, tw * 0.022));
@@ -307,7 +332,7 @@ function paintDeck(ctx, plan, assets, theme) {
     ctx.strokeStyle = theme.light ? 'rgba(18,49,78,.30)' : 'rgba(255,255,255,.34)';
     ctx.setLineDash([r.w * 0.02, r.w * 0.016]);
     ctx.lineWidth = Math.max(1.5, r.w * 0.004);
-    roundRect(ctx, r.x, r.y, r.w, r.h, r.w * 0.02);
+    roundRect(ctx, r.x, r.y, r.w, r.h, CORNER);
     ctx.stroke();
     ctx.restore();
     ctx.setLineDash([]);
@@ -366,7 +391,7 @@ function paintPalmCard(ctx, plan, style, theme, assets, bleed) {
 
   // The faces sit on a quiet tint, not on bare stock: it groups them as one slate.
   ctx.fillStyle = theme.panel;
-  roundRect(ctx, p.panel.x, p.panel.y, p.panel.w, p.panel.h, w * 0.020);
+  roundRect(ctx, p.panel.x, p.panel.y, p.panel.w, p.panel.h, CORNER);
   ctx.fill();
 
   // The values strip, full bleed in the accent.
@@ -557,7 +582,7 @@ function paintCopy(ctx, plan, style, theme) {
       ctx.shadowBlur = it.px * 0.5;
       ctx.shadowOffsetY = it.px * 0.14;
       ctx.fillStyle = theme.ctaBg;
-      roundRect(ctx, px0, it.absY, pillW, pillH, pillH / 2);
+      clipBlock(ctx, px0, it.absY, pillW, pillH, pillH * 0.30);
       ctx.fill();
       ctx.restore();
       clearShadow(ctx);
@@ -715,7 +740,7 @@ function paintBallot(ctx, plan, style, theme) {
   ctx.shadowBlur = plan.s * 0.020;
   ctx.shadowOffsetY = plan.s * 0.006;
   ctx.fillStyle = BRAND.white;
-  roundRect(ctx, b.card.x, b.card.y, b.card.w, b.card.h, plan.s * 0.014);
+  roundRect(ctx, b.card.x, b.card.y, b.card.w, b.card.h, CORNER);
   ctx.fill();
   ctx.restore();
   clearShadow(ctx);
@@ -723,7 +748,7 @@ function paintBallot(ctx, plan, style, theme) {
   // Header: the instruction, in the accent, exactly as the ballot words it.
   const hb = b.rule;
   ctx.fillStyle = accent;
-  roundRect(ctx, b.card.x, b.card.y, b.card.w, b.headerH, plan.s * 0.014);
+  roundRect(ctx, b.card.x, b.card.y, b.card.w, b.headerH, CORNER);
   ctx.fill();
   ctx.fillRect(b.card.x, b.card.y + b.headerH - plan.s * 0.014, b.card.w, plan.s * 0.014);
   ctx.fillStyle = BRAND.white;
@@ -758,7 +783,7 @@ function paintBands(ctx, bands, plan, style, theme, box, centred) {
       const tw = Math.min(box.w, widthOf(ctx, blk, blk.lines[0]) + padX * 2);
       const bx = centred ? tx - tw / 2 : box.x;
       ctx.fillStyle = theme.ctaBg;
-      roundRect(ctx, bx, b.y, tw, boxH, boxH / 2);
+      clipBlock(ctx, bx, b.y, tw, boxH, boxH * 0.30);
       ctx.fill();
       ctx.fillStyle = theme.ctaText;
       setFont(ctx, blk.font, blk.px, blk.ls);
@@ -841,7 +866,7 @@ function paintPalmBack(ctx, plan, style, theme, assets, bleed) {
   // The issues, boxed, two across.
   for (const cell of p.grid.cells) {
     ctx.fillStyle = theme.cell;
-    roundRect(ctx, cell.x, cell.y, cell.w, cell.h, w * 0.016);
+    roundRect(ctx, cell.x, cell.y, cell.w, cell.h, CORNER);
     ctx.fill();
     ctx.fillStyle = accent;
     ctx.fillRect(cell.x, cell.y, Math.max(2, w * 0.006), cell.h);
@@ -970,7 +995,7 @@ function paintVersus(ctx, plan, style, theme, assets) {
     const tint = mine ? 'rgba(47,124,78,.12)' : 'rgba(18,49,78,.07)';
     const mark = mine ? accent : '#8A93A3';
     ctx.fillStyle = tint;
-    roundRect(ctx, col.x, col.y, col.w, col.h, plan.s * 0.018);
+    roundRect(ctx, col.x, col.y, col.w, col.h, CORNER);
     ctx.fill();
     ctx.fillStyle = mark;
     ctx.fillRect(col.x, col.y, col.w, Math.max(3, plan.s * 0.008));
@@ -1002,7 +1027,7 @@ function paintVersus(ctx, plan, style, theme, assets) {
     const tw = Math.min(v.cta.w, widthOf(ctx, c, c.lines[0]) + c.px * 1.24);
     const bx = v.cta.x + (v.cta.w - tw) / 2;
     ctx.fillStyle = theme.ctaBg;
-    roundRect(ctx, bx, v.cta.y, tw, v.cta.h, v.cta.h / 2);
+    clipBlock(ctx, bx, v.cta.y, tw, v.cta.h, v.cta.h * 0.30);
     ctx.fill();
     ctx.fillStyle = theme.ctaText;
     setFont(ctx, c.font, c.px, c.ls);
@@ -1037,7 +1062,7 @@ function paintStrip(ctx, plan, style, theme) {
     const boxH = Math.min(r.h, c.h + c.px * 0.9);
     const by = r.y + (r.h - boxH) / 2;
     ctx.fillStyle = theme.ctaBg;
-    roundRect(ctx, r.x, by, r.w, boxH, Math.min(boxH / 2, plan.s * 0.10));
+    clipBlock(ctx, r.x, by, r.w, boxH, boxH * 0.30);
     ctx.fill();
     ctx.fillStyle = theme.ctaText;
     setFont(ctx, c.font, c.px, c.ls);
@@ -1107,7 +1132,7 @@ function paintReceipt(ctx, plan, style, theme) {
   // from the campaign's argument underneath it.
   ctx.fillStyle = theme.light ? '#FFFFFF' : 'rgba(255,255,255,.94)';
   roundRect(ctx, d.x - plan.pad * 0.35, d.y - plan.pad * 0.30,
-    d.w + plan.pad * 0.70, d.h + plan.pad * 0.55, plan.s * 0.008);
+    d.w + plan.pad * 0.70, d.h + plan.pad * 0.55, CORNER);
   ctx.fill();
   ctx.strokeStyle = 'rgba(18,49,78,.28)';
   ctx.lineWidth = Math.max(1, plan.s * 0.0022);
@@ -1440,23 +1465,17 @@ function paintPromise(ctx, plan, style, theme, assets, bleed = 0) {
   /* The roster is a card laid on the photograph: a margin round it, a shadow
    * under it, its caption strip as its own foot. */
   const stock = theme.light ? BRAND.white : shade(cardStock({ ...style, composition: '' }), 1.12);
-  ctx.save();
-  ctx.shadowColor = 'rgba(0,0,0,.42)';
-  ctx.shadowBlur = w * 0.012;
-  ctx.shadowOffsetY = w * 0.004;
   ctx.fillStyle = style.slatePanel || stock;
-  roundRect(ctx, g.card.x, g.card.y, g.card.w, g.card.h, g.card.r);
-  ctx.fill();
-  ctx.restore();
-  clearShadow(ctx);
+  ctx.fillRect(g.card.x, g.card.y, g.card.w, g.card.h);
+  // An accent edge rather than a shadow and a radius, per the shape rules.
+  ctx.fillStyle = accent;
+  ctx.fillRect(g.card.x, g.card.y, Math.max(3, w * 0.0055), g.card.h);
 
   if (g.bar) {
-    ctx.save();
-    roundRect(ctx, g.card.x, g.card.y, g.card.w, g.card.h, g.card.r);
-    ctx.clip();
     ctx.fillStyle = navy;
     ctx.fillRect(g.bar.x, g.bar.y, g.bar.w, g.bar.h);
-    ctx.restore();
+    ctx.fillStyle = accent;
+    ctx.fillRect(g.bar.x, g.bar.y, Math.max(3, w * 0.0055), g.bar.h);
   }
 
   // The spine runs down the outside edge, over the photograph rather than under
@@ -1500,6 +1519,16 @@ function paintPromise(ctx, plan, style, theme, assets, bleed = 0) {
     ctx.fillStyle = b.role === 'headline' || b.role === 'claim' ? ink : soft;
     setFont(ctx, blk.font, blk.px, blk.ls);
     blk.lines.forEach((l, i) => ctx.fillText(l, g.col.x, b.y + blk.lh * (i + 0.84)));
+  }
+
+  // The names, under the group, in ballot order.
+  if (g.names) {
+    const blk = g.names.block;
+    ctx.fillStyle = theme.light ? (style.plateColor || BRAND.navy) : BRAND.white;
+    setFont(ctx, blk.font, blk.px, blk.ls);
+    ctx.textAlign = 'center';
+    blk.lines.forEach((l, i) => ctx.fillText(l, g.names.x, g.names.y + blk.lh * (i + 0.84)));
+    ctx.textAlign = 'left';
   }
 
   if (g.caption) {
@@ -1571,6 +1600,60 @@ function paintProof(ctx, plan, style, theme, assets, bleed = 0) {
   if ('letterSpacing' in ctx) ctx.letterSpacing = '0px';
 }
 
+/* The poster: the figure, then the words over the ground it stands on.
+ *
+ * The ground gets a vignette rather than a flat fill. A social graphic is
+ * looked at on a screen next to a hundred other rectangles, and a flat panel of
+ * one colour is the one that reads as a placeholder. */
+function paintPoster(ctx, plan, style, theme, bleed = 0) {
+  const g = plan.poster;
+  const { w, h } = plan.canvas;
+  const B = bleed;
+  const accent = theme.accent;
+  const ink = theme.primary;
+
+  ctx.save();
+  const vig = ctx.createLinearGradient(-B, -B, w + B, h + B);
+  vig.addColorStop(0, 'rgba(255,255,255,.07)');
+  vig.addColorStop(0.55, 'rgba(0,0,0,0)');
+  vig.addColorStop(1, 'rgba(0,0,0,.22)');
+  ctx.fillStyle = vig;
+  ctx.fillRect(-B, -B, w + B * 2, h + B * 2);
+  ctx.restore();
+
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'alphabetic';
+  for (const b of g.bands) {
+    const blk = b.block;
+    if (b.role === 'bar') {
+      // A solid bar, not a pill. A pill is a button; this is a title block.
+      const r = g.bar;
+      ctx.fillStyle = theme.light ? (style.plateColor || BRAND.navy) : 'rgba(0,0,0,.30)';
+      ctx.fillRect(r.x, r.y, r.w, r.h);
+      ctx.fillStyle = style.plateAccent || BRAND.mint;
+      setFont(ctx, blk.font, blk.px, blk.ls);
+      ctx.fillText(blk.lines[0], r.x + blk.px * 0.8, r.y + (r.h + blk.px * 0.72) / 2);
+      continue;
+    }
+    ctx.fillStyle = b.role === 'kicker' ? (style.plateAccent || BRAND.mint) : ink;
+    setFont(ctx, blk.font, blk.px, blk.ls);
+    blk.lines.forEach((l, i) => {
+      if (b.role === 'headline' && style.headlineShadow !== false) {
+        ctx.save();
+        ctx.shadowColor = 'rgba(0,0,0,.30)';
+        ctx.shadowBlur = blk.px * 0.16;
+        ctx.shadowOffsetY = blk.px * 0.045;
+        ctx.fillText(l, g.col.x, b.y + blk.lh * (i + 0.84));
+        ctx.restore();
+        clearShadow(ctx);
+        return;
+      }
+      ctx.fillText(l, g.col.x, b.y + blk.lh * (i + 0.84));
+    });
+  }
+  if ('letterSpacing' in ctx) ctx.letterSpacing = '0px';
+}
+
 /** Paint a solved plan. `assets` = { portraits: {name -> Image}, bgImage, logo }. */
 export function paint(ctx, plan, style, assets = {}, copy = {}, bleed = 0) {
   const theme = themeFor(style);
@@ -1627,6 +1710,10 @@ export function paint(ctx, plan, style, assets = {}, copy = {}, bleed = 0) {
     for (const tile of plan.tiles) paintTile(ctx, tile, plan, style, assets, theme);
   } else if (plan.proof) {
     paintProof(ctx, plan, style, theme, assets, bleed);
+  } else if (plan.poster) {
+    // The figure first: the words sit on the ground it stands on, not on it.
+    for (const tile of plan.tiles) paintTile(ctx, tile, plan, style, assets, theme);
+    paintPoster(ctx, plan, style, theme, bleed);
   } else {
     for (const tile of plan.tiles) paintTile(ctx, tile, plan, style, assets, theme);
     paintCopy(ctx, plan, style, theme);

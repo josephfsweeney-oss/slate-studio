@@ -254,9 +254,9 @@ function idealTile(n, s) {
 
 /* ----------------------------------------------------------------- the solve */
 
-const COMPOSITIONS = ['stack', 'banner', 'split', 'slateOnly', 'palmcard',
+export const COMPOSITIONS = ['stack', 'banner', 'split', 'slateOnly', 'palmcard',
   'palmback', 'ballot', 'spotlight', 'versus', 'strip', 'stat', 'receipt', 'typeled',
-  'promise', 'proof'];
+  'promise', 'proof', 'poster'];
 
 /* The palm card is a designed template rather than a solved one: a fixed stack
  * of bands, in a fixed order, the way a rack card is read top to bottom. The
@@ -1562,6 +1562,167 @@ function pairUp(values) {
   return out.join('\n');
 }
 
+/* A cluster of faces with the names under the group.
+ *
+ * Not a grid of tiles. Every candidate used to sit in their own box with their
+ * own plate under them, which is nine cards on one card: nine borders, nine
+ * shadows, nine little labels, and no group. Out of the boxes they read as one
+ * team standing together, which is the thing the piece is actually claiming.
+ *
+ * Four across is the ceiling. Past four the faces are too small to be faces at
+ * this width, and the rows balance rather than leaving a row of one hanging off
+ * the bottom: nine goes three and three and three, not four and four and one.
+ *
+ * The names go under the whole group, in ballot order, the way a team
+ * photograph is captioned. Positional, left to right, which is how everybody
+ * already reads one.
+ */
+function clusterFaces(measure, slate, box, s, opts = {}) {
+  const n = slate.length;
+  if (!n) return { tiles: [], names: { lines: [], h: 0, px: 0 }, namesY: box.y, rows: 0, cols: 0 };
+  const maxCols = opts.maxCols || 4;
+  const rows = Math.ceil(n / maxCols);
+  const cols = Math.ceil(n / rows);
+
+  // Clustered, not spaced: the gap is a seam between people standing together.
+  const gapX = box.w * 0.012;
+  const gapY = box.w * 0.016;
+
+  /* The names first, because they are the fixed cost. Surnames alone once the
+   * group is big enough that first names would not fit on two lines anyway. */
+  const long = n > 4;
+  const label = (c) => (long ? c.last : `${firstLine(c, opts.style || {})} ${c.last}`).trim();
+  const namePx = Math.min(box.w * 0.052, box.h * 0.070);
+  const names = fitBlock(measure, slate.map(label).join('   ·   '),
+    COND_BOLD, namePx, box.w, 3, 0.06, true);
+  const namesH = names.h ? names.h + box.h * 0.030 : 0;
+
+  const faceBox = { w: box.w, h: Math.max(1, box.h - namesH) };
+  const tileW = Math.min((faceBox.w - (cols - 1) * gapX) / cols,
+    (faceBox.h - (rows - 1) * gapY) / rows / PHOTO_AR);
+  const tileH = tileW * PHOTO_AR;
+  const gridH = rows * tileH + (rows - 1) * gapY;
+  const top = box.y + Math.max(0, (faceBox.h - gridH) / 2);
+
+  const tiles = slate.map((c, i) => {
+    const row = Math.floor(i / cols);
+    const col = i % cols;
+    const inRow = Math.min(cols, n - row * cols);
+    const rowW = inRow * tileW + (inRow - 1) * gapX;
+    const x = box.x + (box.w - rowW) / 2 + col * (tileW + gapX);
+    const y = top + row * (tileH + gapY);
+    // No plate. The names are under the group, once.
+    return { candidate: c, x, y, w: tileW, h: tileH,
+             photo: { x, y, w: tileW, h: tileH }, plate: null };
+  });
+
+  return { tiles, names, namesY: top + gridH + box.h * 0.030, rows, cols, tileW, tileH };
+}
+
+/* ----------------------------------------------------------------- poster --- */
+
+/* One candidate, cut out and bleeding off the edge, under a headline that takes
+ * the piece. This is the social graphic: a thing somebody sees at 400 pixels
+ * wide in a feed, at a glance, with no second look.
+ *
+ * The spotlight was the nearest thing in this app and it was not close. It puts
+ * the subject in a boxed tile with a name plate under it, sets the headline at
+ * a third of the height it wants, and runs the rest of the slate along the foot
+ * as chips. All three are right on a mail piece and all three are wrong at feed
+ * size: the box reads as a deck tile, the headline loses to the box, and the
+ * chips are illegible. So the poster is its own composition rather than a flag
+ * on that one. There is no box, no plate, and nobody else on it.
+ */
+function solvePoster(spec, measure) {
+  const { w, h } = spec.canvas;
+  const slate = spec.slate || [];
+  const style = spec.style || {};
+  const copy = spec.copy || {};
+  const s = Math.min(w, h);
+  const density = style.density ?? 1;
+
+  const wanted = String(style.spotlight || '').trim();
+  const hero = slate.find((c) => c.name === wanted) || slate[0] || null;
+
+  const disc = (copy.disclaimer || '').trim();
+  const discPx = Math.max(11, s * 0.0195);
+  const discH = disc ? discPx * 2.1 : 0;
+
+  const pad = w * 0.044 * density;
+  const tall = w / h < 0.92;
+
+  /* The figure takes a column at the right on anything wide, and the foot on
+   * anything tall, and bleeds off two edges either way. A cutout with air all
+   * round it is a sticker; a cutout running off the page is a person standing
+   * in it. */
+  const figW = tall ? w : w * 0.42;
+  const figH = tall ? h * 0.46 : h;
+  const fig = { x: w - figW, y: h - figH, w: figW, h: figH };
+  const colW = Math.max(s * 0.3, (tall ? w : fig.x) - pad * 2);
+  const colH = (tall ? fig.y : h) - discH;
+
+  const barText = String(copy.cta || copy.footer || '').trim();
+
+  const build = (k) => {
+    const kick = fitBlock(measure, copy.kicker, COND_BOLD, h * 0.036 * k, colW, 2, 0.16, true);
+    const head = fitBlock(measure, copy.headline, ANTON, h * 0.150 * k, colW, 4, -0.015, true);
+    const barPx = barText ? h * 0.040 * k : 0;
+    const bar = fitBlock(measure, barText, COND_BOLD, barPx, colW - barPx * 1.6, 1, 0.08, true);
+    const entries = [
+      { role: 'kicker', block: kick, gap: 0 },
+      { role: 'headline', block: head, gap: h * 0.014 * k },
+      { role: 'bar', block: bar, gap: h * 0.034 * k, h: bar.h ? bar.px * 2.3 : 0 },
+    ];
+    return { entries, height: stackBlocks(entries, 0).height, k };
+  };
+
+  const room = Math.max(s * 0.2, colH - pad * 1.4);
+  const built = fitColumn(build, density, room, { min: 0.34, max: 1.25, fill: 0.94 });
+  const top = pad + Math.max(0, (room - built.height) / 2);
+  const bands = stackBlocks(built.entries, top);
+  const barBand = bands.at('bar');
+
+  const dpi = spec.dpi || 0;
+  return {
+    canvas: { w, h },
+    composition: 'poster',
+    pad, gap: h * 0.03, s, scale: built.k,
+    grid: { cols: 1, rows: 1, tileW: fig.w, tileH: fig.h },
+    slateRect: fig,
+    // No plate: the name is in the headline, and a plate under a bleeding
+    // cutout is a label stuck on a photograph.
+    tiles: hero ? [{ candidate: hero, x: fig.x, y: fig.y, w: fig.w, h: fig.h,
+                     photo: { ...fig }, plate: null }] : [],
+    deck: null,
+    copy: null,
+    mailPanel: null,
+    qr: null,
+    poster: {
+      col: { x: pad, y: top, w: colW, h: room },
+      bands: bands.items,
+      fig,
+      tall,
+      bar: barBand
+        ? { x: pad, y: barBand.y, w: Math.min(colW, barBand.block.w + barBand.block.px * 1.6),
+            h: barBand.h, block: barBand.block }
+        : null,
+    },
+    disclaimer: disc
+      ? { text: disc, px: discPx, x: pad, y: h - discPx * 0.95, w: w - pad * 2, centreOn: w / 2 }
+      : null,
+    warnings: [
+      ...(!hero ? ['A poster with nobody on it is a background.'] : []),
+      ...(!String(copy.headline || '').trim() ? ['A poster with no headline is a portrait.'] : []),
+      ...(slate.length > 1 && !wanted
+        ? [`${slate.length} on this slate and nobody picked, so the poster is `
+          + `${hero ? hero.name : 'the first name'}. Pick the subject under Spotlight on.`] : []),
+      ...(built.k < 0.55 ? ['The headline shrank past half to fit. A poster is read at a glance, so cut words.'] : []),
+      ...(dpi && built.entries[1].block.px / dpi < 0.5 && s / dpi >= 6
+        ? ['The headline is under half an inch on a printed poster.'] : []),
+    ],
+  };
+}
+
 /* ------------------------------------------------- the Granite Guarantee pair
  *
  * Two compositions that together make one mail piece. `promise` is the message
@@ -1687,7 +1848,7 @@ function solvePromise(spec, measure) {
   /* The caption strip is the foot of the card, not a band under it, so the card
    * stays one object. */
   const caption = String(copy.footer || '').trim();
-  const card = { x: cardX, y: cardY, w: cardW, h: cardH, r: w * 0.009 };
+  const card = { x: cardX, y: cardY, w: cardW, h: cardH };
   const barH = caption ? cardH * 0.128 : 0;
   const bar = caption ? { x: cardX, y: cardY + cardH - barH, w: cardW, h: barH } : null;
   const well = { x: cardX, y: cardY, w: cardW, h: cardH - barH };
@@ -1736,33 +1897,16 @@ function solvePromise(spec, measure) {
   const bands = stackBlocks(built.entries, top);
   const ruleW = w * 0.14205;
 
-  /* The faces, gridded inside the panel with their name plates, the same way
-   * every other layout in this app sets a slate. One candidate gets one big
-   * portrait, nine get a grid of nine, and the panel is the same box either
-   * way, so the programme looks like one programme across 174 districts. */
-  const plate = style.plate !== false;
-  const pgap = well.w * 0.045 * density;
-  const tileAR = tileAspect(style, plate);
-  const g = n ? bestGrid(n, well.w - pgap * 2, well.h - pgap * 2, pgap, plate, tileAR)
-    : { tileW: 0, cols: 1, rows: 1 };
-  const tileW = Math.min(g.tileW, well.w * 0.86);
-  const tileH = tileW * tileAR;
-  const gridH = g.rows * tileH + Math.max(0, g.rows - 1) * pgap;
-  const gy = well.y + (well.h - gridH) / 2;
-  const tiles = slate.map((c, i) => {
-    const col = i % g.cols;
-    const row = Math.floor(i / g.cols);
-    const inRow = Math.min(g.cols, n - row * g.cols);
-    const rowW = inRow * tileW + (inRow - 1) * pgap;
-    const x = well.x + (well.w - rowW) / 2 + col * (tileW + pgap);
-    const ty = gy + row * (tileH + pgap);
-    const photoH = tileW * PHOTO_AR;
-    return {
-      candidate: c, x, y: ty, w: tileW, h: tileH,
-      photo: { x, y: ty, w: tileW, h: photoH },
-      plate: plate ? { x, y: ty + photoH + tileW * 0.03, w: tileW, h: tileW * PLATE_AR } : null,
-    };
-  });
+  /* The faces, clustered inside the panel with the names under the group. */
+  const inset = well.w * 0.055 * density;
+  const cl = clusterFaces(measure, slate, {
+    x: well.x + inset, y: well.y + inset,
+    w: well.w - inset * 2, h: well.h - inset * 2,
+  }, s, { style, maxCols: 4 });
+  const tiles = cl.tiles;
+  const tileW = cl.tileW || 0;
+  const g = { cols: cl.cols || 1, rows: cl.rows || 1 };
+  const tileH = cl.tileH || 0;
 
   const capBlk = caption
     ? fitBlock(measure, caption, COND_SEMI, barH * 0.30, bar.w * 0.90, 1, 0.14, true)
@@ -1790,6 +1934,8 @@ function solvePromise(spec, measure) {
       bar,
       card,
       well,
+      names: cl.names.lines.length
+        ? { block: cl.names, x: well.x + well.w / 2, y: cl.namesY } : null,
       photo: photoRect,
       caption: capBlk.lines.length
         ? { block: capBlk, x: bar.x + bar.w / 2, y: bar.y + (bar.h - capBlk.h) / 2 }
@@ -2142,6 +2288,7 @@ function solveAll(spec, measure) {
   if (comp === 'typeled') return solveTypeLed(spec, measure);
   if (comp === 'promise') return solvePromise(spec, measure);
   if (comp === 'proof') return solveProof(spec, measure);
+  if (comp === 'poster') return solvePoster(spec, measure);
   if (!hasCopy) comp = 'slateOnly';
 
   // Reserve the disclaimer strip first. It is required on a finished ad under
