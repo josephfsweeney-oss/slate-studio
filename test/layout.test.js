@@ -1035,10 +1035,19 @@ test('the issue rounds argue on one side and carry the team on the other', () =>
       assert.ok(b.mark, `${where} has no mark`);
       assert.ok(CONTRAST_MARKS.includes(b.mark.id), `${where} asks for a mark called ${b.mark.id}`);
 
-      // The words and the mark stay out of each other.
-      assert.ok(b.col.x + b.col.w <= b.mark.rect.x + 1, `${where} the words run under the mark`);
-      assert.ok(b.mark.rect.x + b.mark.rect.w <= c.w, `${where} the mark runs off the paper`);
-      assert.ok(b.mark.rect.y + b.mark.rect.h <= b.cta.y + 1, `${where} the mark sits on the foot`);
+      /* A photograph is the ground of the piece, so the words sit on it and it
+       * runs the whole paper. A drawing has no ground, so it keeps a panel of
+       * its own and the words stay out of it. */
+      if (b.mark.art) {
+        assert.equal(b.mark.rect.x, 0, `${where} the photograph does not start at the edge`);
+        assert.equal(b.mark.rect.w, c.w, `${where} the photograph does not run the full width`);
+        assert.equal(b.mark.rect.h, c.h, `${where} the photograph does not run the full height`);
+        assert.ok(b.col.w < c.w * 0.7, `${where} the words take the whole width of the picture`);
+      } else {
+        assert.ok(b.col.x + b.col.w <= b.mark.rect.x + 1, `${where} the words run under the drawing`);
+        assert.ok(b.mark.rect.x + b.mark.rect.w <= c.w, `${where} the drawing runs off the paper`);
+        assert.ok(b.mark.rect.y + b.mark.rect.h <= b.cta.y + 1, `${where} the drawing sits on the foot`);
+      }
 
       // Nothing in the column lands on the foot.
       for (const at of [b.kicker, b.head, b.number, b.caption]) {

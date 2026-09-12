@@ -1673,19 +1673,27 @@ function paintContrast(ctx, plan, style, theme, assets, bleed = 0) {
    * the right, and the drawing only if there is not. */
   const shot = assets && assets.mark;
   if (c.mark && shot) {
+    /* Edge to edge, cropped rather than squashed, with a scrim that is heaviest
+     * on the left where the words are and lets go across the picture. */
     const r = c.mark.rect;
     ctx.save();
     ctx.beginPath();
-    ctx.rect(r.x, r.y - B, r.w + B, r.h + B);
+    ctx.rect(r.x - B, r.y - B, r.w + B * 2, r.h + B * 2);
     ctx.clip();
-    const k = Math.max((r.w + B) / shot.width, (r.h + B) / shot.height);
+    const k = Math.max((r.w + B * 2) / shot.width, (r.h + B * 2) / shot.height);
     const dw = shot.width * k;
     const dh = shot.height * k;
-    ctx.drawImage(shot, r.x + (r.w + B - dw) / 2, r.y - B + (r.h + B - dh) / 2, dw, dh);
+    ctx.drawImage(shot, r.x - B + (r.w + B * 2 - dw) / 2,
+      r.y - B + (r.h + B * 2 - dh) / 2, dw, dh);
+    const [gr, gg, gb] = hexToRgb(ground);
+    const scrim = ctx.createLinearGradient(r.x, 0, r.x + r.w, 0);
+    scrim.addColorStop(0, `rgba(${gr},${gg},${gb},.96)`);
+    scrim.addColorStop(0.46, `rgba(${gr},${gg},${gb},.90)`);
+    scrim.addColorStop(0.68, `rgba(${gr},${gg},${gb},.52)`);
+    scrim.addColorStop(1, `rgba(${gr},${gg},${gb},.30)`);
+    ctx.fillStyle = scrim;
+    ctx.fillRect(r.x - B, r.y - B, r.w + B * 2, r.h + B * 2);
     ctx.restore();
-    // A hairline of the ground down its left edge, so it reads as a panel.
-    ctx.fillStyle = accent;
-    ctx.fillRect(r.x, r.y - B, Math.max(2, w * 0.004), r.h + B);
   } else if (c.mark && MARKS[c.mark.id]) {
     ctx.save();
     MARKS[c.mark.id](ctx, c.mark.rect, ink, accent);

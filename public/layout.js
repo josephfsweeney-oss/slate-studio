@@ -2241,14 +2241,18 @@ function solveContrast(spec, measure) {
 
   /* The mark takes a third on the right. Anything narrower and a drawing reads
    * as a logo somebody forgot to move. */
+  /* A photograph takes the whole piece. The words sit on the left of it under a
+   * scrim that is heaviest where they are and lets go across the picture, so it
+   * is a photograph with an argument on it rather than a photograph in a box. A
+   * drawing, having no ground of its own, still stands in a panel on the right.
+   */
+  const art = String(style.markArt || '');
   const markW = inner.w * 0.30;
   const markX = inner.x + inner.w - markW;
-  /* A photograph earns the whole corner: it runs off the top and the right of
-   * the paper and stops on the foot. A picture with a margin round it on three
-   * sides is a picture somebody was nervous about. */
-  const mark = { id: String(style.mark || ''), art: String(style.markArt || ''),
-    rect: { x: markX, y: box.y, w: w - markX, h: Math.max(1, footTop - box.y) } };
-  const colW = mark.id || mark.art ? inner.w - markW - gutter : inner.w;
+  const mark = { id: String(style.mark || ''), art,
+    rect: art ? { x: box.x, y: box.y, w, h }
+      : { x: markX, y: box.y, w: w - markX, h: Math.max(1, footTop - box.y) } };
+  const colW = art ? inner.w * 0.62 : (mark.id ? inner.w - markW - gutter : inner.w);
 
   const kick = fitInside(measure, copy.kicker, COND_BOLD, box.h * 0.038 * density,
     colW, 2, 0.16, true);

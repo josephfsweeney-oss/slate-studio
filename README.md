@@ -577,8 +577,14 @@ people on it, and it carries a drawing rather than a photograph:
 | Lower Health Care Costs | `redacted` | An invoice with the prices taken out |
 | Parents Decide | `door` | The schoolhouse door, with somebody standing in it |
 
-The marks are geometry in `public/render.js`, not photographs and not generated
-art. A photograph of a tax form is a photograph. A drawing of one is an
+Each of those is a photograph now, edge to edge: the picture is the ground of
+the piece, and the words sit on the left of it under a scrim that is heaviest
+where they are and lets go across the picture. The drawings stay in
+`public/render.js` as the fallback when no photograph is loaded, and a round
+that asks for a drawing rather than a photograph gets a panel on the right
+instead of a ground.
+
+The marks are geometry, not photographs and not generated art. A photograph of a tax form is a photograph. A drawing of one is an
 argument, it costs nothing, it carries no licence, and it is as sharp at 300 dpi
 as at 72.
 
