@@ -2,11 +2,15 @@
 .slate-studio/
 .env
 
-# Service-account keys. One was committed once; never again.
+# Credential JSON. A service-account key was committed once; never again.
+# Narrow enough to still let the app's own data through: a blanket *.json rule
+# silently swallowed data/cutouts.json and shipped a deploy with no portraits.
 *.json
 !package.json
 !package-lock.json
 !vercel.json
+!data/*.json
+!.vscode/*.json
 
 dist/
 node_modules/
