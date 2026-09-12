@@ -696,7 +696,7 @@ function openPhotoEditor(name) {
   if (!n) return;
   Object.assign(ed, {
     name: n.name, slug: n.slug, img: null, view: null, base: 1,
-    knockout: false, tol: 34, sourceName: '', token: ed.token + 1,
+    knockout: false, tol: 34, sourceName: '', reframing: false, token: ed.token + 1,
   });
   $('#photo-who').textContent = n.name;
   $('#photo-file').value = '';
@@ -704,6 +704,30 @@ function openPhotoEditor(name) {
   $('#photo-tol').value = '34';
   edStatus('');
   $('#photo').hidden = false;
+  syncEditor();
+  loadForReframe(n, ed.token);
+}
+
+/* The portrait already on file, opened for editing rather than only for
+ * looking at.
+ *
+ * The zoom and the drag used to appear the moment somebody picked a new file
+ * and never otherwise, so a photo that was already in the app could not be
+ * re-framed at all: the only way to move a face up an inch was to find the
+ * original and upload it again. It is loaded into the editor now, at the frame
+ * it is already at, and the knockout is off, because a cutout that ships with
+ * the app has been cut out once already and doing it twice eats the edges. */
+async function loadForReframe(n, token) {
+  const img = await portraitImage(n);
+  if (!img || token !== ed.token || ed.img) return;
+  ed.img = img;
+  ed.reframing = true;
+  ed.sourceName = '';
+  ed.base = photos.minScale(img);
+  ed.view = photos.clampView(img, photos.defaultView(img));
+  ed.knockout = false;
+  $('#photo-knockout').checked = false;
+  $('#photo-zoom').value = '1';
   syncEditor();
 }
 
@@ -722,7 +746,7 @@ function syncEditor() {
 
   $('#photo-zoom-wrap').hidden = !picking;
   $('#photo-tol-wrap').hidden = !picking || !ed.knockout;
-  $('#photo-knockout').closest('.inline').hidden = !picking;
+  // (set below, once the re-framing case is known)
   $('#photo-use').hidden = !picking;
   $('#photo-download').hidden = !picking && !mine;
   $('#photo-default').hidden = !canWrite || (!picking && !mine);
@@ -731,12 +755,18 @@ function syncEditor() {
   // The label's text, not the label's contents: the file input lives in there
   // and replacing textContent would throw it away.
   $('#photo-pick-label').textContent = picking || (n && hasFace(n)) ? 'Choose another file' : 'Choose a photo';
+  // Re-framing a cutout that is already cut out only takes more off it.
+  $('#photo-knockout').closest('.inline').hidden = !picking || ed.reframing;
   $('#photo-pick').className = picking ? 'pick ghost' : 'pick primary';
 
   $('#photo-sub').textContent = picking
-    ? 'Drag to move it, scroll or use the slider to zoom. The frame is the 4:5 tile the slate uses.'
+    ? (ed.reframing
+      ? 'Drag to move it, scroll or use the slider to zoom, then Use it. The frame is '
+        + 'the 4:5 tile the slate uses.'
+      : 'Drag to move it, scroll or use the slider to zoom. The frame is the 4:5 tile the slate uses.')
     : mine
-      ? `Your photo. It is on every canvas for ${ed.name} in this browser, and nowhere else yet.`
+      ? `Your photo, in this browser only. Download for the repo, commit it to `
+        + 'public/cutouts, and everybody has it.'
       : n && hasFace(n)
         ? 'The portrait that ships with the app.'
         // A topper points at where its portrait will be, so asking whether the
@@ -745,7 +775,7 @@ function syncEditor() {
           ? `No portrait for ${ed.name} yet. Add one and it is on every piece.`
           : 'No headshot was ever sent, so this candidate shows as PHOTO NEEDED.';
 
-  $('#photo-knock-note').hidden = !picking;
+  $('#photo-knock-note').hidden = !picking || ed.reframing;
   $('#photo-knock-note').textContent = ed.knockout
     ? 'Clearing everything that touches the edge of the frame and matches the corners. Works on a plain wall or a studio backdrop. Slide Edge up if a rim is left, down if it is eating the candidate.'
     : 'Leave this off for a photo already cut out, or one shot somewhere busy.';
@@ -872,6 +902,7 @@ async function pickPhotoFile(file) {
   const { img, error } = await decodeFile(file);
   if (error) return edStatus(error, true);
   ed.img = img;
+  ed.reframing = false;
   ed.sourceName = file.name;
   ed.base = photos.minScale(img);
   ed.view = photos.clampView(img, photos.defaultView(img));
@@ -936,8 +967,9 @@ async function downloadForRepo() {
   const file = await currentFile();
   if (!file) return;
   download(file.blob, photos.cutoutName(ed.slug, file.ext));
-  notice(`Saved as ${ed.slug}.${file.ext}. Put it in public/cutouts/, run npm run index:cutouts, `
-    + 'then commit both and push.');
+  notice(`Saved as ${ed.slug}.${file.ext}. That filename is the candidate slug, so leave it `
+    + 'alone. Put it in public/cutouts/, run npm run index:cutouts, then commit both and '
+    + 'push. Vercel redeploys on its own and everybody has it.');
 }
 
 async function removePhoto() {
@@ -972,9 +1004,22 @@ function renderPhotoBank() {
   bank.hidden = overrides.size === 0;
   if (!overrides.size) return;
   const n = overrides.size;
+  /* Say plainly why they are stuck here and what moves them.
+   *
+   * A photo dropped in on the hosted copy lives in this browser's own storage
+   * and nowhere else, because a hosted copy has no disk it is allowed to write
+   * to. The only thing that puts a portrait in front of everybody is the file
+   * landing in public/cutouts in the repository, which is one download and one
+   * commit away. Somebody asked how to share them, which means the app was not
+   * saying it. */
   $('#photo-bank-count').textContent =
-    `${n} photo${n > 1 ? 's' : ''} you added, in this browser only. `
-    + 'They are not in the app for anybody else yet.';
+    `${n} photo${n > 1 ? 's' : ''} you added, in this browser and nowhere else. `
+    + (state.server.canWriteCutouts
+      ? 'Make them the defaults writes them into public/cutouts here.'
+      : 'A hosted copy cannot write to disk, so nobody else can see them yet. '
+        + 'Download them for the repo gives you a zip of the files, named the way '
+        + 'the roster expects, with the three steps in it. Commit that and everybody '
+        + 'has them.');
   $('#photos-default').hidden = !state.server.canWriteCutouts;
 }
 

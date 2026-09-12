@@ -655,3 +655,37 @@ name, in ballot order, in 174 districts, and be right every time. Deterministic
 layout is the whole reason this exists. Read the rule as covering illustrative
 graphics for the sites, and this as a different tool, or tell me otherwise and
 we will talk about what that means.
+
+## Photos
+
+Click the **+** beside a name on the Slate panel and the editor opens with
+whatever portrait is on file already loaded. Drag to move it, scroll or use the
+slider to zoom, then **Use this photo**. The frame is the 4:5 tile the slate
+uses. That works on a portrait that ships with the app as much as on one you
+have just chosen, which it did not before: the zoom only appeared for a newly
+picked file, so the only way to move a face up an inch was to find the original
+and upload it again.
+
+The knockout stays off while re-framing. A cutout that ships with the app has
+been cut out once already and doing it twice eats the edges.
+
+### Getting a photo you added in front of everybody
+
+A photo dropped into the hosted copy lives in that browser's own storage and
+nowhere else. A hosted copy has no disk it is allowed to write to, so there is
+nothing it could do with the file even if it wanted to.
+
+One download and one commit moves it:
+
+1. **Download them for the repo** in the photo bank, or **Download for the repo**
+   in the editor for one. You get the files named the way the roster expects,
+   with the steps in the zip.
+2. Copy them into `public/cutouts/`.
+3. `npm run index:cutouts` — that rewrites `data/cutouts.json`, which is how a
+   hosted copy finds them.
+4. Commit both and push. Vercel redeploys on its own.
+
+The filenames are candidate slugs. Leave them exactly as they are.
+
+Running the app locally against a writable checkout, **Make them the defaults**
+does steps 1 to 3 for you and you only have to commit.

@@ -1,5 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
+import { ROOT } from '../server/config.js';
 import { solve, bestGrid, PHOTO_AR, PLATE_AR, COMPOSITIONS } from '../public/layout.js';
 import { nameParts, slugify } from '../public/names.js';
 import { fillTokens, CANVASES, TEMPLATES } from '../public/presets.js';
@@ -970,4 +973,30 @@ test('the name band says every name the same way, and never drops a surname', ()
         `${n} names: ${f.name.text} is set wider than the cell it is under`);
     }
   }
+});
+
+/* --------------------------------------------------------------- portraits */
+
+test('a photo already on file can be re-framed, not only a newly picked one', async () => {
+  /* The zoom and the drag used to appear the moment somebody picked a new file
+   * and never otherwise, so the only way to move a face up an inch in an
+   * existing portrait was to find the original and upload it again. The editor
+   * loads what is on file, which means every control it has works on it. */
+  const src = fs.readFileSync(path.join(ROOT, 'public', 'app.js'), 'utf8');
+  assert.match(src, /function loadForReframe\b/, 'the editor never loads what is on file');
+  assert.match(src, /loadForReframe\(n, ed\.token\)/, 'opening the editor does not load it');
+  // The knockout is off while re-framing: a cutout cut out twice loses its edges.
+  assert.match(src, /ed\.reframing = true;[\s\S]{0,200}ed\.knockout = false;/,
+    're-framing turns the knockout on');
+  assert.match(src, /\$\('#photo-knockout'\)\.closest\('\.inline'\)\.hidden = !picking \|\| ed\.reframing;/,
+    'the knockout is still offered while re-framing');
+});
+
+test('the app says where an uploaded photo lives and how to share it', async () => {
+  const src = fs.readFileSync(path.join(ROOT, 'public', 'app.js'), 'utf8');
+  // A photo dropped in on a hosted copy is in one browser's storage and nowhere
+  // else. Somebody asked how to share them, which means the app was not saying.
+  assert.match(src, /in this browser and nowhere else/);
+  assert.match(src, /public\/cutouts/);
+  assert.match(src, /npm run index:cutouts/);
 });
