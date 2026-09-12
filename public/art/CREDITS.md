@@ -19,6 +19,26 @@ from, and "we do not know" is not an answer.
 | `town.webp` | The Close | Main Street, Nashua, New Hampshire | Seth Dewey | https://unsplash.com/photos/EOlo15oy8Ks |
 | `portsmouth.webp` | Shared back | New Hampshire village from the air | Andri Kyrychok | https://unsplash.com/photos/wSqzNP1fsHw |
 
+## The contrast sides
+
+Six more, one for each issue round's message side. These are the photographs the
+argument is made against, and they are deliberately not the photograph on the
+other side of the same piece.
+
+| File | Round | Photograph | Photographer | Source |
+|---|---|---|---|---|
+| `c-tax.webp` | No Income Tax | A 1040 with a calculator on it | Kelly Sikkema | https://unsplash.com/photos/S0II1AQa9GI |
+| `c-house.webp` | Cap Your School Tax | A suburban house and lawn | Kellen Riggin | https://unsplash.com/photos/VZJ1BnsMTb4 |
+| `c-build.webp` | Free Market Housing | A row of townhouses under construction | Ernie Journeys | https://unsplash.com/photos/JqZlFnJ-KpE |
+| `c-meters.webp` | Lower Energy Bills | Five electric meters on a brick wall | ABDURREHMAN | https://unsplash.com/photos/veAjsOjXpvQ |
+| `c-hospital.webp` | Lower Health Care Costs | A hospital corridor with a gurney in it | Miguel Ausejo | https://unsplash.com/photos/vsSu0oGtLoI |
+| `c-classroom.webp` | Parents Decide | An empty classroom with desks and a chalkboard | Ivan Aleksic | https://unsplash.com/photos/PDRFeeDniCk |
+
+Two were rejected and are worth recording so nobody puts them back. A "SOLD"
+sign that carried a real estate agency's brand and logo: a living business does
+not belong on political mail without its say-so. And a letter box that was not
+an American one, which anybody in New Hampshire would have spotted.
+
 Three of the nine were taken in New Hampshire: the State House in Concord, Main
 Street in Nashua, and the village aerial, whose photographer works out of
 Hillsborough. The other six are subject photographs and were chosen for the

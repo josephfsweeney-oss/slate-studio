@@ -1658,7 +1658,7 @@ const MARKS = {
 
 /* The message side of an issue round, with nobody's face on it. Dark on
  * purpose: it must not look like the side with the people on it. */
-function paintContrast(ctx, plan, style, theme, bleed = 0) {
+function paintContrast(ctx, plan, style, theme, assets, bleed = 0) {
   const c = plan.contrast;
   const { w, h } = plan.canvas;
   const B = bleed;
@@ -1669,7 +1669,24 @@ function paintContrast(ctx, plan, style, theme, bleed = 0) {
   ctx.fillStyle = ground;
   ctx.fillRect(-B, -B, w + B * 2, h + B * 2);
 
-  if (c.mark && MARKS[c.mark.id]) {
+  /* A photograph if there is one, cropped to the panel and bled off the top and
+   * the right, and the drawing only if there is not. */
+  const shot = assets && assets.mark;
+  if (c.mark && shot) {
+    const r = c.mark.rect;
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(r.x, r.y - B, r.w + B, r.h + B);
+    ctx.clip();
+    const k = Math.max((r.w + B) / shot.width, (r.h + B) / shot.height);
+    const dw = shot.width * k;
+    const dh = shot.height * k;
+    ctx.drawImage(shot, r.x + (r.w + B - dw) / 2, r.y - B + (r.h + B - dh) / 2, dw, dh);
+    ctx.restore();
+    // A hairline of the ground down its left edge, so it reads as a panel.
+    ctx.fillStyle = accent;
+    ctx.fillRect(r.x, r.y - B, Math.max(2, w * 0.004), r.h + B);
+  } else if (c.mark && MARKS[c.mark.id]) {
     ctx.save();
     MARKS[c.mark.id](ctx, c.mark.rect, ink, accent);
     ctx.restore();
@@ -1804,7 +1821,7 @@ export function paint(ctx, plan, style, assets = {}, copy = {}, bleed = 0) {
     for (const tile of plan.tiles) paintTile(ctx, tile, plan, style, assets, theme);
     paintTypeLed(ctx, plan, style, theme);
   } else if (plan.contrast) {
-    paintContrast(ctx, plan, style, theme, bleed);
+    paintContrast(ctx, plan, style, theme, assets, bleed);
   } else if (plan.band) {
     paintSlateBand(ctx, plan, style, theme, assets, bleed);
   } else if (plan.poster) {

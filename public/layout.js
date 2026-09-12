@@ -2242,10 +2242,13 @@ function solveContrast(spec, measure) {
   /* The mark takes a third on the right. Anything narrower and a drawing reads
    * as a logo somebody forgot to move. */
   const markW = inner.w * 0.30;
-  const mark = { id: String(style.mark || ''),
-    rect: { x: inner.x + inner.w - markW, y: inner.y,
-            w: markW, h: Math.max(1, footTop - inner.y - box.h * 0.03) } };
-  const colW = mark.id ? inner.w - markW - gutter : inner.w;
+  const markX = inner.x + inner.w - markW;
+  /* A photograph earns the whole corner: it runs off the top and the right of
+   * the paper and stops on the foot. A picture with a margin round it on three
+   * sides is a picture somebody was nervous about. */
+  const mark = { id: String(style.mark || ''), art: String(style.markArt || ''),
+    rect: { x: markX, y: box.y, w: w - markX, h: Math.max(1, footTop - box.y) } };
+  const colW = mark.id || mark.art ? inner.w - markW - gutter : inner.w;
 
   const kick = fitInside(measure, copy.kicker, COND_BOLD, box.h * 0.038 * density,
     colW, 2, 0.16, true);
@@ -2299,7 +2302,7 @@ function solveContrast(spec, measure) {
       head: place(head, box.h * 0.022),
       number: place(num, box.h * 0.016),
       caption: place(cap, box.h * 0.018),
-      mark: mark.id ? mark : null,
+      mark: mark.id || mark.art ? mark : null,
       source: srcBlk.lines.length
         ? { block: srcBlk, y: footTop } : null,
       cta: ctaBlk.lines.length
@@ -2315,7 +2318,7 @@ function solveContrast(spec, measure) {
         ? ['No source line. A side that attacks a record and does not cite it is a '
           + 'side you cannot defend. Put the bill number and the roll call on it.'] : []),
       ...(head.truncated ? ['The headline is longer than three lines will hold.'] : []),
-      ...(dpi && mark.id && !CONTRAST_MARKS.includes(mark.id)
+      ...(dpi && mark.id && !mark.art && !CONTRAST_MARKS.includes(mark.id)
         ? [`There is no mark called ${mark.id}. The column will print empty.`] : []),
     ],
   };

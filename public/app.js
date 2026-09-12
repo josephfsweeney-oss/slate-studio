@@ -5,7 +5,7 @@ import {
   CANVASES, TEMPLATES, PALETTES, GROUNDS, TOKENS, TOPPERS,
   fillTokens, buildFilename, buildName, canvasById, topperById,
 } from './presets.js';
-import { MAIL_PROGRAMS, MAIL_VARS, SHARED_BACK, SHARED_BACK_ART, SIDE_COMMON, artUrl, sideCopyFor,
+import { MAIL_PROGRAMS, MAIL_VARS, SHARED_BACK, SHARED_BACK_ART, SIDE_COMMON, artUrl, contrastArtUrl, sideCopyFor,
   programById, pieceById, sideStyle } from './mailers.js';
 import { makeZip } from './zip.js';
 import * as gh from './github.js';
@@ -1258,6 +1258,10 @@ async function loadProgrammeArt(piece) {
     try { return await loadImage(url); } catch { return null; }
   };
   if (!$('#hero-file').value) assets.hero = await load(artUrl(piece));
+  /* The photograph that stands in the contrast side's panel. It is a different
+   * picture from the one behind the slate, on purpose: the two sides of a round
+   * argue different things. */
+  assets.mark = await load(contrastArtUrl(piece));
   if (!$('#evidence-file').value) {
     assets.evidence = state.mail.sharedBack ? await load(SHARED_BACK_ART) : null;
   }

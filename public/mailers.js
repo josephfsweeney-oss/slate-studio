@@ -71,6 +71,7 @@ export const MAIL_PROGRAMS = [{
       id: 'income-tax', art: 'statehouse', n: 2, label: 'No Income Tax',
       contrast: {
         mark: 'form',
+        art: 'c-tax',
         kicker: 'The income tax ban died in the House',
         headline: 'They Would Not Close The Door',
         number: '43',
@@ -90,6 +91,7 @@ export const MAIL_PROGRAMS = [{
       id: 'school-tax', art: 'home', n: 3, label: 'Cap Your School Tax',
       contrast: {
         mark: 'stairs',
+        art: 'c-house',
         kicker: 'Your school tax has no ceiling',
         headline: 'It Climbs Every Single Year',
         number: '',
@@ -109,6 +111,7 @@ export const MAIL_PROGRAMS = [{
       id: 'housing', art: 'framing', n: 4, label: 'Free Market Housing',
       contrast: {
         mark: 'sold',
+        art: 'c-build',
         kicker: 'Nothing got built',
         headline: 'Priced Out Of The Town They Grew Up In',
         number: '15',
@@ -128,6 +131,7 @@ export const MAIL_PROGRAMS = [{
       id: 'energy', art: 'grid', n: 5, label: 'Lower Energy Bills',
       contrast: {
         mark: 'meter',
+        art: 'c-meters',
         kicker: 'What you pay for the same electricity',
         headline: 'Over The Country. Every Month.',
         number: '27%',
@@ -147,6 +151,7 @@ export const MAIL_PROGRAMS = [{
       id: 'health', art: 'bill', n: 6, label: 'Lower Health Care Costs',
       contrast: {
         mark: 'redacted',
+        art: 'c-hospital',
         kicker: 'They kept the prices out of sight',
         headline: 'You Were Never Meant To See The Bill',
         number: '',
@@ -166,6 +171,7 @@ export const MAIL_PROGRAMS = [{
       id: 'parents', art: 'family', n: 7, label: 'Parents Decide',
       contrast: {
         mark: 'door',
+        art: 'c-classroom',
         kicker: 'HB 115, on Education Freedom Accounts',
         headline: 'Not One Democrat Voted Yes',
         number: '0',
@@ -225,6 +231,7 @@ export function sideStyle(piece, side, useContrast) {
       ...LOOK,
       composition: 'contrast',
       mark: piece.contrast.mark || '',
+      markArt: piece.contrast.art || '',
       mailPanel: 'none',
     };
   }
@@ -244,6 +251,10 @@ export function sideCopyFor(piece, side, useContrast) {
 
 /** The bundled photograph for a piece, or null. */
 export const artUrl = (piece) => (piece && piece.art ? `/art/${piece.art}.webp` : null);
+
+/** The photograph that stands in the contrast side's panel, or null. */
+export const contrastArtUrl = (piece) =>
+  (piece && piece.contrast && piece.contrast.art ? `/art/${piece.contrast.art}.webp` : null);
 
 /* One back for the whole drop.
  *
