@@ -182,7 +182,156 @@ function idealTile(n, s) {
 
 /* ----------------------------------------------------------------- the solve */
 
-const COMPOSITIONS = ['stack', 'banner', 'split', 'slateOnly'];
+const COMPOSITIONS = ['stack', 'banner', 'split', 'slateOnly', 'palmcard'];
+
+/* The palm card is a designed template rather than a solved one: a fixed stack
+ * of bands, in a fixed order, the way a rack card is read top to bottom. The
+ * faces take whatever the copy does not. Proportions follow the 4.25 x 11 card
+ * this was modelled on. */
+const PALM = {
+  askGap: 0.012,      // fractions of the card height
+  stripGap: 0.014,
+  bandMin: 0.15,      // the event band never gets thinner than this
+  bandMax: 0.24,
+  panelMin: 0.24,     // nor the faces panel
+};
+
+/* ------------------------------------------------------------- palm card --- */
+
+/** A vertical stack of bands. Everything is measured, then the faces take the
+ *  remainder, so a longer headline costs the portraits height rather than
+ *  pushing the footer off the bottom of the card. */
+function solvePalmCard(spec, measure) {
+  const { w, h } = spec.canvas;
+  const slate = spec.slate || [];
+  const n = slate.length;
+  const style = spec.style || {};
+  const copy = spec.copy || {};
+  const s = Math.min(w, h);
+  const density = style.density ?? 1;
+
+  const pad = w * 0.052 * density;
+  const gap = w * 0.030 * density;
+  const inner = w - pad * 2;
+
+  const disc = (copy.disclaimer || '').trim();
+  const discPx = Math.max(11, w * 0.0155);
+  const footerH = disc ? discPx * 2.9 : 0;
+
+  // Masthead. The headline is the loudest thing on the card.
+  const head = fitBlock(measure, copy.headline, ANTON, w * 0.082, inner, 4, -0.01, true);
+  const kick = fitBlock(measure, copy.kicker, COND_BOLD, w * 0.030, inner, 2, 0.16, true);
+  const mastH = (kick.h ? kick.h + h * 0.006 : 0) + head.h + h * 0.016;
+
+  // The ask: the one sentence a voter has to take away.
+  const ask = fitBlock(measure, copy.subhead, COND_SEMI, w * 0.042, inner, 3, 0.005, false);
+  const askH = ask.h ? ask.h + h * PALM.askGap : 0;
+
+  // The values strip, set on two lines the way the card it copies does.
+  const vals = String(copy.values || '').split(/[\n,]/).map((v) => v.trim()).filter(Boolean);
+  const strip = vals.length
+    ? fitBlock(measure, pairUp(vals), COND_BOLD, w * 0.040, inner, 3, 0.06, true)
+    : { lines: [], h: 0, px: 0 };
+  const stripH = strip.h ? strip.h + h * 0.030 : 0;
+
+  // The event band carries when and where, together, at the foot of the card.
+  const evLines = [copy.cta, copy.details].map((x) => String(x || '').trim()).filter(Boolean);
+  const ev = evLines.length ? Math.min(h * PALM.bandMax,
+    Math.max(h * PALM.bandMin, h * 0.045 * (String(copy.details || '').split('\n').length + 2))) : 0;
+
+  // Whatever is left is the faces panel.
+  let panelH = h - pad * 2 - mastH - askH - stripH - ev - footerH - gap;
+  const shortfall = Math.max(0, h * PALM.panelMin - panelH);
+  panelH = Math.max(h * PALM.panelMin * 0.72, panelH);
+
+  let y = pad;
+  const mast = { x: pad, y, w: inner, h: mastH, kicker: kick, headline: head };
+  y += mastH;
+  const askBand = { x: pad, y, w: inner, h: askH, block: ask };
+  y += askH;
+  const panel = { x: pad * 0.45, y, w: w - pad * 0.9, h: panelH };
+  y += panelH + gap;
+  const stripBand = { x: pad, y, w: inner, h: stripH, block: strip };
+  y += stripH;
+  const event = { x: 0, y: h - footerH - ev, w, h: ev };
+
+  // Faces inside the panel, with room under each for a name plate and a tagline.
+  const hasTags = slate.some((c) => (c.tag || '').trim());
+  const tileAR = PHOTO_AR + PLATE_AR + (hasTags ? 0.22 : 0);
+  const pin = panel.h - gap * 1.2;
+  const g = bestGrid(n, panel.w - gap * 1.2, pin, gap, false, tileAR);
+  const tileW = Math.min(g.tileW, panel.w * 0.46);
+  const tileH = tileW * tileAR;
+  const gridH = g.rows * tileH + (g.rows - 1) * gap;
+  const gy = panel.y + (panel.h - gridH) / 2;
+
+  const tiles = slate.map((c, i) => {
+    const col = i % g.cols, row = Math.floor(i / g.cols);
+    const inRow = Math.min(g.cols, n - row * g.cols);
+    const rowW = inRow * tileW + (inRow - 1) * gap;
+    const x = panel.x + (panel.w - rowW) / 2 + col * (tileW + gap);
+    const ty = gy + row * (tileH + gap);
+    const photoH = tileW * PHOTO_AR;
+    const plateH = tileW * PLATE_AR;
+    return {
+      candidate: c, x, y: ty, w: tileW, h: tileH,
+      photo: { x, y: ty, w: tileW, h: photoH },
+      plate: { x, y: ty + photoH + tileW * 0.030, w: tileW, h: plateH },
+      tag: hasTags ? { x, y: ty + photoH + tileW * 0.030 + plateH + tileW * 0.028, w: tileW } : null,
+    };
+  });
+
+  return {
+    canvas: { w, h },
+    composition: 'palmcard',
+    pad, gap, s,
+    scale: 1,
+    grid: { cols: g.cols, rows: g.rows, tileW, tileH },
+    slateRect: panel,
+    tiles,
+    deck: null,
+    copy: null,
+    mailPanel: null,
+    palm: { mast, ask: askBand, panel, strip: stripBand, event, hasTags,
+            date: String(copy.cta || '').trim(), where: String(copy.details || '').trim() },
+    disclaimer: disc
+      ? { text: disc, px: discPx, x: pad, y: h - discPx * 1.0, w: inner, centreOn: w / 2 }
+      : null,
+    warnings: [
+      ...(head.truncated ? ['The headline is too long for the card and was cut. Shorten it.'] : []),
+      ...(ask.truncated ? ['The ask is too long for the card and was cut.'] : []),
+      ...(shortfall > h * 0.04 ? ['The copy is crowding the portraits. Cut a line somewhere.'] : []),
+      ...(vals.length > 6 ? ['More than six values will not fit the strip.'] : []),
+    ],
+  };
+}
+
+/** Two per line, the way the strip on the reference card is set. */
+function pairUp(values) {
+  const out = [];
+  for (let i = 0; i < values.length; i += 2) out.push(values.slice(i, i + 2).join('   ·   '));
+  return out.join('\n');
+}
+
+/** Wrap `text` at `px`, shrinking until it fits `maxLines`. */
+function fitBlock(measure, text, font, px, maxW, maxLines, ls, upper) {
+  const raw = String(text || '').trim();
+  if (!raw) return { lines: [], h: 0, px: 0, font, ls };
+  const paras = raw.split('\n').map((t) => (upper ? t.toUpperCase() : t));
+  let size = px;
+  let lines;
+  const floor = px * 0.5;
+  for (;;) {
+    lines = [];
+    for (const p of paras) lines.push(...balancedWrap(measure, p, font, size, ls, maxW));
+    if (lines.length <= maxLines || size <= floor) break;
+    size *= 0.94;
+  }
+  const truncated = lines.length > maxLines;
+  if (truncated) lines = lines.slice(0, maxLines);
+  const lh = size * (font === ANTON ? 0.98 : 1.2);
+  return { lines, px: size, lh, h: lh * lines.length, font, ls, truncated };
+}
 
 function autoComposition(w, h, n, hasCopy) {
   if (!hasCopy) return 'slateOnly';
@@ -255,6 +404,7 @@ export function solve(spec, measure) {
 
   let comp = style.composition && style.composition !== 'auto' ? style.composition : autoComposition(w, h, n, hasCopy);
   if (!COMPOSITIONS.includes(comp)) comp = 'stack';
+  if (comp === 'palmcard') return solvePalmCard(spec, measure);
   if (!hasCopy) comp = 'slateOnly';
 
   // Reserve the disclaimer strip first. It is required on a finished ad under

@@ -194,3 +194,57 @@ test('the 6x9 postcard is gone and 11x5.5 is there', () => {
   assert.equal(mail.h, 1650);
   assert.equal(mail.w / mail.h, 2, '11 by 5.5 is exactly 2:1');
 });
+
+test('the palm card is a 4.25 by 11 stack that always leaves room for the footer', () => {
+  const copy = {
+    kicker: 'Hillsborough District 29',
+    headline: "Goffstown's Republican team",
+    subhead: 'Four seats. One team. Vote for all four.',
+    values: 'No new taxes, Safer streets, Parents decide, Lower energy bills',
+    cta: 'Vote Tuesday, November 3',
+    details: 'Goffstown High School\nPolls open 7 am to 7 pm',
+    disclaimer: 'Paid for by Committee to Elect House Republicans, Concord NH.',
+  };
+  for (const n of [1, 2, 3, 4, 6, 9]) {
+    const p = solve({ canvas: { w: 1275, h: 3300 }, slate: slate(n), copy,
+      style: { composition: 'palmcard' } }, measure);
+    assert.equal(p.composition, 'palmcard');
+    assert.ok(p.palm, 'the plan describes its bands');
+    // The bands stay in order and inside the card.
+    const { mast, ask, panel, strip, event } = p.palm;
+    assert.ok(mast.y >= 0);
+    assert.ok(ask.y >= mast.y + mast.h - 1, `n=${n}: the ask overlaps the masthead`);
+    assert.ok(panel.y >= ask.y + ask.h - 1, `n=${n}: the panel overlaps the ask`);
+    assert.ok(strip.y >= panel.y + panel.h - 1, `n=${n}: the strip overlaps the panel`);
+    assert.ok(event.y + event.h <= 3300 + 1, `n=${n}: the event band runs off the card`);
+    // The paid-for line is the thing that went missing on the card this copies.
+    assert.ok(p.disclaimer, `n=${n}: no disclaimer`);
+    assert.ok(p.disclaimer.y <= 3300, `n=${n}: the disclaimer is off the bottom`);
+    assert.ok(p.disclaimer.y > event.y + event.h - 1,
+      `n=${n}: the disclaimer is under the event band, where it cannot be read`);
+    for (const t of p.tiles) {
+      assert.ok(t.y >= panel.y - 1 && t.y + t.h <= panel.y + panel.h + 1,
+        `n=${n}: a portrait is outside the panel`);
+    }
+  }
+});
+
+test('a palm card with taglines leaves room under each plate for one', () => {
+  const withTags = solve({ canvas: { w: 1275, h: 3300 },
+    slate: slate(4).map((c) => ({ ...c, tag: 'Selectman' })),
+    copy: { headline: 'Team', disclaimer: 'x' }, style: { composition: 'palmcard' } }, measure);
+  const without = solve({ canvas: { w: 1275, h: 3300 }, slate: slate(4),
+    copy: { headline: 'Team', disclaimer: 'x' }, style: { composition: 'palmcard' } }, measure);
+  assert.ok(withTags.tiles[0].tag, 'a tagline slot is reserved');
+  assert.equal(without.tiles[0].tag, null, 'and not reserved when nobody has one');
+  assert.ok(withTags.grid.tileW <= without.grid.tileW,
+    'the tagline comes out of the tile, not out of the card');
+});
+
+test('the 4.25 by 11 palm card replaced the 5.5 by 8.5 one', () => {
+  const palm = CANVASES.find((c) => c.id === 'palm');
+  assert.equal(palm.w, 1275);
+  assert.equal(palm.h, 3300);
+  assert.equal(palm.w / 300, 4.25);
+  assert.equal(palm.h / 300, 11);
+});

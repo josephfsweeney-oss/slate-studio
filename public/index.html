@@ -54,6 +54,7 @@
     <div class="actions">
       <button id="btn-png" class="primary">Download PNG</button>
       <button id="btn-2x" class="ghost">Download @2x</button>
+      <button id="btn-print" class="ghost" title="Trim size plus bleed and crop marks">Print ready</button>
       <button id="btn-drive" class="ghost">Save to Drive</button>
       <button id="btn-copy" class="ghost">Copy image</button>
       <button id="btn-cycle" class="ghost" title="Cycle the colour combinations (press C)">Colors: Granite Guarantee</button>
@@ -88,6 +89,8 @@
       <label class="f">Subhead <textarea id="c-subhead" rows="2"></textarea></label>
       <label class="f">Details <textarea id="c-details" rows="3" placeholder="One line per line break"></textarea></label>
       <label class="f">Call to action <input id="c-cta" placeholder="Vote Tuesday, November 3"></label>
+      <label class="f" id="values-wrap" hidden>Values strip <span class="hint">the issue words, comma separated</span>
+        <input id="c-values" placeholder="No new taxes, Safer streets, Parents decide, Lower energy bills"></label>
       <label class="f">Footer <input id="c-footer" placeholder="Website or handle"></label>
       <div id="mail-fields" hidden>
         <label class="f">Return address <textarea id="c-returnAddress" rows="3"></textarea></label>
@@ -126,6 +129,7 @@
           <option value="banner">Copy below the faces</option>
           <option value="split">Copy beside the faces</option>
           <option value="slateOnly">Faces only</option>
+          <option value="palmcard">Palm card, 4.25 x 11</option>
         </select>
       </label>
       <label class="f">Copy alignment

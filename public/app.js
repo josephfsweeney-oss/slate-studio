@@ -3,6 +3,7 @@ import { solve, BRAND } from './layout.js';
 import { paint, makeMeasurer } from './render.js';
 import { CANVASES, TEMPLATES, PALETTES, GROUNDS, TOKENS, fillTokens, buildFilename } from './presets.js';
 import { makeZip } from './zip.js';
+import { printSheet, slugLine, drawSlug, inchesOf } from './print.js';
 
 const $ = (s) => document.querySelector(s);
 const $$ = (s) => [...document.querySelectorAll(s)];
@@ -12,7 +13,7 @@ const $$ = (s) => [...document.querySelectorAll(s)];
 const DEFAULT_DISCLAIMER = 'Paid for by Committee to Elect House Republicans, 75 S Main Street Unit 7 Box 159, Concord, NH 03301. Jason Osborne, Chairman.';
 
 const COPY_FIELDS = ['kicker', 'headline', 'subhead', 'details', 'cta', 'footer',
-  'disclaimer', 'returnAddress', 'indicia'];
+  'disclaimer', 'returnAddress', 'indicia', 'values'];
 
 const COLOR_FIELDS = [
   ['#accent', 'accent'], ['#plate-accent', 'plateAccent'],
@@ -45,10 +46,12 @@ const state = {
   districtId: null,
   drop: {},              // districtId -> Set of excluded candidate names
   order: {},             // districtId -> [names]
+  tags: {},              // districtId -> { name -> tagline }
   canvasId: '1x1',
   cw: 1080, ch: 1080,
   copy: {
     kicker: '', headline: '', subhead: '', details: '', cta: '', footer: '', disclaimer: '',
+    values: '',
     returnAddress: 'Committee to Elect House Republicans\n75 S Main Street Unit 7 Box 159\nConcord, NH 03301',
     indicia: 'NONPROFIT ORG\nU.S. POSTAGE\nPAID\nPERMIT NO. ___',
   },
@@ -90,7 +93,7 @@ const saveLocal = () => {
       districtId: state.districtId, canvasId: state.canvasId, cw: state.cw, ch: state.ch,
       copy: state.copy, style: state.style, waiveDisclaimer: state.waiveDisclaimer,
       drop: Object.fromEntries(Object.entries(state.drop).map(([k, v]) => [k, [...v]])),
-      order: state.order,
+      order: state.order, tags: state.tags,
     }));
   } catch { /* private window, no harm */ }
 };
@@ -105,7 +108,7 @@ function loadLocal() {
       copy: { ...state.copy, ...(s.copy || {}) },
       style: { ...state.style, ...(s.style || {}) },
       waiveDisclaimer: Boolean(s.waiveDisclaimer),
-      order: s.order || {},
+      order: s.order || {}, tags: s.tags || {},
       drop: Object.fromEntries(Object.entries(s.drop || {}).map(([k, v]) => [k, new Set(v)])),
     });
   } catch { /* first visit */ }
@@ -127,7 +130,8 @@ function activeSlate(d = district()) {
     const pos = new Map(order.map((n, i) => [n, i]));
     list = [...list].sort((a, b) => (pos.get(a.name) ?? 99) - (pos.get(b.name) ?? 99));
   }
-  return list;
+  const tags = state.tags[d.id] || {};
+  return list.map((n) => (tags[n.name] ? { ...n, tag: tags[n.name] } : n));
 }
 
 const canvasSize = () => {
@@ -234,6 +238,7 @@ function draw() {
 
   const slate = activeSlate(d);
   plan = buildPlan(d, size, slate);
+  window.__lastPlan = plan;   // for tests to inspect
   paint(ctx, plan, state.style, assets, resolvedCopy(d));
   paintWarnings(d, slate);
   $('#stage-size').textContent = `${size.w} x ${size.h} px  ·  ${plan.composition}  ·  ${plan.grid.cols}x${plan.grid.rows} grid`;
@@ -274,6 +279,12 @@ function paintWarnings(d, slate) {
 }
 
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+/** Canvases authored at 300 dpi, where bleed and crop marks mean something. */
+function isPrintCanvas() {
+  return ['palm', 'mail11'].includes(state.canvasId)
+    || (state.canvasId === 'custom' && Math.max(state.cw, state.ch) >= 1500);
+}
 
 async function refreshDeck() {
   const d = district();
@@ -380,7 +391,9 @@ function renderSlatePanel() {
       <span class="nm">${esc(n.name)}${n.incumbent ? ' <span class="tag">inc</span>' : ''}</span>${tag}
       <button data-mv="up" ${!on || i === 0 ? 'disabled' : ''}>&uarr;</button>
       <button data-mv="down" ${!on || i >= list.length - 1 ? 'disabled' : ''}>&darr;</button>
-    </div>`;
+    </div>
+    <input class="tagline" data-tag="${esc(n.name)}" placeholder="Title or role, palm card only"
+      value="${esc((state.tags[d.id] || {})[n.name] || '')}">`;
   }).join('');
 }
 
@@ -423,6 +436,25 @@ async function exportPng(scale) {
   if (!d) return;
   const cv = await renderTo(d, canvasSize(), scale);
   cv.toBlob((b) => download(b, filenameNow(scale)), 'image/png');
+}
+
+/** Trim size plus 1/8 inch of bleed, crop marks and a slug line. */
+async function exportPrint() {
+  const d = district();
+  if (!d) return;
+  const size = canvasSize();
+  const plan = buildPlan(d, size, activeSlate(d));
+  const dpi = state.canvasId === 'sign' ? 150 : 300;
+  const sheet = printSheet({ plan, style: state.style, assets, copy: resolvedCopy(d), dpi });
+  drawSlug(sheet.canvas.getContext('2d'), sheet.sheet,
+    slugLine(plan, dpi, `${d.county} ${d.district}`), dpi);
+  const inches = inchesOf(plan.canvas, dpi);
+  const name = filenameNow(1).replace(/\.png$/, '-PRINT.png');
+  sheet.canvas.toBlob((b) => {
+    download(b, name);
+    notice(`Print sheet: ${inches.w} x ${inches.h} in trim, 0.125 in bleed, crop marks, ${dpi} dpi. `
+      + 'Files are RGB, so ask the printer to proof colour.');
+  }, 'image/png');
 }
 
 async function saveToDrive() {
@@ -554,6 +586,8 @@ function syncControls() {
     if (el) el.value = state.copy[k] || '';
   }
   $('#mailpanel').value = state.style.mailPanel;
+  $('#values-wrap').hidden = state.style.composition !== 'palmcard';
+  $('#btn-print').hidden = !isPrintCanvas();
   $('#mail-fields').hidden = state.style.mailPanel !== 'right';
   $('#composition').value = state.style.composition;
   $('#align').value = state.style.align;
@@ -705,6 +739,14 @@ function bind() {
   }
   $('#disc-waive').addEventListener('change', (e) => { state.waiveDisclaimer = e.target.checked; saveLocal(); draw(); });
 
+  $('#slate-list').addEventListener('input', (e) => {
+    const name = e.target.dataset.tag;
+    if (name === undefined) return;
+    const d = district();
+    if (!d) return;
+    (state.tags[d.id] ||= {})[name] = e.target.value;
+    saveLocal(); scheduleDraw();
+  });
   $('#face-source').addEventListener('change', async (e) => {
     state.style.faceSource = e.target.value;
     const d = district();
@@ -736,6 +778,7 @@ function bind() {
   });
 
   $('#btn-png').addEventListener('click', () => exportPng(1));
+  $('#btn-print').addEventListener('click', exportPrint);
   $('#btn-2x').addEventListener('click', () => exportPng(2));
   $('#btn-drive').addEventListener('click', saveToDrive);
   $('#btn-copy').addEventListener('click', copyImage);

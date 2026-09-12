@@ -46,6 +46,14 @@ function clearShadow(ctx) {
 
 /** Theme derived from whatever sits behind the copy. */
 export function themeFor(style) {
+  if (style.composition === 'palmcard') {
+    const accent = style.accent || BRAND.green;
+    return {
+      light: true, primary: BRAND.navy, secondary: 'rgba(18,49,78,.80)',
+      headline2: accent, accent, ctaBg: accent, ctaText: BRAND.white,
+      rule: 'rgba(18,49,78,.18)', disclaimer: 'rgba(18,49,78,.70)',
+    };
+  }
   const bg = style.bgType === 'transparent' ? '#FFFFFF' : (style.bgColor || BRAND.navyDeep);
   const light = luminance(bg) > 0.45;
   const accent = style.accent || BRAND.green;
@@ -79,33 +87,36 @@ function bandMetrics(plan, style) {
 
 /* ---------------------------------------------------------------- background */
 
-function paintBackground(ctx, plan, style, assets) {
+function paintBackground(ctx, plan, style, assets, bleed = 0) {
   const { w, h } = plan.canvas;
-  ctx.clearRect(0, 0, w, h);
+  // Everything full-bleed is drawn from -bleed to w+bleed, so the trim cut
+  // lands inside the artwork instead of on the edge of it.
+  const bx = -bleed, by = -bleed, bw = w + bleed * 2, bh = h + bleed * 2;
+  ctx.clearRect(bx, by, bw, bh);
   const type = style.bgType || 'solid';
   if (type === 'transparent') return;
 
   if (type === 'gradient') {
-    const g = ctx.createLinearGradient(0, 0, w * 0.35, h);
+    const g = ctx.createLinearGradient(bx, by, bx + bw * 0.35, by + bh);
     g.addColorStop(0, style.bgColor || BRAND.navy);
     g.addColorStop(1, style.bgColor2 || BRAND.navyLift);
     ctx.fillStyle = g;
-    ctx.fillRect(0, 0, w, h);
+    ctx.fillRect(bx, by, bw, bh);
   } else {
     ctx.fillStyle = style.bgColor || BRAND.navy;
-    ctx.fillRect(0, 0, w, h);
+    ctx.fillRect(bx, by, bw, bh);
   }
 
   if (type === 'image' && assets.bgImage) {
     const img = assets.bgImage;
-    const scale = Math.max(w / img.width, h / img.height);
+    const scale = Math.max(bw / img.width, bh / img.height);
     const dw = img.width * scale, dh = img.height * scale;
-    ctx.drawImage(img, (w - dw) / 2, (h - dh) / 2, dw, dh);
+    ctx.drawImage(img, bx + (bw - dw) / 2, by + (bh - dh) / 2, dw, dh);
     const dim = style.bgDim ?? 0.45;
     if (dim > 0) {
       const [dr, dg, db] = hexToRgb(style.bgColor || BRAND.navyDeep);
       ctx.fillStyle = `rgba(${dr},${dg},${db},${dim})`;
-      ctx.fillRect(0, 0, w, h);
+      ctx.fillRect(bx, by, bw, bh);
     }
   }
 
@@ -114,17 +125,18 @@ function paintBackground(ctx, plan, style, assets) {
   const m = bandMetrics(plan, style);
   if (m.rule) {
     const [c1, c2] = style.bar || [style.accent || BRAND.green, BRAND.navy];
-    const barW = plan.mailPanel ? plan.mailPanel.x : w;
+    const barW = plan.mailPanel ? plan.mailPanel.x : w + bleed;
+    const barL = plan.mailPanel ? 0 : -bleed;
     if (m.band) {
       ctx.fillStyle = c2;
-      ctx.fillRect(0, h - m.band, barW, m.band);
+      ctx.fillRect(barL, h - m.band, barW - barL, m.band + bleed);
       ctx.fillStyle = c1;
-      ctx.fillRect(0, h - m.band, barW, m.rule);
+      ctx.fillRect(barL, h - m.band, barW - barL, m.rule);
     } else {
       ctx.fillStyle = c1;
-      ctx.fillRect(0, h - m.rule, barW, m.rule);
+      ctx.fillRect(barL, h - m.rule, barW - barL, m.rule + bleed);
       ctx.fillStyle = c2;
-      ctx.fillRect(0, h - m.rule, barW * 0.34, m.rule);
+      ctx.fillRect(barL, h - m.rule, (barW - barL) * 0.34, m.rule + bleed);
     }
   }
 }
@@ -259,6 +271,126 @@ function paintDeck(ctx, plan, assets, theme) {
   const scale = Math.min(r.w / img.width, r.h / img.height);
   const dw = img.width * scale, dh = img.height * scale;
   ctx.drawImage(img, r.x + (r.w - dw) / 2, r.y + (r.h - dh) / 2, dw, dh);
+}
+
+/* -------------------------------------------------------------- palm card ---
+ * A rack card read top to bottom: masthead, the ask, the faces, the values
+ * strip, then when and where. Same green and navy as everything else. */
+function paintPalmCard(ctx, plan, style, theme, assets, bleed) {
+  const p = plan.palm;
+  const { w, h } = plan.canvas;
+  const accent = style.accent || BRAND.green;
+  const ink = style.plateColor || BRAND.navy;
+
+  // Masthead: a full-bleed navy block behind the headline.
+  const mastBottom = p.mast.y + p.mast.h - plan.pad * 0.3;
+  ctx.fillStyle = ink;
+  ctx.fillRect(-bleed, -bleed, w + bleed * 2, mastBottom + bleed);
+  ctx.fillStyle = accent;
+  ctx.fillRect(-bleed, mastBottom, w + bleed * 2, Math.max(3, w * 0.010));
+
+  let y = p.mast.y + plan.pad * 0.15;
+  if (p.mast.kicker.lines.length) {
+    ctx.fillStyle = style.plateAccent || BRAND.mint;
+    setFont(ctx, p.mast.kicker.font, p.mast.kicker.px, p.mast.kicker.ls);
+    ctx.textAlign = 'center';
+    for (const l of p.mast.kicker.lines) { y += p.mast.kicker.lh; ctx.fillText(l, w / 2, y - p.mast.kicker.lh * 0.24); }
+    y += h * 0.004;
+  }
+  const hd = p.mast.headline;
+  ctx.textAlign = 'center';
+  hd.lines.forEach((line, i) => {
+    // Two-tone, first line in the accent, as the brand sets it.
+    ctx.fillStyle = (style.twoTone !== false && hd.lines.length > 1 && i === 0)
+      ? (style.plateAccent || BRAND.mint) : BRAND.white;
+    setFont(ctx, hd.font, hd.px, hd.ls);
+    ctx.fillText(line, w / 2, y + hd.lh * (i + 0.82));
+  });
+
+  // The ask.
+  if (p.ask.block.lines.length) {
+    const a = p.ask.block;
+    ctx.fillStyle = ink;
+    setFont(ctx, a.font, a.px, a.ls);
+    ctx.textAlign = 'center';
+    a.lines.forEach((l, i) => ctx.fillText(l, w / 2, p.ask.y + a.lh * (i + 0.9)));
+  }
+
+  // The faces sit on a quiet tint, not on white: it groups them as one slate.
+  ctx.fillStyle = theme.light ? 'rgba(47,124,78,.07)' : 'rgba(255,255,255,.07)';
+  roundRect(ctx, p.panel.x, p.panel.y, p.panel.w, p.panel.h, w * 0.020);
+  ctx.fill();
+
+  // The values strip, full bleed in the accent.
+  if (p.strip.block.lines.length) {
+    const st = p.strip.block;
+    const top = p.strip.y - plan.gap * 0.55;
+    const height = p.strip.h + plan.gap * 0.5;
+    ctx.fillStyle = accent;
+    ctx.fillRect(-bleed, top, w + bleed * 2, height);
+    ctx.fillStyle = BRAND.white;
+    setFont(ctx, st.font, st.px, st.ls);
+    ctx.textAlign = 'center';
+    st.lines.forEach((l, i) => ctx.fillText(l, w / 2, top + plan.gap * 0.25 + st.lh * (i + 0.85)));
+  }
+
+  // When and where, together, on the town photo if there is one.
+  if (p.event.h > 0) {
+    const e = p.event;
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(-bleed, e.y, w + bleed * 2, e.h);
+    ctx.clip();
+    if (assets.bgImage) {
+      const img = assets.bgImage;
+      const sc = Math.max((w + bleed * 2) / img.width, e.h / img.height);
+      ctx.drawImage(img, -bleed + ((w + bleed * 2) - img.width * sc) / 2,
+        e.y + (e.h - img.height * sc) / 2, img.width * sc, img.height * sc);
+      const [r, g, b] = hexToRgb(ink);
+      ctx.fillStyle = `rgba(${r},${g},${b},.72)`;
+    } else {
+      ctx.fillStyle = ink;
+    }
+    ctx.fillRect(-bleed, e.y, w + bleed * 2, e.h);
+    ctx.restore();
+
+    // Centre the whole block in the band rather than hanging it from the top,
+    // which left a third of the band empty.
+    ctx.textAlign = 'center';
+    const datePx = w * 0.062;
+    const wherePx = w * 0.034;
+    const whereLines = p.where ? p.where.split('\n').filter(Boolean) : [];
+    const blockH = (p.date ? datePx * 1.02 : 0)
+      + (whereLines.length ? w * 0.020 + wherePx * 1.24 * whereLines.length : 0);
+    let ey = e.y + (e.h - blockH) / 2;
+    if (p.date) {
+      setFont(ctx, { family: 'Anton', weight: 400 }, datePx, -0.01);
+      ctx.fillStyle = BRAND.white;
+      ctx.fillText(p.date.toUpperCase(), w / 2, ey + datePx * 0.84);
+      ey += datePx * 1.02 + w * 0.020;
+    }
+    if (whereLines.length) {
+      setFont(ctx, { family: 'Barlow Condensed', weight: 600 }, wherePx, 0.02);
+      ctx.fillStyle = style.plateAccent || BRAND.mint;
+      whereLines.forEach((l, i) => ctx.fillText(l, w / 2, ey + wherePx * (0.86 + 1.24 * i)));
+    }
+  }
+  if ('letterSpacing' in ctx) ctx.letterSpacing = '0px';
+}
+
+/** The line of role or title under a name on a palm card. */
+function paintTagline(ctx, tile, style, theme) {
+  const t = (tile.candidate.tag || '').trim();
+  if (!t || !tile.tag) return;
+  const px = tile.w * 0.072;
+  ctx.fillStyle = style.accent || BRAND.green;
+  setFont(ctx, { family: 'Barlow Condensed', weight: 600 }, px, 0.01);
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'alphabetic';
+  t.split('\n').slice(0, 2).forEach((line, i) => {
+    ctx.fillText(line, tile.x + tile.w / 2, tile.tag.y + px * (i + 0.9) * 1.12);
+  });
+  if ('letterSpacing' in ctx) ctx.letterSpacing = '0px';
 }
 
 /* ------------------------------------------------------------------ mail panel
@@ -435,10 +567,24 @@ function paintLogo(ctx, plan, style, assets) {
 /* ---------------------------------------------------------------------- entry */
 
 /** Paint a solved plan. `assets` = { portraits: {name -> Image}, bgImage, logo }. */
-export function paint(ctx, plan, style, assets = {}, copy = {}) {
+export function paint(ctx, plan, style, assets = {}, copy = {}, bleed = 0) {
   const theme = themeFor(style);
   ctx.save();
-  paintBackground(ctx, plan, style, assets);
+  if (plan.palm) {
+    // The palm card paints its own ground: it is bands, not one background.
+    ctx.clearRect(-bleed, -bleed, plan.canvas.w + bleed * 2, plan.canvas.h + bleed * 2);
+    ctx.fillStyle = style.cardGround || BRAND.ground;
+    ctx.fillRect(-bleed, -bleed, plan.canvas.w + bleed * 2, plan.canvas.h + bleed * 2);
+    paintPalmCard(ctx, plan, style, theme, assets, bleed);
+    for (const tile of plan.tiles) {
+      paintTile(ctx, tile, plan, style, assets, theme);
+      paintTagline(ctx, tile, style, theme);
+    }
+    paintDisclaimer(ctx, plan, style, theme);
+    ctx.restore();
+    return theme;
+  }
+  paintBackground(ctx, plan, style, assets, bleed);
   if (plan.deck) paintDeck(ctx, plan, assets, theme);
   for (const tile of plan.tiles) paintTile(ctx, tile, plan, style, assets, theme);
   paintCopy(ctx, plan, style, theme);
