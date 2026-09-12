@@ -597,7 +597,13 @@ address side proves it and says what to do about it. The credit goes to the
 party, not to the signers: Republicans voted, Democrats voted the other way.
 Every side closes on the same line, **Vote Republican Down The Ballot November
 3**, and the eighth round is the whole ticket: support it on the message side,
-vote all the way down on the address side. `public/mailers.js` holds
+vote all the way down on the address side.
+
+Governor Ayotte is on four of the sixteen sides: the housing package and the
+price transparency law say House Republicans worked with her, and both sides of
+the close make her the reason to vote the whole ticket. The first two are
+characterisations of how a bill got through, not vote records, so check them
+before a drop goes out. The two on the close are an ask, not a claim. `public/mailers.js` holds
 every line; every number in it was transcribed from the Granite Guarantee
 artwork. Check them against the journal before a drop goes out.
 

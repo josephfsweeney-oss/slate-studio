@@ -97,7 +97,7 @@ export const MAIL_PROGRAMS = [{
       },
       back: {
         headline: 'Fifteen Bills. One Session.',
-        subhead: 'Every one of them makes a house easier to build and cheaper to buy.',
+        subhead: 'House Republicans worked with Governor Ayotte to move all fifteen.',
       },
     },
     {
@@ -119,7 +119,7 @@ export const MAIL_PROGRAMS = [{
       },
       back: {
         headline: 'Prices Out In The Open',
-        subhead: 'Hospitals and insurers post what they charge. Hidden prices protect the system, not you.',
+        subhead: 'House Republicans and Governor Ayotte opened the books. The system liked them closed.',
       },
     },
     {
@@ -137,11 +137,11 @@ export const MAIL_PROGRAMS = [{
       id: 'close', art: 'town', n: 8, label: 'The Close',
       front: {
         headline: 'Support The Whole Ticket',
-        subhead: 'Seven promises. One team. Vote every Republican on your ballot.',
+        subhead: 'Governor Ayotte needs a Republican House. Vote every Republican on your ballot.',
       },
       back: {
         headline: 'Vote All The Way Down',
-        subhead: 'Every Republican on the ballot, and yes on the school tax cap.',
+        subhead: 'Give Governor Ayotte the House she needs, and yes on the school tax cap.',
       },
     },
   ],
