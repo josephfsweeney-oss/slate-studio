@@ -75,7 +75,7 @@ export const MAIL_PROGRAMS = [{
       },
       back: {
         headline: 'Forty-Three Votes Short',
-        subhead: 'We voted to ban the income tax for good. It died in the House.',
+        subhead: 'Republicans voted to ban it for good. It died in the House.',
       },
     },
     {
@@ -85,7 +85,7 @@ export const MAIL_PROGRAMS = [{
         subhead: 'Capped at inflation. Not at whatever the district asks for.',
       },
       back: {
-        headline: 'We Gave You The Vote',
+        headline: 'Republicans Gave You The Vote',
         subhead: 'The cap is on your ballot. Vote yes, and vote for the people who put it there.',
       },
     },
@@ -93,7 +93,7 @@ export const MAIL_PROGRAMS = [{
       id: 'housing', art: 'framing', n: 4, label: 'Free Market Housing',
       front: {
         headline: 'Your Kids Cannot Afford To Live Here',
-        subhead: 'We voted to change that. More homes, built faster.',
+        subhead: 'Republicans voted to change that. More homes, built faster.',
       },
       back: {
         headline: 'Fifteen Bills. One Session.',
@@ -108,7 +108,7 @@ export const MAIL_PROGRAMS = [{
       },
       back: {
         headline: 'More Supply. Lower Bills.',
-        subhead: 'We voted for supply. They voted for mandates that land on your bill.',
+        subhead: 'Republicans voted for supply. Democrats voted for mandates that land on your bill.',
       },
     },
     {
@@ -136,12 +136,12 @@ export const MAIL_PROGRAMS = [{
     {
       id: 'close', art: 'town', n: 8, label: 'The Close',
       front: {
-        headline: 'Seven Promises. In Writing.',
-        subhead: 'Hold us to every one of them.',
+        headline: 'Support The Whole Ticket',
+        subhead: 'Seven promises. One team. Vote every Republican on your ballot.',
       },
       back: {
-        headline: 'Two Votes. One Ballot.',
-        subhead: 'Vote the slate. Vote yes on the school tax cap.',
+        headline: 'Vote All The Way Down',
+        subhead: 'Every Republican on the ballot, and yes on the school tax cap.',
       },
     },
   ],
@@ -153,7 +153,7 @@ export const MAIL_PROGRAMS = [{
  * somebody when to vote has not finished. */
 export const SIDE_COMMON = {
   footer: '{{PLACE}}',
-  cta: 'Vote Republican November 3',
+  cta: 'Vote Republican Down The Ballot November 3',
   /* The date on its own, for the block that stands beside a short slate. The
    * call to action carries it in a sentence; the block carries it big. */
   voteDate: 'November 3',

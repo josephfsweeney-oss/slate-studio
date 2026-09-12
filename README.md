@@ -593,7 +593,11 @@ artwork has to be looked up per district, so a drop builds for all 174 without
 anybody typing anything.
 
 One structure, eight times. The message side says what this costs you. The
-address side proves it and says what to do about it. `public/mailers.js` holds
+address side proves it and says what to do about it. The credit goes to the
+party, not to the signers: Republicans voted, Democrats voted the other way.
+Every side closes on the same line, **Vote Republican Down The Ballot November
+3**, and the eighth round is the whole ticket: support it on the message side,
+vote all the way down on the address side. `public/mailers.js` holds
 every line; every number in it was transcribed from the Granite Guarantee
 artwork. Check them against the journal before a drop goes out.
 
