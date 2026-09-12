@@ -749,6 +749,35 @@ and upload it again.
 The knockout stays off while re-framing. A cutout that ships with the app has
 been cut out once already and doing it twice eats the edges.
 
+### Pushing photos to the repository from the app
+
+**Push to the repo**, in the photo bank under the Slate tab. One commit: every
+photo in this browser, plus `data/cutouts.json` rebuilt from the branch's own
+copy so the index is never built from a stale list. The host rebuilds on its own
+and the photo is in front of everybody.
+
+The app has no server that can write to disk and must not have one. This site is
+public, and a token sitting on a public server is a token anybody can use. So the
+push runs in the browser, with a token typed in by the person at the keyboard.
+It is kept in that browser's localStorage if they tick the box, and nowhere else.
+It is never sent to this app's own server, never written into a file, and never
+committed. **Forget the token** clears it.
+
+Use a fine-grained personal access token, scoped to the one repository, with
+**Contents: read and write** and nothing else ticked. That token can add a
+portrait. It cannot do anything else with the account. The panel says so, and a
+test holds it to that: every request the push module makes goes to
+`api.github.com`, and the token never enters the app state, which is saved to
+localStorage wholesale.
+
+It does not work in a published Artifact. That page is served under a policy
+that blocks every host it was not given, `api.github.com` included. Open the app
+on its own address and push from there. The error message says so rather than
+failing quietly.
+
+**Download them for the repo** is still there for anyone without a token: a zip,
+named the way the repo expects, with `HOW-TO.txt` inside.
+
 ### Getting a photo you added in front of everybody
 
 A photo dropped into the hosted copy lives in that browser's own storage and

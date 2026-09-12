@@ -960,6 +960,44 @@ test('every mail side puts the slate, a headline and a call to action on the pie
   }
 });
 
+test('a repository is named owner/repo, and a typo is caught before the push', async () => {
+  const { parseRepo } = await import('../public/github.js');
+  assert.deepEqual(parseRepo('josephfsweeney-oss/slate-studio'),
+    { owner: 'josephfsweeney-oss', repo: 'slate-studio' });
+  assert.deepEqual(parseRepo('  https://github.com/josephfsweeney-oss/slate-studio.git '),
+    { owner: 'josephfsweeney-oss', repo: 'slate-studio' });
+  for (const junk of ['', 'slate-studio', 'a/b/c', 'owner /repo', 'owner/repo?', null]) {
+    assert.equal(parseRepo(junk), null, `${JSON.stringify(junk)} should not parse`);
+  }
+});
+
+test('the push token stays in the browser and never reaches this app', () => {
+  const ghSrc = fs.readFileSync(path.join(ROOT, 'public', 'github.js'), 'utf8');
+  const appSrc = fs.readFileSync(path.join(ROOT, 'public', 'app.js'), 'utf8');
+  const html = fs.readFileSync(path.join(ROOT, 'public', 'index.html'), 'utf8');
+
+  /* Every fetch in the push module goes to GitHub. One that went anywhere else,
+   * including back to this app's own server, would be a token leak. */
+  const fetches = [...ghSrc.matchAll(/fetch\(([^)]*)/g)].map((m) => m[1]);
+  assert.ok(fetches.length, 'the push module makes no requests at all');
+  for (const f of fetches) {
+    assert.ok(/\bAPI\b/.test(f), `a request in github.js does not go to the API: ${f}`);
+  }
+  assert.match(ghSrc, /const API = 'https:\/\/api\.github\.com'/);
+
+  // The token is not kept in the app's own saved state.
+  assert.ok(!/state\.[A-Za-z.]*[Tt]oken/.test(appSrc),
+    'the token must not live in the app state, which is saved to localStorage wholesale');
+
+  // The field is a password field, and there is a way to forget it.
+  assert.match(html, /id="gh-token"[^>]*type="password"/);
+  assert.match(html, /id="gh-forget"/);
+  assert.match(appSrc, /gh\.forget\(\)/);
+
+  // And the panel says what the token is allowed to be.
+  assert.match(html, /Contents set to\s*\n?\s*read and write/);
+});
+
 test('the issue rounds argue on one side and carry the team on the other', () => {
   const c = CANVASES.find((x) => x.id === 'mail6');
   const list = slate(4);

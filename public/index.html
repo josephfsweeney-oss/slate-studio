@@ -243,8 +243,31 @@
         <div class="sub" id="photo-bank-count"></div>
         <div class="photo-bank-actions">
           <button id="photos-zip" class="ghost small">Download them for the repo</button>
+          <button id="photos-push" class="ghost small">Push to the repo</button>
           <button id="photos-default" class="ghost small" hidden>Make them the defaults</button>
           <button id="photos-clear" class="ghost small">Clear mine</button>
+        </div>
+        <div id="gh" class="gh" hidden>
+          <p class="hint">One commit: every photo in this browser, plus the portrait
+            index rebuilt to match. The token is typed here and kept here. It is never
+            sent to this app's server and never written into the repository. Use a
+            fine-grained token scoped to this one repository, with Contents set to
+            read and write and nothing else ticked.</p>
+          <label class="f">Repository
+            <input id="gh-repo" placeholder="owner/repo" autocomplete="off"></label>
+          <label class="f">Branch
+            <input id="gh-branch" placeholder="main" autocomplete="off"></label>
+          <label class="f">Token
+            <input id="gh-token" type="password" placeholder="github_pat_..."
+              autocomplete="off" spellcheck="false"></label>
+          <label class="inline"><input type="checkbox" id="gh-remember">
+            Remember the token in this browser</label>
+          <div class="photo-bank-actions">
+            <button id="gh-go" class="small">Push</button>
+            <button id="gh-forget" class="ghost small">Forget the token</button>
+            <button id="gh-cancel" class="ghost small">Close</button>
+          </div>
+          <p class="hint" id="gh-status"></p>
         </div>
       </div>
     </div>

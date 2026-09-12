@@ -8,6 +8,7 @@ import {
 import { MAIL_PROGRAMS, MAIL_VARS, SHARED_BACK, SHARED_BACK_ART, SIDE_COMMON, artUrl, sideCopyFor,
   programById, pieceById, sideStyle } from './mailers.js';
 import { makeZip } from './zip.js';
+import * as gh from './github.js';
 import * as photos from './photos.js';
 import { printSheet, slugLine, drawSlug, inchesOf } from './print.js';
 
@@ -1038,6 +1039,76 @@ async function photosZip() {
     + 'expects. HOW-TO.txt inside says where they go.');
 }
 
+/* ------------------------------------------------------- push to the repo
+ *
+ * The app has no server that can write to disk and must not have one: this site
+ * is public, and a token on a public server is a token anybody can use. So the
+ * push runs in this browser, with a token the person at the keyboard typed in.
+ * See public/github.js for what that token is allowed to be.
+ */
+
+function ghShow(on) {
+  const panel = $('#gh');
+  panel.hidden = !on;
+  if (!on) return;
+  const saved = gh.settings();
+  $('#gh-repo').value = saved.repo || 'josephfsweeney-oss/slate-studio';
+  $('#gh-branch').value = saved.branch || 'main';
+  $('#gh-token').value = saved.token || '';
+  $('#gh-remember').checked = !!saved.token;
+  ghSay(`${overrides.size} photo${overrides.size === 1 ? '' : 's'} ready to push.`);
+  $('#gh-repo').focus();
+}
+
+function ghSay(text, kind = '') {
+  const el = $('#gh-status');
+  el.textContent = text;
+  el.className = `hint ${kind}`;
+}
+
+async function ghPush() {
+  if (!overrides.size) return ghSay('No photos in this browser to push.', 'bad');
+  const where = gh.parseRepo($('#gh-repo').value);
+  const branch = $('#gh-branch').value.trim() || 'main';
+  const token = $('#gh-token').value.trim();
+  if (!where) return ghSay('Write the repository as owner/repo.', 'bad');
+  if (!token) return ghSay('Paste a token. It stays in this browser.', 'bad');
+
+  const files = [];
+  for (const [slug, rec] of overrides) {
+    files.push({ path: `public/cutouts/${photos.cutoutName(slug, rec.ext)}`, blob: rec.blob });
+  }
+  const names = files.map((f) => f.path.split('/').pop());
+  const ok = window.confirm(
+    `Commit ${files.length} photo${files.length === 1 ? '' : 's'} to `
+    + `${where.owner}/${where.repo} on ${branch}?\n\n${names.slice(0, 12).join('\n')}`
+    + `${names.length > 12 ? `\n...and ${names.length - 12} more` : ''}`
+    + '\n\nThe portrait index is rebuilt in the same commit.');
+  if (!ok) return ghSay('Nothing pushed.');
+
+  $('#gh-go').disabled = true;
+  try {
+    ghSay('Checking the token');
+    const who = await gh.whoami(token);
+    const res = await gh.push({
+      ...where, branch, token, files, indexPath: 'data/cutouts.json',
+      message: `Portraits: ${files.length} from the builder\n\n`
+        + `${names.join('\n')}\n\nPushed from Slate Studio by ${who}.`,
+      onStep: (t) => ghSay(t),
+    });
+    ghSay(`Pushed as ${res.sha.slice(0, 7)}. The host rebuilds on its own.`, 'good');
+    notice(`${files.length} photo${files.length === 1 ? '' : 's'} committed to `
+      + `${where.owner}/${where.repo}. ${res.url}`);
+    if ($('#gh-remember').checked) gh.remember({ repo: `${where.owner}/${where.repo}`, branch, token });
+    else gh.remember({ repo: `${where.owner}/${where.repo}`, branch });
+  } catch (e) {
+    ghSay(e.message, 'bad');
+  } finally {
+    $('#gh-go').disabled = false;
+  }
+  return undefined;
+}
+
 async function photosToDefault() {
   const list = [...overrides.values()];
   if (!list.length) return;
@@ -1961,6 +2032,15 @@ function bind() {
   $('#photos-zip').addEventListener('click', photosZip);
   $('#photos-default').addEventListener('click', photosToDefault);
   $('#photos-clear').addEventListener('click', clearMyPhotos);
+  $('#photos-push').addEventListener('click', () => ghShow($('#gh').hidden));
+  $('#gh-cancel').addEventListener('click', () => ghShow(false));
+  $('#gh-go').addEventListener('click', ghPush);
+  $('#gh-forget').addEventListener('click', () => {
+    gh.forget();
+    $('#gh-token').value = '';
+    $('#gh-remember').checked = false;
+    ghSay('Token forgotten on this computer.');
+  });
 
   $('#btn-png').addEventListener('click', () => exportPng(1));
   $('#btn-print').addEventListener('click', exportPrint);

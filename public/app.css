@@ -155,6 +155,12 @@ button,.ghost{cursor:pointer;border-radius:8px;padding:8px 13px;border:1px solid
 .p-row .tag.mine{background:#E3F3EA;color:#1D5B39}
 .photo-bank{margin-top:10px;padding-top:10px;border-top:1px solid var(--line)}
 .photo-bank-actions{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.gh{margin-top:10px;padding:10px;border-left:3px solid var(--accent);background:var(--panel2,rgba(0,0,0,.03))}
+.gh .f{margin-top:6px}
+.gh .hint{margin:0}
+#gh-status{margin-top:8px;font-variant-numeric:tabular-nums}
+#gh-status.bad{color:var(--bad,#b00020)}
+#gh-status.good{color:var(--ok,#1a7f37)}
 
 /* The file control is the input itself, wearing a button. Nothing here calls
    .click() on a hidden input: that is blocked inside an iframe, and the
