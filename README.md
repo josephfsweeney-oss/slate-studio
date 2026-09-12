@@ -120,11 +120,19 @@ totals against the deck build.
 
 ## Public mode
 
-Set `SLATE_PUBLIC=1` and the app is safe to put on an open URL. Without it,
-do not: a hosted copy reads Drive with whichever account authorised it, and
-several routes would hand that access to anyone who found the link.
+The app closes the credential-backed routes itself whenever there is nothing
+behind them. A copy that ships its own portraits and holds no Drive credential
+is shut on arrival: no flag, no settings page, no step anyone has to remember.
+A service-account key is read-only by construction, so writes stay shut there
+too. The one route that stays open is sign-in when an OAuth client is
+configured and nobody has used it yet, because locking the owner out of their
+own deployment helps nobody.
 
-`SLATE_PUBLIC=1` closes them:
+Set `SLATE_PUBLIC=1` anyway. It closes the same routes by declaration, so
+adding a credential later cannot quietly reopen them. `npm run verify` will
+tell you to set it.
+
+These are the routes in question:
 
 | Route | Why it is closed |
 |---|---|
@@ -165,7 +173,9 @@ and it is off by default.
 ## Hosting it
 
 **Read this first.** A hosted copy reads Drive with whatever credential it is
-given. Set `SLATE_PUBLIC=1` on any deployment that is not behind a password.
+given. The app shuts the routes that could hand that access away when it has no
+credential, but set `SLATE_PUBLIC=1` on any deployment that is not behind a
+password so adding one later stays safe.
 
 GitHub Pages cannot run it. Pages serves static files only, and this app needs a
 server to hold the Drive credential and to pass the portraits to the browser.
@@ -201,10 +211,11 @@ portrait loads with CDN cache headers, and that `POST /api/save`,
 `/auth/signout`, `/auth/google` and `/auth/callback` all refuse. Any failure
 exits non-zero and says "do not share the link yet", with the reason.
 
-Forgetting `SLATE_PUBLIC=1` trips seven checks at once, which is the point: the
-routes that would let a stranger write to your Drive or revoke the site's access
-are exactly the ones it tests. Add `--private` for a password-gated copy, where
-those routes are meant to stay open.
+A credential-holding copy with `SLATE_PUBLIC` unset trips seven checks at once,
+which is the point: the routes that would let a stranger write to your Drive or
+revoke the site's access are exactly the ones it tests. A copy with no
+credential passes and is told to set the flag anyway. Add `--private` for a
+password-gated copy, where those routes are meant to stay open.
 
 ### The short path: a service account
 

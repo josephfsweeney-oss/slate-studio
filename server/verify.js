@@ -58,9 +58,16 @@ const main = async () => {
   if (expectPrivate) {
     st.isPublic ? no('this copy is private', 'SLATE_PUBLIC is set: it is open') : ok('this copy is private');
   } else if (st.isPublic) {
-    ok('public mode is on, so the write and auth routes are shut');
+    ok('public mode is declared with SLATE_PUBLIC');
+  } else if (st.readOnly && st.writesClosed && st.authClosed) {
+    // Safe without the flag: there is no credential behind those routes, so the
+    // app shuts them itself. Setting SLATE_PUBLIC is still worth doing.
+    ok('read-only in effect: no credential here, so the write and auth routes shut themselves');
+    hm('SLATE_PUBLIC is not set. It is not needed while there is no credential, '
+       + 'but set it so adding one later cannot quietly open them.');
   } else {
-    no('public mode is on', 'SLATE_PUBLIC is not set to 1. Everything below is exposed.');
+    no('this copy is closed to writes',
+       'SLATE_PUBLIC is not set and a credential is present, so the routes below are live.');
   }
 
   // A copy that ships its own portraits needs no Google credential at all.

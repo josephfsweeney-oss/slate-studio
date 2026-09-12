@@ -153,3 +153,13 @@ export function signOut() {
 
 /** Printed by `npm run token` so it can be pasted into a hosting environment. */
 export function refreshToken() { return tokens?.refresh_token || ''; }
+
+/** The credential came from the environment, not from somebody signing in here.
+ *  Signing out cannot revoke one of those, so offering it is a confusing no-op. */
+export function fromEnvironment() {
+  return Boolean(sa || (config.refreshToken && tokens?.refresh_token === config.refreshToken));
+}
+
+/** A service-account key is read-only by construction, so this copy can never
+ *  write to Drive however it is configured. */
+export function readOnlyCredential() { return Boolean(sa); }

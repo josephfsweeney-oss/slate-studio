@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
+import { execFileSync } from 'node:child_process';
 import { ROOT } from '../server/config.js';
 
 /* A malformed vercel.json is not caught by anything else: the app runs fine
@@ -84,4 +85,28 @@ test('everything the function reads at runtime is bundled into it', () => {
     && !/data', 'cutouts\.json'/.test(catalog);
   assert.ok(!readsPublic,
     'catalog.js lists public/ without a data/ index; that finds nothing on a serverless host');
+});
+
+test('the portrait index is committed, not just sitting on a disk somewhere', () => {
+  // The index existed locally and every other test passed while the deploy had
+  // no portraits at all, because a blanket *.json gitignore rule swallowed it.
+  // Presence on disk proves nothing; git has to have it.
+  const tracked = execFileSync('git', ['ls-files', 'data/'], { cwd: ROOT, encoding: 'utf8' })
+    .split('\n').filter(Boolean);
+  assert.ok(tracked.includes('data/cutouts.json'),
+    'data/cutouts.json is not tracked by git, so it will not reach a deployment.\n'
+    + '        Check .gitignore, then: git add -f data/cutouts.json');
+  assert.ok(tracked.includes('data/slate-manifest.csv'), 'the manifest is not tracked either');
+});
+
+test('nothing committed carries a private key', () => {
+  const files = execFileSync('git', ['ls-files'], { cwd: ROOT, encoding: 'utf8' })
+    .split('\n').filter((f) => /\.(json|pem|txt|env|js|mjs)$/i.test(f));
+  for (const f of files) {
+    const full = path.join(ROOT, f);
+    if (!fs.existsSync(full) || fs.statSync(full).size > 2_000_000) continue;
+    const body = fs.readFileSync(full, 'utf8');
+    assert.ok(!/-----BEGIN [A-Z ]*PRIVATE KEY-----/.test(body), `${f} contains a private key`);
+    assert.ok(!/"type"\s*:\s*"service_account"/.test(body), `${f} looks like a service-account key`);
+  }
 });

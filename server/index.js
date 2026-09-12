@@ -50,17 +50,54 @@ async function readBody(req, limit = 40 * 1024 * 1024) {
 
 /* --------------------------------------------------------------- public mode */
 
-/* A public deployment reads Drive with the account that authorised it, so the
- * routes that write, spend quota, or hand that access away are closed. Left
- * open, /auth/signout alone would let any passer-by revoke the app's Drive
- * access, and /api/save would be an unauthenticated write into someone's Drive. */
-const CLOSED_WHEN_PUBLIC = new Set(['/auth/google', '/auth/callback', '/auth/signout']);
+/* Which of the credential-backed routes are open, and why.
+ *
+ * SLATE_PUBLIC shuts all of them. But most of them should also be shut when
+ * there is simply nothing behind them: an OAuth route with no client
+ * configured is a dead end that answers 500, and a save route with no
+ * credential cannot write anywhere. Leaving those open until somebody
+ * remembers a flag is how a deployment ends up looking exposed when it is
+ * only broken, and how a real one ends up genuinely exposed.
+ *
+ * Returns null when the route is open, or the reason it is not. */
+function closedReason(pathname) {
+  const isAuthFlow = pathname === '/auth/google' || pathname.startsWith('/auth/callback');
+  const isSignOut = pathname === '/auth/signout';
+  const isSave = pathname === '/api/save';
+  if (!isAuthFlow && !isSignOut && !isSave) return null;
+
+  if (config.isPublic) return 'This deployment is public and read-only.';
+  if (isAuthFlow && !auth.configured()) {
+    return 'No Google client is configured here, so there is no sign-in to start. '
+      + 'Set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET, or use a service-account key.';
+  }
+  if (isSignOut && !auth.signedIn()) return 'Not signed in, so there is nothing to sign out of.';
+  if (isSignOut && auth.fromEnvironment()) {
+    return 'The credential here comes from the environment, so signing out cannot '
+      + 'revoke it. Remove it where it is set instead.';
+  }
+  if (isSave && auth.readOnlyCredential()) {
+    return 'This copy reads Drive with a read-only service account and cannot write to it.';
+  }
+  if (isSave && !auth.signedIn() && !auth.configured()) {
+    return 'No Drive credential is configured here, so there is nothing to write with. '
+      + 'Use Download PNG instead.';
+  }
+  // A client is configured but nobody has signed in yet: that is fixable, and
+  // /api/save answers with how, rather than refusing outright.
+  return null;
+}
+
+/** Read-only in effect: either declared, or because nothing can write. */
+function effectivelyReadOnly() {
+  return config.isPublic || !auth.signedIn() || auth.readOnlyCredential();
+}
 
 /** Crude per-IP ceiling on the endpoints that can reach Drive. In-memory, so on
  *  serverless it is per instance: a speed bump, not a guarantee. */
 const hits = new Map();
 function rateLimited(req, limit = 600, windowMs = 600000) {
-  if (!config.isPublic) return false;
+  if (!effectivelyReadOnly()) return false;
   const ip = (req.headers['x-forwarded-for'] || '').split(',')[0].trim()
     || req.socket?.remoteAddress || 'unknown';
   const now = Date.now();
@@ -108,6 +145,9 @@ async function api(req, res, url) {
     const cat = catalog.peek();
     return json(res, 200, {
       isPublic: config.isPublic,
+      readOnly: effectivelyReadOnly(),
+      writesClosed: Boolean(closedReason('/api/save')) || !auth.signedIn(),
+      authClosed: Boolean(closedReason('/auth/google')),
       readyOnly: config.readyOnly,
       disclaimer: config.disclaimer,
       driveConfigured: auth.configured(),
@@ -122,12 +162,12 @@ async function api(req, res, url) {
 
   if (p === '/api/catalog') {
     // Refresh re-crawls Drive. Not something a stranger gets to trigger.
-    const refresh = !config.isPublic && url.searchParams.get('refresh') === '1';
+    const refresh = !effectivelyReadOnly() && url.searchParams.get('refresh') === '1';
     const cat = await catalog.get({ refresh });
     // Rebuilding the catalog is several Drive calls, which a serverless host
     // would otherwise repeat on every cold start. An hour at the CDN keeps that
     // rare while still picking up a newly added headshot the same morning.
-    const extra = config.isPublic && !cat.driveError
+    const extra = effectivelyReadOnly() && !cat.driveError
       ? { 'cache-control': 'public, max-age=300, s-maxage=3600, stale-while-revalidate=86400' }
       : { 'cache-control': 'no-store' };
     if (!config.readyOnly) return json(res, 200, cat, extra);
@@ -165,9 +205,6 @@ async function api(req, res, url) {
   }
 
   if (p === '/api/save' && req.method === 'POST') {
-    if (config.isPublic) {
-      return json(res, 403, { error: 'This copy is read-only. Use Download PNG instead.' });
-    }
     if (!auth.signedIn()) return json(res, 400, { error: 'Connect Google Drive first.' });
     const png = await readBody(req);
     if (!png.length) return json(res, 400, { error: 'no image' });
@@ -237,8 +274,11 @@ function serveStatic(res, pathname) {
 export async function handler(req, res) {
   const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
   try {
-    if (config.isPublic && CLOSED_WHEN_PUBLIC.has(url.pathname)) {
-      return text(res, 403, 'This deployment is public and read-only. Drive sign-in is disabled.');
+    const shut = closedReason(url.pathname);
+    if (shut) {
+      return url.pathname.startsWith('/api/')
+        ? json(res, 403, { error: shut })
+        : text(res, 403, shut);
     }
     if ((url.pathname.startsWith('/api/portrait/') || url.pathname.startsWith('/api/deck/'))
         && rateLimited(req)) {

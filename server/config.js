@@ -6,6 +6,9 @@ export const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '
 
 /** .env is read here so nobody has to export variables by hand. */
 function loadDotEnv() {
+  // A test harness sets this so a developer's own .env cannot decide the result
+  // of a test about what happens when nothing is configured.
+  if (process.env.SLATE_NO_DOTENV === '1') return;
   const f = path.join(ROOT, '.env');
   if (!fs.existsSync(f)) return;
   for (const line of fs.readFileSync(f, 'utf8').split('\n')) {
