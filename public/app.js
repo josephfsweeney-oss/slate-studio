@@ -52,6 +52,7 @@ const state = {
   drop: {},              // districtId -> Set of excluded candidate names
   order: {},             // districtId -> [names]
   tags: {},              // districtId -> { name -> tagline }
+  reps: {},              // districtId -> Set of names ticked as sitting members
   canvasId: '1x1',
   cw: 1080, ch: 1080,
   copy: {
@@ -69,7 +70,7 @@ const state = {
     bar: ['#2F7C4E', '#12314E'],
     faceSource: 'cutouts', mailPanel: 'none', spotlight: '',
     topper: '', topperAt: 'first',
-    flagBar: true, headlineShadow: true, twoTone: true,
+    flagBar: true, headlineShadow: true, twoTone: true, honorific: true,
     logoPos: 'top-right', logoScale: 0.16,
   },
   waiveDisclaimer: false,
@@ -100,6 +101,7 @@ const saveLocal = () => {
       copy: state.copy, style: state.style, waiveDisclaimer: state.waiveDisclaimer,
       drop: Object.fromEntries(Object.entries(state.drop).map(([k, v]) => [k, [...v]])),
       order: state.order, tags: state.tags,
+      reps: Object.fromEntries(Object.entries(state.reps).map(([k, v]) => [k, [...v]])),
     }));
   } catch { /* private window, no harm */ }
 };
@@ -116,6 +118,7 @@ function loadLocal() {
       waiveDisclaimer: Boolean(s.waiveDisclaimer),
       order: s.order || {}, tags: s.tags || {},
       drop: Object.fromEntries(Object.entries(s.drop || {}).map(([k, v]) => [k, new Set(v)])),
+      reps: Object.fromEntries(Object.entries(s.reps || {}).map(([k, v]) => [k, new Set(v)])),
     });
   } catch { /* first visit */ }
 }
@@ -151,7 +154,15 @@ function activeSlate(d = district()) {
     list = [...list].sort((a, b) => (pos.get(a.name) ?? 99) - (pos.get(b.name) ?? 99));
   }
   const tags = state.tags[d.id] || {};
-  const out = list.map((n) => (tags[n.name] ? { ...n, tag: tags[n.name] } : n));
+  /* Sitting members come off the manifest, and anything ticked here is on top
+   * of that. The manifest is the shared truth; a tick is one person's piece
+   * until it goes back into the file. */
+  const marked = state.reps[d.id] || new Set();
+  const out = list.map((n) => {
+    const rep = Boolean(n.incumbent) || marked.has(n.name);
+    if (!tags[n.name] && rep === Boolean(n.incumbent)) return n;
+    return { ...n, ...(tags[n.name] ? { tag: tags[n.name] } : {}), incumbent: rep };
+  });
 
   /* Whoever is at the top of the ticket, added to the drawing list only. The
    * district record is untouched, so she is never counted in the seats, never
@@ -451,6 +462,10 @@ async function selectDistrict(id) {
   draw();
 }
 
+/** Is this candidate a sitting member, from the manifest or from a tick here? */
+const fromManifest = (n) => Boolean(n.incumbent);
+const isRep = (d, n) => fromManifest(n) || (state.reps[d.id] || new Set()).has(n.name);
+
 function renderSlatePanel() {
   const d = district();
   $('#face-source').value = state.style.faceSource;
@@ -477,6 +492,9 @@ function renderSlatePanel() {
       <input type="checkbox" data-inc="${esc(n.name)}" ${on ? 'checked' : ''}>
       <button class="ph${mine ? ' mine' : ''}" data-photo="${esc(n.name)}"
         title="${hasFace(n) ? 'Change the photo' : 'Add a photo'}"><span class="plus">+</span></button>
+      <button class="rep${isRep(d, n) ? ' on' : ''}" data-rep="${esc(n.name)}"
+        title="${fromManifest(n) ? 'A sitting member, from the manifest' : 'Mark as a sitting member'}"
+        ${fromManifest(n) ? 'disabled' : ''}>Rep.</button>
       <span class="nm">${esc(n.name)}${n.incumbent ? ' <span class="tag">inc</span>' : ''}</span>${tag}
       <button data-mv="up" ${!on || i === 0 ? 'disabled' : ''}>&uarr;</button>
       <button data-mv="down" ${!on || i >= list.length - 1 ? 'disabled' : ''}>&darr;</button>
@@ -485,7 +503,52 @@ function renderSlatePanel() {
       value="${esc((state.tags[d.id] || {})[n.name] || '')}">`;
   }).join('');
   renderPhotoBank();
+  renderRepBank();
   fillThumbs();
+}
+
+/* Ticks made here are one person's, in one browser. This is the way back into
+ * the manifest, which is where a fact about who is a sitting member belongs. */
+function renderRepBank() {
+  const bank = $('#rep-bank');
+  if (!bank) return;
+  const rows = repRows();
+  bank.hidden = rows.length === 0;
+  if (!rows.length) return;
+  const n = rows.reduce((a, r) => a + r.names.length, 0);
+  $('#rep-bank-count').textContent =
+    `${n} member${n > 1 ? 's' : ''} ticked across ${rows.length} district${rows.length > 1 ? 's' : ''}, `
+    + 'in this browser only. Put them in the manifest and everybody gets them.';
+}
+
+/** The districts with local ticks, as manifest rows. */
+function repRows() {
+  const out = [];
+  for (const [id, set] of Object.entries(state.reps)) {
+    const names = [...set].filter(Boolean);
+    if (!names.length) continue;
+    const d = state.catalog?.districts.find((x) => x.id === id);
+    if (!d) continue;
+    // Anything already in the manifest is not somebody's tick to hand back.
+    const fresh = names.filter((nm) => !d.nominees.some((x) => x.name === nm && x.incumbent));
+    if (fresh.length) out.push({ id, county: d.county, district: d.district, names: fresh });
+  }
+  return out.sort((a, b) => a.county.localeCompare(b.county) || a.district - b.district);
+}
+
+async function copyRepsForManifest() {
+  const rows = repRows();
+  if (!rows.length) return;
+  const csv = ['County,District,Incumbents',
+    ...rows.map((r) => `${r.county},${r.district},"${r.names.join('; ')}"`)].join('\n');
+  try {
+    await navigator.clipboard.writeText(csv);
+    notice(`${rows.length} row${rows.length > 1 ? 's' : ''} copied. Paste them into the `
+      + 'Incumbents column of data/slate-manifest.csv, matching on County and District.');
+  } catch {
+    notice('This browser will not let a page write to the clipboard. The rows are in the console.', true);
+    console.log(csv);
+  }
 }
 
 /* The thumbnails arrive after the rows because the static build has to cut each
@@ -1264,6 +1327,7 @@ function syncControls() {
   $('#flagbar').checked = state.style.flagBar;
   $('#hshadow').checked = state.style.headlineShadow;
   $('#twotone').checked = state.style.twoTone !== false;
+  $('#honorific').checked = state.style.honorific !== false;
   $('#logo-pos').value = state.style.logoPos;
   $('#disc-waive').checked = state.waiveDisclaimer;
   $('#bg-upload-wrap').hidden = state.style.bgType !== 'image';
@@ -1421,7 +1485,8 @@ function bind() {
     });
   }
   $('#density').addEventListener('input', (e) => { state.style.density = +e.target.value; scheduleDraw(); });
-  for (const [sel, key] of [['#plate', 'plate'], ['#flagbar', 'flagBar'], ['#hshadow', 'headlineShadow'], ['#twotone', 'twoTone']]) {
+  for (const [sel, key] of [['#plate', 'plate'], ['#flagbar', 'flagBar'], ['#hshadow', 'headlineShadow'],
+    ['#twotone', 'twoTone'], ['#honorific', 'honorific']]) {
     $(sel).addEventListener('change', async (e) => {
       state.style[key] = e.target.checked;
       if (key === 'plate') await refreshDeck();   // named and clean are separate files
@@ -1452,6 +1517,13 @@ function bind() {
     const name = row.dataset.name;
     const ph = e.target.closest('[data-photo]');
     if (ph) return openPhotoEditor(ph.dataset.photo);
+    const rep = e.target.closest('[data-rep]');
+    if (rep && !rep.disabled) {
+      const set = (state.reps[d.id] ||= new Set());
+      set.has(rep.dataset.rep) ? set.delete(rep.dataset.rep) : set.add(rep.dataset.rep);
+      renderSlatePanel(); saveLocal(); draw();
+      return;
+    }
     if (e.target.dataset.inc !== undefined) {
       const set = (state.drop[d.id] ||= new Set());
       e.target.checked ? set.delete(name) : set.add(name);
@@ -1543,6 +1615,12 @@ function bind() {
   $('#photo-remove').addEventListener('click', removePhoto);
   $('#photo-close').addEventListener('click', closePhotoEditor);
   $('#photo').addEventListener('click', (e) => { if (e.target.id === 'photo') closePhotoEditor(); });
+  $('#reps-copy').addEventListener('click', copyRepsForManifest);
+  $('#reps-clear').addEventListener('click', () => {
+    state.reps = {};
+    renderSlatePanel(); saveLocal(); draw();
+    notice('Ticks cleared. Whoever the manifest says is a sitting member still is.');
+  });
   $('#photos-zip').addEventListener('click', photosZip);
   $('#photos-default').addEventListener('click', photosToDefault);
   $('#photos-clear').addEventListener('click', clearMyPhotos);

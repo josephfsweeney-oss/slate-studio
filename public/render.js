@@ -4,6 +4,7 @@
  * with the same plan at the same canvas size, so what you approve is what ships.
  */
 import { BRAND, PHOTO_AR, luminance, flagBand } from './layout.js';
+import { firstLine } from './names.js';
 
 /* ------------------------------------------------------------------- helpers */
 
@@ -218,7 +219,7 @@ function paintTile(ctx, tile, plan, style, assets, theme) {
   ctx.fillRect(p.x, p.y, p.w, Math.max(3, tw * 0.022));
   ctx.restore();
 
-  const first = (c.first || '').toUpperCase();
+  const first = firstLine(c, style);
   const last = (c.last || '').toUpperCase();
   const firstPx = tw * 0.082;
   // Long surnames step down so they never overflow the plate.
@@ -234,12 +235,21 @@ function paintTile(ctx, tile, plan, style, assets, theme) {
     lastPx *= 0.95;
     setFont(ctx, { family: 'Anton', weight: 400 }, lastPx, -0.01);
   }
+  // "REP. " is four characters the plate was not sized for, so the first line
+  // steps down the same way the surname does rather than running off the plate.
+  let firstSize = firstPx;
+  setFont(ctx, { family: 'Barlow Condensed', weight: 700 }, firstSize, 0.10);
+  let fguard = 0;
+  while (first && ctx.measureText(first).width > inner && fguard++ < 40) {
+    firstSize *= 0.95;
+    setFont(ctx, { family: 'Barlow Condensed', weight: 700 }, firstSize, 0.10);
+  }
 
-  const stackH = first ? firstPx * 1.05 + tw * 0.012 + lastPx * 0.96 : lastPx * 0.96;
-  let y = p.y + (p.h - stackH) / 2 + (first ? firstPx * 0.86 : lastPx * 0.80);
+  const stackH = first ? firstSize * 1.05 + tw * 0.012 + lastPx * 0.96 : lastPx * 0.96;
+  let y = p.y + (p.h - stackH) / 2 + (first ? firstSize * 0.86 : lastPx * 0.80);
   if (first) {
     ctx.fillStyle = style.plateAccent || BRAND.mint;
-    setFont(ctx, { family: 'Barlow Condensed', weight: 700 }, firstPx, 0.10);
+    setFont(ctx, { family: 'Barlow Condensed', weight: 700 }, firstSize, 0.10);
     ctx.fillText(first, cx, y);
     y += tw * 0.012 + lastPx * 0.88;
   }
@@ -588,6 +598,7 @@ function paintOval(ctx, o, ink, filled) {
 }
 
 function paintBallotRows(ctx, rows, style, opts) {
+  opts = { ...opts, style };
   const ink = opts.ink;
   const accent = style.accent || BRAND.green;
   ctx.textBaseline = 'alphabetic';
@@ -603,17 +614,18 @@ function paintBallotRows(ctx, rows, style, opts) {
     /* The name block is centred in the row as a block, not hung off fractions
      * of the row height. Positioned by fractions, a tall row pulled the first
      * name and the surname to opposite ends of it. */
-    const stack = (c.first ? firstPx * 1.25 : 0) + namePx;
+    const firstTxt = firstLine(c, opts.style || {});
+    const stack = (firstTxt ? firstPx * 1.25 : 0) + namePx;
     const top = r.y + (r.h - stack) / 2;
     ctx.textAlign = 'left';
-    if (c.first) {
+    if (firstTxt) {
       ctx.fillStyle = opts.quiet;
       setFont(ctx, { family: 'Barlow Condensed', weight: 600 }, firstPx, 0.05);
-      ctx.fillText(c.first, r.textX, top + firstPx * 0.86);
+      ctx.fillText(firstTxt, r.textX, top + firstPx * 0.86);
     }
     ctx.fillStyle = ink;
     setFont(ctx, { family: 'Anton', weight: 400 }, namePx, -0.005);
-    ctx.fillText(c.last, r.textX, top + stack - namePx * 0.16);
+    ctx.fillText(c.last, r.textX, top + stack - (firstTxt ? namePx * 0.16 : namePx * 0.16));
 
     if (opts.party && r.w > namePx * 7) {
       const px = firstPx * 0.92;

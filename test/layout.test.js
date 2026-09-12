@@ -690,3 +690,71 @@ test('one name on a ballot card gets a ballot row, not the whole card', () => {
     > nine.ballot.body.y + nine.ballot.body.h * 0.9, 'nine rows no longer fill the card');
   assert.ok(nine.ballot.rowH <= one.ballot.rowH + 1, 'a longer list got taller rows');
 });
+
+/* ------------------------------------------- towns and sitting members --- */
+
+test('towns read as a sentence, and fall back to the seat when there are none', () => {
+  const at = (towns) => fillTokens('{{TOWNS}}', { county: 'Rockingham', district: 25, seats: 9, towns, nominees: [{ last: 'X' }] });
+  assert.equal(at(['Salem']), 'Salem');
+  assert.equal(at(['Derry', 'Londonderry']), 'Derry and Londonderry');
+  assert.equal(at(['Atkinson', 'Plaistow', 'Newton']), 'Atkinson, Plaistow and Newton');
+  assert.equal(at([]), 'Rockingham 25', 'with no towns it has to say something true');
+  assert.equal(at(['Salem', 'Salem']), 'Salem', 'a town listed twice is one town');
+
+  const one = (towns) => fillTokens('{{TOWN}}', { county: 'Rockingham', district: 25, towns, nominees: [{ last: 'X' }] });
+  assert.equal(one(['Derry', 'Londonderry']), 'Derry', 'the anchor town is the first one');
+  assert.equal(one([]), 'Rockingham 25');
+});
+
+test('a sitting member carries Rep. on the first-name line, never on the surname', async () => {
+  const { firstLine, HONORIFIC } = await import('../public/names.js');
+  const rep = { name: 'Tom Ploszaj', first: 'TOM', last: 'PLOSZAJ', incumbent: true };
+  const challenger = { ...rep, incumbent: false };
+
+  assert.equal(firstLine(rep, {}), 'REP. TOM');
+  assert.equal(firstLine(challenger, {}), 'TOM');
+  assert.equal(firstLine(rep, { honorific: false }), 'TOM', 'the switch has to turn it off');
+  // The surname is what a voter matches against the ballot, so nothing goes in
+  // front of it. firstLine never touches it.
+  assert.ok(!firstLine(rep, {}).includes('PLOSZAJ'));
+  assert.equal(HONORIFIC, 'REP.');
+  // Somebody with no first name on record still gets the honorific alone.
+  assert.equal(firstLine({ last: 'X', incumbent: true }, {}), 'REP.');
+});
+
+test('the manifest carries towns and sitting members, and flags a name nobody stands under', async () => {
+  const { _internal } = await import('../server/catalog.js');
+  const csv = [
+    'County,District,Seats,Slate size,Built?,Nominees,Missing photos,Towns,Incumbents',
+    'Rockingham,25,9,9,YES,Lorie Ball; Joe Sweeney; John Sytek,,Salem,Joe Sweeney; John Sytek',
+    'Belknap,1,1,1,YES,Tom Ploszaj,,Center Harbor; Meredith,',
+    'Carroll,2,2,2,YES,Erlon Jones; Jennifer LePla,,Bartlett,Somebody Else',
+  ].join('\n');
+  const byId = _internal.fromManifest(csv);
+
+  const rock = byId.get('Rockingham-25');
+  assert.deepEqual(rock.towns, ['Salem']);
+  assert.deepEqual(rock.nominees.filter((n) => n.incumbent).map((n) => n.name),
+    ['Joe Sweeney', 'John Sytek']);
+  assert.equal(rock.nominees.find((n) => n.name === 'Lorie Ball').incumbent, false);
+
+  assert.deepEqual(byId.get('Belknap-1').towns, ['Center Harbor', 'Meredith']);
+  assert.equal(byId.get('Belknap-1').nominees[0].incumbent, false, 'an empty column marks nobody');
+
+  // A name in Incumbents that is on nobody's ballot is a typo, and a typo that
+  // puts Rep. in front of the wrong person is worth catching.
+  assert.deepEqual(byId.get('Carroll-2').strayIncumbents, ['Somebody Else']);
+  assert.deepEqual(byId.get('Rockingham-25').strayIncumbents, []);
+});
+
+test('a manifest with neither column reads exactly as it did before', async () => {
+  const { _internal } = await import('../server/catalog.js');
+  const byId = _internal.fromManifest([
+    'County,District,Seats,Slate size,Built?,Nominees,Missing photos',
+    'Belknap,1,1,1,YES,Tom Ploszaj,',
+  ].join('\n'));
+  const d = byId.get('Belknap-1');
+  assert.deepEqual(d.towns, []);
+  assert.equal(d.nominees[0].incumbent, false);
+  assert.deepEqual(d.strayIncumbents, []);
+});

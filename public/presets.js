@@ -40,7 +40,8 @@ export const TOKENS = [
   ['{{COUNTY}}', 'Rockingham'],
   ['{{DISTRICT}}', '25'],
   ['{{SEAT}}', 'Rockingham District 25'],
-  ['{{TOWNS}}', 'Salem'],
+  ['{{TOWNS}}', 'Salem, or Derry and Londonderry'],
+  ['{{TOWN}}', 'Salem, the first town listed'],
   ['{{REPUBLICANS}}', '9 Republicans, or 1 Republican'],
   ['{{TEAM}}', 'team, or candidate'],
   ['{{COUNT}}', '9'],
@@ -350,9 +351,16 @@ export const topperById = (id) => TOPPERS.find((t) => t.id === id) || null;
 export function fillTokens(str, district) {
   if (!str || !district) return str || '';
   const surnames = district.nominees.map((n) => n.last.replace(/\b\w+/g, (w) => w[0] + w.slice(1).toLowerCase()));
-  const towns = (district.towns && district.towns.length)
-    ? [...new Set(district.towns)].join(', ')
-    : `${district.county} ${district.district}`;
+  /* Towns come off the district record. With none listed the tokens fall back
+   * to the seat, which is always true and never wrong, just less useful than
+   * the name of the place somebody lives. The app says when that happens. */
+  const townList = [...new Set(district.towns || [])].filter(Boolean);
+  const seat = `${district.county} ${district.district}`;
+  const towns = townList.length
+    ? (townList.length > 1
+      ? `${townList.slice(0, -1).join(', ')} and ${townList[townList.length - 1]}`
+      : townList[0])
+    : seat;
   // 93 of 174 districts run a single nominee, so a template that always says
   // "9 Republicans" and "team" reads wrong on more than half the state.
   const n = district.nominees.length;
@@ -377,6 +385,7 @@ export function fillTokens(str, district) {
     '{{DISTRICT}}': String(district.district),
     '{{SEAT}}': `${district.county} District ${district.district}`,
     '{{TOWNS}}': towns,
+    '{{TOWN}}': townList[0] || seat,
     '{{COUNT}}': String(district.nominees.length),
     '{{SEATS}}': String(district.seats ?? district.nominees.length),
     '{{SURNAMES}}': surnames.join(', '),

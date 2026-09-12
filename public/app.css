@@ -134,6 +134,12 @@ button,.ghost{cursor:pointer;border-radius:8px;padding:8px 13px;border:1px solid
 .p-row .tag{font-size:11px;padding:2px 6px;border-radius:5px;background:#EEF1F6;color:var(--muted)}
 .p-row .tag.gap{background:#FDE8EC;color:#A3123A}
 .p-row button{padding:2px 7px;font-size:13px}
+/* The Rep. tick. On means a sitting member; disabled means the manifest
+   already says so and this is not somebody's local opinion to change. */
+.p-row .rep{flex:none;font-size:11px;padding:2px 6px;font-weight:700;letter-spacing:.04em;
+  color:var(--muted);background:#fff}
+.p-row .rep.on{background:var(--navy);border-color:var(--navy);color:#fff}
+.p-row .rep:disabled{opacity:1;cursor:default;background:#2F7C4E;border-color:#2F7C4E;color:#fff}
 .tagline{width:100%;margin:-2px 0 4px;padding:5px 8px;border:1px solid var(--line);
   border-radius:6px;font-size:13px;background:#FBFCFE}
 

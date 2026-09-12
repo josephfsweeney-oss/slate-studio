@@ -176,9 +176,44 @@ donate ask, the record, the contrast and the ballot guide. A template that needs
 a particular layout switches to it; one that does not hands the canvas back the
 choice.
 
+**Towns and sitting members** are two optional columns on
+`data/slate-manifest.csv`, both semicolon separated, both empty as shipped:
+
+```
+County,District,...,Towns,Incumbents
+Rockingham,25,...,Salem,Joe Sweeney; John Sytek
+Rockingham,7,...,Derry; Londonderry,
+```
+
+`Towns` makes `{{TOWNS}}` say "Salem" or "Derry and Londonderry" instead of
+falling back to "Rockingham 25", and gives you `{{TOWN}}` for the anchor town.
+`Incumbents` puts **Rep.** in front of a sitting member, on the first-name line
+of the plate and of the ballot row. Never on the surname: the surname is what a
+voter matches against the ballot and nothing goes in front of it. A name in
+`Incumbents` that is on nobody's ballot in that district is reported as a stray,
+because a typo there puts Rep. in front of the wrong person.
+
+Neither is guessed. A row with both columns blank reads exactly as it did
+before. Under **Design**, "Put Rep. in front of sitting members" turns the
+honorific off for a piece that does not want it.
+
+Until the columns are filled, the **Rep.** button on each roster row marks
+somebody for the piece in front of you. Those ticks live in your browser, so
+**Copy them for the manifest** hands back the rows to paste into the file, where
+they belong and where everybody gets them.
+
 **Tokens** fill per district, so one piece of copy builds the whole state:
 `{{SEAT}}`, `{{COUNTY}}`, `{{DISTRICT}}`, `{{TOWNS}}`, `{{COUNT}}`, `{{NAMES}}`,
-`{{SURNAMES}}`, `{{SEATS}}`, `{{REPUBLICANS}}`, `{{TEAM}}`.
+`{{SURNAMES}}`, `{{SEATS}}`, `{{REPUBLICANS}}`, `{{TEAM}}`, `{{TOWN}}`.
+
+Three of them carry phrasing rather than a number, because 75 of the 174
+districts elect a single member and "Vote for all 1" is not English:
+
+| | one seat | nine seats |
+|---|---|---|
+| `{{VOTEFOR}}` | one | all 9 |
+| `{{OVALS}}` | the oval | all 9 ovals |
+| `{{SEATLINE}}` | This district elects one member. Fill in the oval and your ballot counts. | This district elects 9. A ballot with one name marked leaves the other 8 on the table. |
 
 **The undervote is the other photo gap.** 81 of the 174 districts elect more
 than one member and 237 of the 330 nominees run in one of them. A voter who
@@ -467,6 +502,9 @@ to looking the folder up by name.
 - The document layout mimics a bill on purpose. Every figure on it has to be
   defensible, which is why the source line is not optional there and the app
   says so when it is empty.
+- Towns and incumbency ship empty. They are facts about 174 districts and
+  nobody should invent them, least of all this app. Fill the two columns from
+  whatever list you already trust.
 - The contrast layout takes the other side's record from a field somebody
   types. Nothing checks it. Get it wrong in public and it is a correction, so
   source every line before it ships.

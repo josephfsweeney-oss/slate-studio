@@ -68,9 +68,28 @@ function fromManifest(text) {
     d.seats = Number(row.Seats) || null;
     d.built = String(row['Built?']).toUpperCase() === 'YES';
     d.missing = (row['Missing photos'] || '').split(';').map((s) => s.trim()).filter(Boolean);
+
+    /* Two optional columns, both semicolon separated and both blank by default.
+     *
+     *   Towns        the towns this district covers, so {{TOWNS}} stops falling
+     *                back to "Rockingham 25" and starts saying "Salem"
+     *   Incumbents   the nominees who are sitting members, so the pieces can
+     *                say Rep.
+     *
+     * They are facts about the district and the people, so they live with the
+     * roster in git rather than in one person's browser. A row with neither
+     * reads exactly as it did before. */
+    d.towns = (row.Towns || '').split(';').map((t) => t.trim()).filter(Boolean);
+    const sitting = new Set((row.Incumbents || '').split(';').map((t) => t.trim()).filter(Boolean));
     for (const name of (row.Nominees || '').split(';').map((s) => s.trim()).filter(Boolean)) {
-      addNominee(d, name, { hasPhoto: !d.missing.includes(name) });
+      addNominee(d, name, {
+        hasPhoto: !d.missing.includes(name),
+        incumbent: sitting.has(name),
+      });
     }
+    // A name in Incumbents that is on nobody's ballot is a typo, and a typo
+    // that puts Rep. in front of the wrong person is worth catching.
+    d.strayIncumbents = [...sitting].filter((n) => !d.nominees.some((x) => x.name === n));
     byId.set(d.id, d);
   }
   return byId;

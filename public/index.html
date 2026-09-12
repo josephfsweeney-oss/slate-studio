@@ -161,6 +161,7 @@
       <label class="f">Breathing room <input id="density" type="range" min="0.75" max="1.3" step="0.05"></label>
       <label class="inline"><input type="checkbox" id="plate" checked> Name plates under each portrait</label>
       <label class="inline"><input type="checkbox" id="flagbar" checked> Flag bar along the bottom</label>
+      <label class="inline"><input type="checkbox" id="honorific" checked> Put Rep. in front of sitting members</label>
       <label class="inline"><input type="checkbox" id="twotone" checked> Two-tone headline, first line in the accent</label>
       <label class="inline"><input type="checkbox" id="hshadow" checked> Headline shadow</label>
       <label class="f">Logo <input id="logo-file" type="file" accept="image/*"></label>
@@ -193,6 +194,13 @@
       <div class="sub" id="face-note"></div>
       <div class="sub" id="slate-note"></div>
       <div id="slate-list" class="slate-list"></div>
+      <div id="rep-bank" class="photo-bank" hidden>
+        <div class="sub" id="rep-bank-count"></div>
+        <div class="photo-bank-actions">
+          <button id="reps-copy" class="ghost small">Copy them for the manifest</button>
+          <button id="reps-clear" class="ghost small">Clear my ticks</button>
+        </div>
+      </div>
       <div id="photo-bank" class="photo-bank" hidden>
         <div class="sub" id="photo-bank-count"></div>
         <div class="photo-bank-actions">

@@ -21,6 +21,21 @@ export function slugify(name) {
   return String(name || '').replace(/[^A-Za-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
 }
 
+/* The honorific a sitting member carries on a piece.
+ *
+ * It goes on the first-name line, not the surname, because the surname is the
+ * thing a voter matches against the ballot and nothing may be in front of it.
+ * "REP. TOM" over "PLOSZAJ" is how New Hampshire sets it. */
+export const HONORIFIC = 'REP.';
+
+/** The first-name line for a plate or a ballot row, with the honorific if due. */
+export function firstLine(candidate, style = {}) {
+  const first = String(candidate?.first || '').toUpperCase();
+  const show = style.honorific !== false && candidate?.incumbent;
+  if (!show) return first;
+  return first ? `${HONORIFIC} ${first}` : HONORIFIC;
+}
+
 /** Surname + first initial, suffixes dropped. Used to reconcile sources. */
 export function matchKey(name) {
   const toks = String(name || '')
