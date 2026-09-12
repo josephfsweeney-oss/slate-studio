@@ -370,4 +370,29 @@ export async function get({ refresh = false } = {}) {
 }
 
 export function peek() { return cache; }
+
+/** Drop the cached catalog so the next get() rebuilds. Called after a portrait
+ *  is written into public/cutouts, which changes who has a face.
+ *
+ *  The copy on disk goes too. It is read back at start-up, so leaving it would
+ *  bring the old answer back on the next restart: a portrait deleted a minute
+ *  ago reappearing in the roster with nothing behind it. */
+export function invalidate() {
+  cache = null;
+  try { fs.rmSync(paths.catalog); } catch { /* never built, or already gone */ }
+}
+
+export const CUTOUTS_DIR = path.join(ROOT, 'public', 'cutouts');
+const CUTOUTS_INDEX = path.join(ROOT, 'data', 'cutouts.json');
+
+/** Rewrite data/cutouts.json from what is actually on disk. The same list
+ *  build/index-cutouts.mjs writes, kept in step when a portrait is added
+ *  through the app instead of through the build script. */
+export function reindexBundled() {
+  const files = fs.readdirSync(CUTOUTS_DIR).filter((f) => /\.(webp|png)$/i.test(f)).sort();
+  fs.mkdirSync(path.dirname(CUTOUTS_INDEX), { recursive: true });
+  fs.writeFileSync(CUTOUTS_INDEX, JSON.stringify(files));
+  invalidate();
+  return files.length;
+}
 export const _internal = { parseCsv, fromManifest, mergeRoster, DECK_RE };

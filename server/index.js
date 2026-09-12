@@ -9,7 +9,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
-import { config, paths, ROOT } from './config.js';
+import { config, paths, ROOT, serverless } from './config.js';
 import * as auth from './google-auth.js';
 import * as drive from './drive.js';
 import * as catalog from './catalog.js';
@@ -64,9 +64,15 @@ function closedReason(pathname) {
   const isAuthFlow = pathname === '/auth/google' || pathname.startsWith('/auth/callback');
   const isSignOut = pathname === '/auth/signout';
   const isSave = pathname === '/api/save';
-  if (!isAuthFlow && !isSignOut && !isSave) return null;
+  const isCutout = pathname.startsWith('/api/cutout/');
+  if (!isAuthFlow && !isSignOut && !isSave && !isCutout) return null;
 
   if (config.isPublic) return 'This deployment is public and read-only.';
+  if (isCutout && !cutoutsWritable()) {
+    return 'This copy cannot set default portraits: it has no writable checkout '
+      + 'of public/cutouts. Download the file and add it to the repo instead.';
+  }
+  if (isCutout) return null;
   if (isAuthFlow && !auth.configured()) {
     return 'No Google client is configured here, so there is no sign-in to start. '
       + 'Set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET, or use a service-account key.';
@@ -92,6 +98,23 @@ function closedReason(pathname) {
 function effectivelyReadOnly() {
   return config.isPublic || !auth.signedIn() || auth.readOnlyCredential();
 }
+
+/* Writing a new default portrait means writing into the repo: public/cutouts
+ * and the index beside it. That only makes sense where the repo actually is, on
+ * somebody's own machine. A serverless host has a read-only disk apart from
+ * /tmp, and nothing written to /tmp survives the next cold start, so a portrait
+ * "saved" there would vanish without ever telling anyone. */
+function cutoutsWritable() {
+  if (serverless || config.isPublic) return false;
+  const dir = fs.existsSync(catalog.CUTOUTS_DIR) ? catalog.CUTOUTS_DIR : path.join(ROOT, 'public');
+  try { fs.accessSync(dir, fs.constants.W_OK); return true; } catch { return false; }
+}
+
+/* A portrait filename, and nothing else. The route writes to disk, so the name
+ * is checked against this and then against the roster: a slug nobody is
+ * standing for is refused, which keeps a typo from leaving an orphan file and
+ * keeps the route from being a way to write anywhere at all. */
+const CUTOUT_FILE = /^[A-Za-z0-9][A-Za-z0-9-]{0,79}\.(webp|png)$/;
 
 /** Crude per-IP ceiling on the endpoints that can reach Drive. In-memory, so on
  *  serverless it is per instance: a speed bump, not a guarantee. */
@@ -148,6 +171,7 @@ async function api(req, res, url) {
       readOnly: effectivelyReadOnly(),
       writesClosed: Boolean(closedReason('/api/save')) || !auth.signedIn(),
       authClosed: Boolean(closedReason('/auth/google')),
+      canWriteCutouts: cutoutsWritable(),
       readyOnly: config.readyOnly,
       disclaimer: config.disclaimer,
       driveConfigured: auth.configured(),
@@ -212,6 +236,51 @@ async function api(req, res, url) {
     const name = url.searchParams.get('name') || 'slate.png';
     const file = await drive.upload(name, folder, png);
     return json(res, 200, { ok: true, id: file.id, name: file.name, link: file.webViewLink });
+  }
+
+  /* /api/cutout/<Slug>.webp -- make a photo the default for that candidate.
+   *
+   * POST writes it into public/cutouts and rewrites data/cutouts.json, so it is
+   * a real default for every canvas and every district from the next request
+   * on, and a `git add public/cutouts data/cutouts.json` away from being the
+   * default for everybody. DELETE takes it back out. */
+  if (p.startsWith('/api/cutout/')) {
+    const file = decodeURIComponent(p.slice('/api/cutout/'.length));
+    if (!CUTOUT_FILE.test(file)) {
+      return json(res, 400, { error: 'A portrait filename is <Slug>.webp or <Slug>.png, nothing else.' });
+    }
+    const slug = file.replace(/\.(webp|png)$/i, '');
+    const cat = await catalog.get();
+    const who = cat.districts.flatMap((d) => d.nominees).find((n) => n.slug === slug);
+    if (!who) return json(res, 404, { error: `No candidate on the roster has the slug ${slug}.` });
+    const target = path.join(catalog.CUTOUTS_DIR, file);
+
+    if (req.method === 'DELETE') {
+      // Only the pair this route could have written. A .png next to a .webp of
+      // the same name is dead weight once the .webp is gone, so both go.
+      let gone = 0;
+      for (const ext of ['webp', 'png']) {
+        const f = path.join(catalog.CUTOUTS_DIR, `${slug}.${ext}`);
+        if (fs.existsSync(f)) { fs.rmSync(f); gone++; }
+      }
+      if (!gone) return json(res, 404, { error: `No portrait on disk for ${who.name}.` });
+      const left = catalog.reindexBundled();
+      return json(res, 200, { ok: true, removed: gone, name: who.name, portraits: left });
+    }
+
+    if (req.method !== 'POST') return json(res, 405, { error: 'POST or DELETE' });
+    const body = await readBody(req, 12 * 1024 * 1024);
+    if (!body.length) return json(res, 400, { error: 'no image' });
+    fs.mkdirSync(catalog.CUTOUTS_DIR, { recursive: true });
+    fs.writeFileSync(target, body);
+    // A .png left over from before would otherwise sit there being ignored.
+    const other = path.join(catalog.CUTOUTS_DIR, `${slug}.${file.endsWith('webp') ? 'png' : 'webp'}`);
+    if (fs.existsSync(other)) fs.rmSync(other);
+    const total = catalog.reindexBundled();
+    return json(res, 200, {
+      ok: true, name: who.name, file, bytes: body.length, portraits: total,
+      path: path.relative(ROOT, target),
+    });
   }
 
   if (p === '/api/login' && req.method === 'POST') {

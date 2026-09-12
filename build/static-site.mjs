@@ -50,33 +50,55 @@ const swap = (re, to, what) => {
 };
 
 swap(/  const \[st, cat\] = await Promise\.all\(\[\s*fetch\('\/api\/state'\)[^;]*?\]\);/s,
-  '  const st = window.__SLATE__.state;\n  const cat = window.__SLATE__.catalog;',
+  '  const st = window.__SLATE__.state;\n  const cat = window.__SLATE__.catalog;\n  await loadOverrides();',
   'the state and catalog fetches');
 
-swap(/async function loadPortraits\(d\) \{[\s\S]*?\n\}/,
+/* Portraits come out of the texture atlases here rather than one file each: a
+ * published Artifact is capped at 256 files and there are 301 faces. Only the
+ * two accessors change. loadPortraits, the roster and the photo editor all sit
+ * on top of them and carry on working, added photos included. */
+swap(/async function portraitImage\(n\) \{[\s\S]*?\n\}/,
 `const atlasCache = new Map();
 function loadAtlas(n) {
   if (!atlasCache.has(n)) atlasCache.set(n, loadImage('atlas-' + n + '.webp'));
   return atlasCache.get(n);
 }
 
-async function loadPortraits(d) {
-  const out = {};
-  const map = window.__SLATE__.atlas;
-  await Promise.all((d?.nominees || []).map(async (n) => {
-    const m = map[n.slug];
-    if (!m) return;
-    const sheet = await loadAtlas(m.a);
-    if (!sheet) return;
-    // A canvas is a drawImage source with width and height, exactly like an
-    // Image, so the painter needs no change at all.
-    const c = document.createElement('canvas');
-    c.width = m.w; c.height = m.h;
-    c.getContext('2d').drawImage(sheet, m.x, m.y, m.w, m.h, 0, 0, m.w, m.h);
-    out[n.name] = c;
-  }));
-  return out;
+async function portraitImage(n) {
+  const mine = overrideUrls.get(n?.slug);
+  if (mine) return loadImage(mine);
+  const m = window.__SLATE__.atlas[n?.slug];
+  if (!m) return null;
+  const sheet = await loadAtlas(m.a);
+  if (!sheet) return null;
+  // A canvas is a drawImage source with width and height, exactly like an
+  // Image, so the painter needs no change at all.
+  const c = document.createElement('canvas');
+  c.width = m.w; c.height = m.h;
+  c.getContext('2d').drawImage(sheet, m.x, m.y, m.w, m.h, 0, 0, m.w, m.h);
+  return c;
 }`, 'portrait loading');
+
+swap(/async function portraitThumb\(n\) \{[\s\S]*?\n\}/,
+`const thumbCache = new Map();
+async function portraitThumb(n) {
+  const mine = overrideUrls.get(n?.slug);
+  if (mine) return mine;
+  if (!n || thumbCache.has(n.slug)) return thumbCache.get(n.slug) || null;
+  // A full-size data URL per row would be megabytes of string. 96px is all a
+  // 34px-wide button can show.
+  const p = portraitImage(n).then((full) => {
+    if (!full) return null;
+    const k = 96 / Math.max(full.width, full.height);
+    const c = document.createElement('canvas');
+    c.width = Math.max(1, Math.round(full.width * k));
+    c.height = Math.max(1, Math.round(full.height * k));
+    c.getContext('2d').drawImage(full, 0, 0, c.width, c.height);
+    return c.toDataURL('image/webp', 0.8);
+  });
+  thumbCache.set(n.slug, p);
+  return p;
+}`, 'roster thumbnails');
 
 swap(/function download\(blob, name\) \{[\s\S]*?\n\}/,
 `async function download(blob, name) {

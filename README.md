@@ -165,6 +165,9 @@ Two things make that usable:
   headshot and how many districts are complete, and flags every slate that is
   **one headshot from done**. Those are the cheap wins: one photo turns a broken
   slate into a finished one.
+- **The photo button on every roster row** means the candidate who opens that
+  link can fix it themselves. They drop their headshot in, see it on their own
+  slate, and send back a correctly named file. See Changing a candidate's photo.
 
 If you would rather not show the gap, `SLATE_PUBLIC_READY_ONLY=1` offers only
 districts whose portraits are all present. That is 85 districts instead of 174,
@@ -275,7 +278,53 @@ npm install --no-save playwright && npx playwright install chromium
 
 `npm start`, `npm test` and `npm run verify` still need nothing.
 
-## After adding or replacing a portrait
+## Changing a candidate's photo
+
+Click the face in the roster on the right. That is the whole control.
+
+The editor opens on whatever is there now. Choose a photo, drag it into the 4:5
+frame, scroll or drag the slider to zoom. The panel beside it shows the result
+standing on the plate, which is the only place it is ever seen.
+
+**Cut the background out** flood fills from the edge of the frame, clearing
+anything that reaches it and matches the corners, then trims to what is left.
+That is what makes a phone photo sit next to a real cutout instead of floating
+in a grey rectangle. It switches itself on when the four corners agree, which is
+a plain wall or a studio backdrop, and stays off when they do not. **Edge**
+moves the tolerance: up if a rim of wall is left, down if it is eating the
+candidate.
+
+Then pick where it goes.
+
+| | What it does | Where it works |
+|---|---|---|
+| **Use this photo** | That candidate on every canvas, every district, straight away | Anywhere. It is kept in this browser, in IndexedDB, and nowhere else |
+| **Make it the default** | Writes `public/cutouts/<Slug>.webp` and rewrites `data/cutouts.json` | Only where the app is running on a real checkout. `git add` those two, push, done |
+| **Download for the repo** | Hands back the file, named the way the roster resolves it | Anywhere, including the hosted copy and the Artifact |
+
+A photo added here counts as a face everywhere the app counts faces: the
+PHOTO NEEDED tile goes, the district loses its dot, **Photo gap** stops listing
+it, and **one headshot from done** updates. It is a real fix, not a preview.
+
+Added photos collect at the foot of the roster panel, with **Download them for
+the repo** for the lot at once. The zip has a `HOW-TO.txt` in it and the files
+are already named correctly, so a candidate can add their own headshot on the
+public site, send you the zip, and it drops straight into `public/cutouts/`.
+
+Where a photo is already a default, **Remove the default** takes it back out of
+`public/cutouts` and the index. The candidate goes back to PHOTO NEEDED, which
+is the honest state when the file is wrong.
+
+The route that writes these files closes itself unless the app is running on a
+writable checkout, so the hosted copy offers the download and not the write.
+The filename is checked against `<Slug>.webp|png` and then against the roster:
+a name that is not a portrait, and a slug nobody is standing for, never reach
+the disk.
+
+## After adding or replacing a portrait by hand
+
+Only needed when the file was copied in rather than added through the app. The
+app reindexes itself.
 
 ```
 npm run index:cutouts
@@ -304,3 +353,11 @@ to looking the folder up by name.
 - The 2024 Canva photos are two cycles old. Look before they go out.
 - Portraits come through the server so the browser can read the pixels. First
   load of a district fetches from Drive, after that it is cached on disk.
+- The background knockout in the photo editor is a flood fill, not the pipeline
+  that produced the 301 shipped cutouts. On a plain wall it is as good. On a
+  busy room, or hair against a dark background, it is not, and the preview on
+  the plate is there to show you before it goes anywhere. A photo that will not
+  knock out cleanly is better sent for a proper cutout.
+- Photos added in the browser live in that browser. A different machine, a
+  different profile or a cleared site data and they are gone. Make them the
+  default, or download them, the moment they are right.

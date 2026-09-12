@@ -3,6 +3,7 @@ import { solve, BRAND } from './layout.js';
 import { paint, makeMeasurer } from './render.js';
 import { CANVASES, TEMPLATES, PALETTES, GROUNDS, TOKENS, fillTokens, buildFilename } from './presets.js';
 import { makeZip } from './zip.js';
+import * as photos from './photos.js';
 import { printSheet, slugLine, drawSlug, inchesOf } from './print.js';
 
 const $ = (s) => document.querySelector(s);
@@ -116,9 +117,18 @@ function loadLocal() {
 
 const district = () => state.catalog?.districts.find((d) => d.id === state.districtId) || null;
 
+/* The catalog's own ready/missing fields are "does this nominee have a cutout
+ * on the server". A photo added in this browser is a face too, and the whole
+ * left rail would go on calling a finished slate incomplete if these read the
+ * server's answer instead of working it out. Same rule as the server's, one
+ * term wider. */
+const hasFace = (n) => overrides.has(n.slug) || Boolean(n.cutout);
+const facesMissing = (d) => d.nominees.filter((n) => !hasFace(n)).length;
+const isReady = (d) => facesMissing(d) === 0;
+
 /** One headshot short of a complete slate. These are the cheapest to unlock,
  *  so they are worth calling out rather than burying in the list. */
-const oneAway = (d) => d.missing.length === 1 && d.nominees.length >= 2;
+const oneAway = (d) => facesMissing(d) === 1 && d.nominees.length >= 2;
 
 /** The candidates actually on the graphic, in the chosen order. */
 function activeSlate(d = district()) {
@@ -180,19 +190,60 @@ async function loadDeck(d, size) {
   return im ? Object.assign(im, { _pick: pick }) : null;
 }
 
+/* Photos added in this browser, slug -> record, with a live object URL each.
+ * They beat whatever the catalog points at, so a headshot that arrived this
+ * morning is on the graphic before it is anywhere near the repo. */
+let overrides = new Map();
+const overrideUrls = new Map();
+
+async function loadOverrides() {
+  overrides = await photos.all();
+  for (const u of overrideUrls.values()) URL.revokeObjectURL(u);
+  overrideUrls.clear();
+  for (const [slug, rec] of overrides) overrideUrls.set(slug, URL.createObjectURL(rec.blob));
+}
+
+/** The portrait shipped with the app: a public path the CDN serves directly, or
+ *  a Drive id that goes through the proxy. */
+function shippedSrc(n) {
+  if (!n?.cutout) return null;
+  return String(n.cutout).startsWith('/')
+    ? n.cutout
+    : `/api/portrait/${encodeURIComponent(n.slug)}.png`;
+}
+
+/* Every face the app draws comes through here, so there is one place that
+ * knows an added photo beats the shipped one. The static build swaps the body
+ * for an atlas lookup and inherits the same rule. */
+async function portraitImage(n) {
+  const mine = overrideUrls.get(n?.slug);
+  if (mine) return loadImage(mine);
+  const src = shippedSrc(n);
+  return src ? loadImage(src) : null;
+}
+
+/** A URL for the roster thumbnail, or null when there is no face to show. */
+async function portraitThumb(n) {
+  return overrideUrls.get(n?.slug) || shippedSrc(n);
+}
+
 async function loadPortraits(d) {
   const out = {};
   await Promise.all((d?.nominees || []).map(async (n) => {
-    if (!n.cutout) return;
-    // A cutout shipped with the app is a public path the CDN serves directly.
-    // Anything else is a Drive id and goes through the proxy.
-    const src = String(n.cutout).startsWith('/')
-      ? n.cutout
-      : `/api/portrait/${encodeURIComponent(n.slug)}.png`;
-    const im = await loadImage(src);
+    const im = await portraitImage(n);
     if (im) out[n.name] = im;
   }));
   return out;
+}
+
+/** Re-read the portraits for the district on screen and repaint. The left rail
+ *  goes too: a face added here closes a gap, and the list counts gaps. */
+async function refreshPortraits() {
+  const d = district();
+  assets.portraits = d ? await loadPortraits(d) : {};
+  renderDistrictList();
+  renderSlatePanel();
+  draw();
 }
 
 /* ----------------------------------------------------------------- rendering */
@@ -309,12 +360,12 @@ function renderGapSummary(filter) {
   const el = $('#gap-summary');
   const all = state.catalog.districts;
   const noms = all.reduce((a, d) => a + d.nominees.length, 0);
-  const have = all.reduce((a, d) => a + d.nominees.filter((n) => n.cutout).length, 0);
+  const have = all.reduce((a, d) => a + d.nominees.filter(hasFace).length, 0);
   if (filter !== 'gap' || !noms) { el.hidden = true; return; }
   const close = all.filter(oneAway);
   el.hidden = false;
   el.innerHTML = `<b>${noms - have}</b> of ${noms} nominees still owe a headshot. `
-    + `<b>${all.filter((d) => d.ready).length}</b> of ${all.length} districts are complete.`
+    + `<b>${all.filter(isReady).length}</b> of ${all.length} districts are complete.`
     + (close.length
       ? `<br><b>${close.length}</b> slate${close.length > 1 ? 's are' : ' is'} one headshot from done.`
       : '');
@@ -329,15 +380,15 @@ function renderDistrictList() {
   let county = null;
 
   for (const d of state.catalog.districts) {
-    if (filter === 'ready' && !d.ready) continue;
+    if (filter === 'ready' && !isReady(d)) continue;
     if (filter === 'multi' && d.nominees.length < 2) continue;
-    if (filter === 'gap' && d.ready) continue;
+    if (filter === 'gap' && isReady(d)) continue;
     if (q) {
       const hay = `${d.county} ${d.district} ${(d.towns || []).join(' ')} ${d.nominees.map((n) => n.name).join(' ')}`.toLowerCase();
       if (!hay.includes(q)) continue;
     }
     if (d.county !== county) { county = d.county; html.push(`<div class="county">${esc(county)}</div>`); }
-    const have = d.nominees.filter((n) => n.cutout).length;
+    const have = d.nominees.filter(hasFace).length;
     const cls = have === d.nominees.length ? 'ready' : have ? 'part' : '';
     const close = oneAway(d);
     html.push(
@@ -385,9 +436,14 @@ function renderSlatePanel() {
   $('#slate-note').textContent = 'Ballot order is alphabetical by surname, the way November lists them. Reorder only when you have a reason.';
   $('#slate-list').innerHTML = [...list, ...off].map((n, i) => {
     const on = !dropped.has(n.name);
-    const tag = n.cutout ? '' : `<span class="tag gap">${n.hasPhoto ? 'not loaded' : 'photo needed'}</span>`;
+    const mine = overrides.has(n.slug);
+    const tag = mine ? '<span class="tag mine">yours</span>'
+      : hasFace(n) ? ''
+        : `<span class="tag gap">${n.hasPhoto ? 'not loaded' : 'photo needed'}</span>`;
     return `<div class="p-row${on ? '' : ' off'}" data-name="${esc(n.name)}">
       <input type="checkbox" data-inc="${esc(n.name)}" ${on ? 'checked' : ''}>
+      <button class="ph${mine ? ' mine' : ''}" data-photo="${esc(n.name)}"
+        title="${hasFace(n) ? 'Change the photo' : 'Add a photo'}"><span class="plus">+</span></button>
       <span class="nm">${esc(n.name)}${n.incumbent ? ' <span class="tag">inc</span>' : ''}</span>${tag}
       <button data-mv="up" ${!on || i === 0 ? 'disabled' : ''}>&uarr;</button>
       <button data-mv="down" ${!on || i >= list.length - 1 ? 'disabled' : ''}>&darr;</button>
@@ -395,6 +451,24 @@ function renderSlatePanel() {
     <input class="tagline" data-tag="${esc(n.name)}" placeholder="Title or role, palm card only"
       value="${esc((state.tags[d.id] || {})[n.name] || '')}">`;
   }).join('');
+  renderPhotoBank();
+  fillThumbs();
+}
+
+/* The thumbnails arrive after the rows because the static build has to cut each
+ * one out of a texture atlas. Rendering the row first keeps the list instant. */
+function fillThumbs() {
+  for (const btn of $$('#slate-list .ph')) {
+    const n = district()?.nominees.find((x) => x.name === btn.dataset.photo);
+    if (!n) continue;
+    portraitThumb(n).then((src) => {
+      if (!src || !btn.isConnected) return;
+      const im = new Image();
+      im.alt = '';
+      im.src = src;
+      btn.replaceChildren(im);
+    });
+  }
 }
 
 /** Re-state the existing rows without rebuilding them. */
@@ -411,6 +485,329 @@ function refreshSlateRows() {
     row.querySelector('[data-mv="up"]').disabled = !included || i <= 0;
     row.querySelector('[data-mv="down"]').disabled = !included || i < 0 || i >= on.length - 1;
   }
+}
+
+/* ------------------------------------------------------------- photo editor */
+
+/* Changing a face used to mean finding the candidate's slug, naming a file to
+ * match, dropping it in public/cutouts, running the index script and pushing.
+ * Here it is: click the thumbnail, pick the photo, drag it into the frame.
+ *
+ * The photo lands in this browser first, which is the only thing that works
+ * everywhere: the hosted copy has no writable disk. From there it has two ways
+ * out. Where the app is running on a real checkout it can be written straight
+ * into public/cutouts as the default for everybody. Where it cannot, it comes
+ * back as a correctly named file to drop into the repo. */
+
+const REPO_STEPS = [
+  'Adding these portraits to the app for everybody',
+  '',
+  '1. Copy the files in cutouts/ into public/cutouts/ in the slate-studio repo.',
+  '2. Run: npm run index:cutouts',
+  '   That rewrites data/cutouts.json, which is how a hosted copy finds them.',
+  '3. Commit both and push. Vercel redeploys on its own.',
+  '',
+  'The filenames matter. Each one is the candidate slug the roster uses, so',
+  'leave them exactly as they are.',
+].join('\n');
+
+const ed = {
+  name: null, slug: null, img: null, view: null, base: 1,
+  knockout: false, tol: 34, sourceName: '', token: 0,
+};
+
+const nominee = (name) => district()?.nominees.find((x) => x.name === name) || null;
+const edStatus = (msg = '', bad = false) => {
+  const el = $('#photo-status');
+  el.textContent = msg;
+  el.style.color = bad ? 'var(--red)' : '';
+};
+
+function openPhotoEditor(name) {
+  const n = nominee(name);
+  if (!n) return;
+  Object.assign(ed, {
+    name: n.name, slug: n.slug, img: null, view: null, base: 1,
+    knockout: false, tol: 34, sourceName: '', token: ed.token + 1,
+  });
+  $('#photo-who').textContent = n.name;
+  $('#photo-file').value = '';
+  $('#photo-knockout').checked = false;
+  $('#photo-tol').value = '34';
+  edStatus('');
+  $('#photo').hidden = false;
+  syncEditor();
+}
+
+function closePhotoEditor() {
+  ed.token++;
+  ed.img = null;
+  $('#photo').hidden = true;
+}
+
+/** Buttons, notes and both canvases, from whatever state the editor is in. */
+function syncEditor() {
+  const n = nominee(ed.name);
+  const mine = overrides.get(ed.slug);
+  const picking = Boolean(ed.img);
+  const canWrite = Boolean(state.server.canWriteCutouts);
+
+  $('#photo-zoom-wrap').hidden = !picking;
+  $('#photo-tol-wrap').hidden = !picking || !ed.knockout;
+  $('#photo-knockout').closest('.inline').hidden = !picking;
+  $('#photo-use').hidden = !picking;
+  $('#photo-download').hidden = !picking && !mine;
+  $('#photo-default').hidden = !canWrite || (!picking && !mine);
+  $('#photo-remove').hidden = !(mine || (n?.cutout && canWrite));
+  $('#photo-remove').textContent = mine ? 'Remove my photo' : 'Remove the default';
+  $('#photo-pick').textContent = picking || (n && hasFace(n)) ? 'Choose another file' : 'Choose a photo';
+  $('#photo-pick').className = picking ? 'ghost' : 'primary';
+
+  $('#photo-sub').textContent = picking
+    ? 'Drag to move it, scroll or use the slider to zoom. The frame is the 4:5 tile the slate uses.'
+    : mine
+      ? `Your photo. It is on every canvas for ${ed.name} in this browser, and nowhere else yet.`
+      : n?.cutout
+        ? 'The portrait that ships with the app.'
+        : 'No headshot was ever sent, so this candidate shows as PHOTO NEEDED.';
+
+  $('#photo-knock-note').hidden = !picking;
+  $('#photo-knock-note').textContent = ed.knockout
+    ? 'Clearing everything that touches the edge of the frame and matches the corners. Works on a plain wall or a studio backdrop. Slide Edge up if a rim is left, down if it is eating the candidate.'
+    : 'Leave this off for a photo already cut out, or one shot somewhere busy.';
+
+  drawStage();
+  drawPreview();
+}
+
+function drawStage() {
+  const cv = $('#photo-stage');
+  const ctx = cv.getContext('2d');
+  ctx.clearRect(0, 0, cv.width, cv.height);
+  const hint = $('#photo-hint');
+  if (ed.img && ed.view) {
+    photos.drawView(ctx, ed.img, ed.view, cv.width, cv.height);
+    hint.hidden = true;
+    return;
+  }
+  const token = ed.token;
+  portraitImage(nominee(ed.name)).then((im) => {
+    if (token !== ed.token || ed.img) return;
+    if (!im) {
+      hint.hidden = false;
+      hint.textContent = `No headshot for ${ed.name}. Choose one below.`;
+      return;
+    }
+    hint.hidden = true;
+    const k = Math.min(cv.width / im.width, cv.height / im.height);
+    ctx.drawImage(im, (cv.width - im.width * k) / 2, cv.height - im.height * k,
+      im.width * k, im.height * k);
+  });
+}
+
+let previewTimer = null;
+const schedulePreview = () => { clearTimeout(previewTimer); previewTimer = setTimeout(drawPreview, 170); };
+
+/** The result, standing on the plate colour: the only place it is ever seen. */
+function drawPreview() {
+  const cv = $('#photo-preview');
+  const ctx = cv.getContext('2d');
+  ctx.clearRect(0, 0, cv.width, cv.height);
+  const stand = (im) => {
+    const k = Math.min(cv.width / im.width, cv.height / im.height);
+    ctx.drawImage(im, (cv.width - im.width * k) / 2, cv.height - im.height * k,
+      im.width * k, im.height * k);
+  };
+  if (ed.img && ed.view) {
+    stand(photos.prepare(ed.img, ed.view, { knockout: ed.knockout, tolerance: ed.tol }));
+    return;
+  }
+  const token = ed.token;
+  portraitImage(nominee(ed.name)).then((im) => { if (im && token === ed.token && !ed.img) stand(im); });
+}
+
+/** One client pixel of drag, in source-image pixels. */
+function sourcePerClientPx() {
+  const cv = $('#photo-stage');
+  const shown = cv.getBoundingClientRect().width || cv.width;
+  return cv.width / shown / (ed.view.scale * (cv.width / photos.OUT_W));
+}
+
+function setZoom(mult) {
+  const z = Math.min(4, Math.max(1, mult));
+  $('#photo-zoom').value = String(z);
+  ed.view = photos.clampView(ed.img, { ...ed.view, scale: ed.base * z });
+  drawStage();
+  schedulePreview();
+}
+
+async function pickPhotoFile(file) {
+  if (!file) return;
+  edStatus('Opening...');
+  const img = await loadImage(URL.createObjectURL(file));
+  if (!img || !img.width) return edStatus('That file would not open as an image.', true);
+  ed.img = img;
+  ed.sourceName = file.name;
+  ed.base = photos.minScale(img);
+  ed.view = photos.clampView(img, photos.defaultView(img));
+  // A plain wall or a studio backdrop is worth knocking out by default. A
+  // kitchen is not, and guessing wrong there takes half the candidate with it.
+  ed.knockout = photos.backdropIsPlain(img);
+  $('#photo-knockout').checked = ed.knockout;
+  $('#photo-zoom').value = '1';
+  edStatus(ed.knockout ? 'Plain background, so the knockout is on. Turn it off if it bites.' : '');
+  syncEditor();
+}
+
+/** The prepared photo, encoded the way the repo already stores portraits. */
+async function encodeEdited() {
+  const out = photos.prepare(ed.img, ed.view, { knockout: ed.knockout, tolerance: ed.tol });
+  return photos.encode(out);
+}
+
+/** Whatever is on offer: a freshly framed photo, else the stored override. */
+async function currentFile() {
+  if (ed.img) return encodeEdited();
+  const mine = overrides.get(ed.slug);
+  return mine ? { blob: mine.blob, type: mine.type, ext: mine.ext } : null;
+}
+
+async function usePhoto() {
+  if (!ed.img) return;
+  edStatus('Preparing...');
+  const { blob, type, ext } = await encodeEdited();
+  await photos.put({ slug: ed.slug, name: ed.name, blob, type, ext, sourceName: ed.sourceName });
+  await loadOverrides();
+  closePhotoEditor();
+  await refreshPortraits();
+  saveLocal();
+  notice(`${ed.name} now uses your photo on every canvas. It stays in this browser `
+    + 'until you make it the default or download it for the repo.');
+}
+
+async function makeDefault() {
+  const file = await currentFile();
+  if (!file) return;
+  edStatus('Writing it into the repo...');
+  try {
+    const res = await fetch(`/api/cutout/${encodeURIComponent(ed.slug)}.${file.ext}`, {
+      method: 'POST', headers: { 'content-type': file.type }, body: file.blob,
+    });
+    const j = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(j.error || 'that did not save');
+    // It is the shipped portrait now, so the browser copy is just a duplicate.
+    await photos.remove(ed.slug);
+    await loadOverrides();
+    closePhotoEditor();
+    await reloadCatalog();
+    notice(`${j.name} is the default portrait now, written to ${j.path}. `
+      + `${j.portraits} portraits on file. Commit public/cutouts and data/cutouts.json to ship it.`);
+  } catch (e) {
+    edStatus(e.message, true);
+  }
+}
+
+async function downloadForRepo() {
+  const file = await currentFile();
+  if (!file) return;
+  download(file.blob, photos.cutoutName(ed.slug, file.ext));
+  notice(`Saved as ${ed.slug}.${file.ext}. Put it in public/cutouts/, run npm run index:cutouts, `
+    + 'then commit both and push.');
+}
+
+async function removePhoto() {
+  const mine = overrides.get(ed.slug);
+  if (mine) {
+    await photos.remove(ed.slug);
+    await loadOverrides();
+    closePhotoEditor();
+    await refreshPortraits();
+    return notice(`Your photo for ${ed.name} is gone. Back to what ships with the app.`);
+  }
+  if (!confirm(`Delete the default portrait for ${ed.name} out of public/cutouts?`)) return;
+  edStatus('Deleting...');
+  try {
+    const res = await fetch(`/api/cutout/${encodeURIComponent(ed.slug)}.webp`, { method: 'DELETE' });
+    const j = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(j.error || 'that did not delete');
+    closePhotoEditor();
+    await reloadCatalog();
+    notice(`${j.name} has no portrait now and shows as PHOTO NEEDED. `
+      + 'Commit public/cutouts and data/cutouts.json to make that stick.');
+  } catch (e) {
+    edStatus(e.message, true);
+  }
+}
+
+/* ----------------------------------------------------------------- the bank */
+
+function renderPhotoBank() {
+  const bank = $('#photo-bank');
+  if (!bank) return;
+  bank.hidden = overrides.size === 0;
+  if (!overrides.size) return;
+  const n = overrides.size;
+  $('#photo-bank-count').textContent =
+    `${n} photo${n > 1 ? 's' : ''} you added, in this browser only. `
+    + 'They are not in the app for anybody else yet.';
+  $('#photos-default').hidden = !state.server.canWriteCutouts;
+}
+
+async function photosZip() {
+  if (!overrides.size) return;
+  const files = [];
+  for (const [slug, rec] of overrides) {
+    files.push({
+      name: `cutouts/${photos.cutoutName(slug, rec.ext)}`,
+      data: new Uint8Array(await rec.blob.arrayBuffer()),
+    });
+  }
+  files.push({ name: 'HOW-TO.txt', data: new TextEncoder().encode(REPO_STEPS) });
+  download(makeZip(files), `slate-photos-${overrides.size}.zip`);
+  notice(`${overrides.size} photo${overrides.size > 1 ? 's' : ''} zipped, named the way the repo `
+    + 'expects. HOW-TO.txt inside says where they go.');
+}
+
+async function photosToDefault() {
+  const list = [...overrides.values()];
+  if (!list.length) return;
+  let done = 0;
+  const failed = [];
+  for (const rec of list) {
+    try {
+      const res = await fetch(`/api/cutout/${encodeURIComponent(rec.slug)}.${rec.ext}`, {
+        method: 'POST', headers: { 'content-type': rec.type }, body: rec.blob,
+      });
+      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || 'refused');
+      await photos.remove(rec.slug);
+      done++;
+    } catch (e) {
+      failed.push(`${rec.name}: ${e.message}`);
+    }
+  }
+  await loadOverrides();
+  await reloadCatalog();
+  notice(failed.length
+    ? `${done} written, ${failed.length} refused. ${failed[0]}`
+    : `${done} portrait${done > 1 ? 's' : ''} written into public/cutouts. `
+      + 'Commit public/cutouts and data/cutouts.json to ship them.', failed.length > 0);
+}
+
+async function clearMyPhotos() {
+  if (!confirm(`Clear all ${overrides.size} photos you added? Anything not downloaded or made the default is gone.`)) return;
+  await photos.clear();
+  await loadOverrides();
+  await refreshPortraits();
+  notice('Cleared. The slates are back to the portraits that ship with the app.');
+}
+
+/** Re-crawl and repaint after the portraits on disk change. */
+async function reloadCatalog() {
+  state.catalog = await (await fetch('/api/catalog?refresh=1')).json();
+  imgCache.clear();
+  showSource();
+  renderDistrictList();
+  await selectDistrict(state.districtId);
 }
 
 /* ------------------------------------------------------------------- exports */
@@ -508,7 +905,7 @@ function batchDistricts() {
   const scope = $('#batch-scope').value;
   const all = state.catalog.districts;
   if (scope === 'all') return all;
-  if (scope === 'ready') return all.filter((d) => d.ready);
+  if (scope === 'ready') return all.filter(isReady);
   if (scope === 'county') return all.filter((d) => d.county === $('#batch-county').value);
   return all.filter((d) => state.ticked.has(d.id));
 }
@@ -766,6 +1163,8 @@ function bind() {
     const row = e.target.closest('.p-row');
     if (!row) return;
     const name = row.dataset.name;
+    const ph = e.target.closest('[data-photo]');
+    if (ph) return openPhotoEditor(ph.dataset.photo);
     if (e.target.dataset.inc !== undefined) {
       const set = (state.drop[d.id] ||= new Set());
       e.target.checked ? set.delete(name) : set.add(name);
@@ -784,6 +1183,52 @@ function bind() {
     }
   });
 
+  /* photo editor */
+  const wrap = $('#photo-stage-wrap');
+  let drag = null;
+  wrap.addEventListener('pointerdown', (e) => {
+    if (!ed.img || !ed.view) return;
+    drag = { x: e.clientX, y: e.clientY, cx: ed.view.cx, cy: ed.view.cy };
+    wrap.setPointerCapture(e.pointerId);
+    wrap.classList.add('dragging');
+  });
+  wrap.addEventListener('pointermove', (e) => {
+    if (!drag) return;
+    const k = sourcePerClientPx();
+    ed.view = photos.clampView(ed.img, {
+      ...ed.view,
+      cx: drag.cx - (e.clientX - drag.x) * k,
+      cy: drag.cy - (e.clientY - drag.y) * k,
+    });
+    drawStage();
+    schedulePreview();
+  });
+  for (const ev of ['pointerup', 'pointercancel']) {
+    wrap.addEventListener(ev, () => { drag = null; wrap.classList.remove('dragging'); });
+  }
+  wrap.addEventListener('wheel', (e) => {
+    if (!ed.img) return;
+    e.preventDefault();
+    setZoom(Number($('#photo-zoom').value) * (e.deltaY < 0 ? 1.08 : 1 / 1.08));
+  }, { passive: false });
+  $('#photo-zoom').addEventListener('input', (e) => setZoom(Number(e.target.value)));
+  $('#photo-knockout').addEventListener('change', (e) => {
+    ed.knockout = e.target.checked;
+    syncEditor();
+  });
+  $('#photo-tol').addEventListener('input', (e) => { ed.tol = Number(e.target.value); schedulePreview(); });
+  $('#photo-pick').addEventListener('click', () => $('#photo-file').click());
+  $('#photo-file').addEventListener('change', (e) => pickPhotoFile(e.target.files[0]));
+  $('#photo-use').addEventListener('click', usePhoto);
+  $('#photo-default').addEventListener('click', makeDefault);
+  $('#photo-download').addEventListener('click', downloadForRepo);
+  $('#photo-remove').addEventListener('click', removePhoto);
+  $('#photo-close').addEventListener('click', closePhotoEditor);
+  $('#photo').addEventListener('click', (e) => { if (e.target.id === 'photo') closePhotoEditor(); });
+  $('#photos-zip').addEventListener('click', photosZip);
+  $('#photos-default').addEventListener('click', photosToDefault);
+  $('#photos-clear').addEventListener('click', clearMyPhotos);
+
   $('#btn-png').addEventListener('click', () => exportPng(1));
   $('#btn-print').addEventListener('click', exportPrint);
   $('#btn-2x').addEventListener('click', () => exportPng(2));
@@ -795,8 +1240,9 @@ function bind() {
     try {
       await navigator.clipboard.writeText(link);
       const d = district();
-      notice(d && d.missing.length
-        ? `Link copied. It opens ${d.county} ${d.district} with ${d.missing.length} face${d.missing.length > 1 ? 's' : ''} still missing.`
+      const gaps = d ? facesMissing(d) : 0;
+      notice(gaps
+        ? `Link copied. It opens ${d.county} ${d.district} with ${gaps} face${gaps > 1 ? 's' : ''} still missing.`
         : 'Link copied.');
     } catch { notice(link, false); }
   });
@@ -853,6 +1299,9 @@ async function boot() {
   const [st, cat] = await Promise.all([
     fetch('/api/state').then((r) => r.json()),
     fetch('/api/catalog').then((r) => r.json()),
+    // Before the first district is drawn, so an added photo is on the graphic
+    // from the first paint rather than flicking in a moment later.
+    loadOverrides(),
   ]);
   state.catalog = cat;
 
@@ -894,12 +1343,12 @@ async function boot() {
 
   const first = (wanted && cat.districts.some((d) => d.id === wanted) && wanted)
     || (state.districtId && cat.districts.some((d) => d.id === state.districtId) && state.districtId)
-    || (cat.districts.find((d) => d.ready && d.nominees.length > 2) || cat.districts[0])?.id;
+    || (cat.districts.find((d) => isReady(d) && d.nominees.length > 2) || cat.districts[0])?.id;
   await selectDistrict(first);
   if (wanted) {
     const d = district();
-    if (d && d.missing.length) {
-      notice(`${d.county} District ${d.district}: ${d.missing.length} of ${d.nominees.length} `
+    if (d && facesMissing(d)) {
+      notice(`${d.county} District ${d.district}: ${facesMissing(d)} of ${d.nominees.length} `
         + 'faces are placeholders because no usable headshot was ever sent.');
     }
   }

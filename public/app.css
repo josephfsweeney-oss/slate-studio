@@ -11,6 +11,12 @@ body{margin:0;background:var(--bg);color:var(--ink);
      action buttons off the bottom of the window. */
   height:100vh;display:flex;flex-direction:column;overflow:hidden}
 button,input,select,textarea{font:inherit;color:inherit}
+/* The hidden attribute has to win. Every `display:` below it in this file would
+   otherwise beat the browser's own [hidden] rule, and the element stays on
+   screen while the code that set it believes it is gone. That already cost us
+   an invisible modal swallowing every click on the page, and a Connect Drive
+   button that showed itself with no Drive to connect to. One rule, once. */
+[hidden]{display:none!important}
 
 /* ------------------------------------------------------------------- top bar */
 .bar{flex:none;display:flex;align-items:center;gap:16px;padding:0 16px;height:52px;
@@ -131,10 +137,41 @@ button,.ghost{cursor:pointer;border-radius:8px;padding:8px 13px;border:1px solid
 .tagline{width:100%;margin:-2px 0 4px;padding:5px 8px;border:1px solid var(--line);
   border-radius:6px;font-size:13px;background:#FBFCFE}
 
+/* -------------------------------------------------------------------- photos */
+/* The thumbnail is the control. A face in the list is quicker to check than a
+   filename, and clicking the wrong one is the thing to make hard. */
+.p-row .ph{flex:none;width:34px;height:42px;padding:0;border:1px solid var(--line);
+  border-radius:6px;background:#EEF1F6;overflow:hidden;display:grid;place-items:center;cursor:pointer}
+.p-row .ph:hover{border-color:var(--navy)}
+.p-row .ph img{width:100%;height:100%;object-fit:contain;display:block}
+.p-row .ph .plus{font-size:18px;font-weight:700;color:var(--muted);line-height:1}
+.p-row .ph.mine{border-color:#2F7C4E;border-width:2px}
+.p-row .tag.mine{background:#E3F3EA;color:#1D5B39}
+.photo-bank{margin-top:10px;padding-top:10px;border-top:1px solid var(--line)}
+.photo-bank-actions{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+
+.modal-box.wide{width:min(720px,94vw)}
+.photo-grid{display:grid;grid-template-columns:1fr 200px;gap:16px;align-items:start;margin:12px 0}
+.photo-stage-wrap{position:relative;width:340px;max-width:100%;aspect-ratio:4/5;
+  border-radius:10px;overflow:hidden;background:
+    repeating-conic-gradient(#E8ECF3 0 25%,#fff 0 50%) 0 0/18px 18px;
+  border:1px solid var(--line);touch-action:none;cursor:grab}
+.photo-stage-wrap.dragging{cursor:grabbing}
+.photo-stage-wrap canvas{width:100%;height:100%;display:block}
+.photo-hint{position:absolute;inset:0;display:grid;place-items:center;text-align:center;
+  padding:20px;color:var(--muted);font-size:14px;pointer-events:none;
+  background:rgba(255,255,255,.72)}
+/* The preview sits on the plate colour because that is the only place the
+   cutout is ever seen. A soft edge that looks fine on white does not. */
+.photo-preview{width:188px;aspect-ratio:4/5;border-radius:10px;overflow:hidden;
+  background:#12314E;display:grid;place-items:end center}
+.photo-preview canvas{width:100%;height:100%;display:block;object-fit:contain}
+@media (max-width:620px){
+  .photo-grid{grid-template-columns:1fr}
+  .photo-preview{width:160px}
+}
+
 /* -------------------------------------------------------------------- modal */
-/* `display:grid` would otherwise beat the hidden attribute and leave an
-   invisible sheet over the whole page swallowing clicks. */
-.modal[hidden]{display:none}
 .modal{position:fixed;inset:0;background:rgba(1,35,96,.55);display:grid;place-items:center;z-index:40}
 .modal-box{background:#fff;border-radius:14px;padding:22px;width:min(560px,92vw);max-height:88vh;overflow:auto}
 .modal-box h2{font-family:Anton,sans-serif;margin:0 0 4px;font-size:22px}
