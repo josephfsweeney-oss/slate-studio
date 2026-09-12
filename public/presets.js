@@ -45,6 +45,9 @@ export const TOKENS = [
   ['{{TEAM}}', 'team, or candidate'],
   ['{{COUNT}}', '9'],
   ['{{SEATS}}', '9'],
+  ['{{VOTEFOR}}', 'all 9, or one'],
+  ['{{OVALS}}', 'all 9 ovals, or the oval'],
+  ['{{SEATLINE}}', 'what this district elects, in a sentence'],
   ['{{NAMES}}', 'Ball, Huminick, Janigian and six more'],
   ['{{SURNAMES}}', 'Ball, Huminick, Janigian, ...'],
 ];
@@ -124,10 +127,10 @@ export const TEMPLATES = [
     label: 'Vote for all the seats',
     copy: {
       kicker: '{{SEAT}}',
-      headline: 'Vote for all {{SEATS}}',
-      subhead: 'This district elects {{SEATS}}. A ballot with one name marked leaves the rest on the table.',
+      headline: 'Vote for {{VOTEFOR}}',
+      subhead: '{{SEATLINE}}',
       details: 'Fill in the oval next to every Republican on the list.',
-      cta: 'Fill in all {{SEATS}} ovals',
+      cta: 'Fill in {{OVALS}}',
       footer: '',
     },
     style: { composition: 'ballot' },
@@ -138,7 +141,7 @@ export const TEMPLATES = [
     copy: {
       kicker: 'How to vote {{SEAT}}',
       headline: 'Mark every one',
-      subhead: 'Your ballot lists them in this order. Fill in all {{SEATS}} ovals.',
+      subhead: 'Your ballot lists them in this order. Fill in {{OVALS}}.',
       details: '',
       cta: 'Vote Republican, November 3',
       footer: '',
@@ -353,7 +356,21 @@ export function fillTokens(str, district) {
   // 93 of 174 districts run a single nominee, so a template that always says
   // "9 Republicans" and "team" reads wrong on more than half the state.
   const n = district.nominees.length;
+  /* 75 of the 174 districts elect a single member, and "Vote for all 1" and
+   * "Fill in all 1 ovals" are not English. The seat count is a number; these
+   * are the phrases built from it, so a template written once reads correctly
+   * on every district in the state. */
+  const seats = district.seats ?? district.nominees.length;
+  const many = seats > 1;
   const map = {
+    '{{VOTEFOR}}': many ? `all ${seats}` : 'one',
+    '{{OVALS}}': many ? `all ${seats} ovals` : 'the oval',
+    '{{SEATLINE}}': many
+      // "the other 1" is what a computer writes. Two-seat districts are the
+      // second most common kind in the state, so it is worth the branch.
+      ? `This district elects ${seats}. A ballot with one name marked leaves the other `
+        + `${seats - 1 === 1 ? 'one' : seats - 1} on the table.`
+      : 'This district elects one member. Fill in the oval and your ballot counts.',
     '{{REPUBLICANS}}': `${n} Republican${n === 1 ? '' : 's'}`,
     '{{TEAM}}': n === 1 ? 'candidate' : 'team',
     '{{COUNTY}}': district.county,

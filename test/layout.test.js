@@ -638,3 +638,55 @@ test('a print canvas states a trim size its label agrees with', async () => {
     assert.ok(Math.abs(a - c.w / c.dpi) < 0.01 && Math.abs(b - c.h / c.dpi) < 0.01);
   }
 });
+
+/* ------------------------------------------------------ one-seat districts --- */
+
+test('the copy reads as English in a single-seat district', () => {
+  /* 75 of the 174 districts elect one member. "Vote for all 1" and "Fill in
+   * all 1 ovals" went out on a real piece. The seat count is a number; the
+   * phrases built from it are their own tokens. */
+  const one = { county: 'Belknap', district: 1, seats: 1, nominees: [{ last: 'PLOSZAJ' }] };
+  const nine = { county: 'Rockingham', district: 25, seats: 9, nominees: Array(9).fill({ last: 'X' }) };
+
+  assert.equal(fillTokens('Vote for {{VOTEFOR}}', one), 'Vote for one');
+  assert.equal(fillTokens('Vote for {{VOTEFOR}}', nine), 'Vote for all 9');
+  assert.equal(fillTokens('Fill in {{OVALS}}', one), 'Fill in the oval');
+  assert.equal(fillTokens('Fill in {{OVALS}}', nine), 'Fill in all 9 ovals');
+  assert.match(fillTokens('{{SEATLINE}}', one), /elects one member/);
+  assert.match(fillTokens('{{SEATLINE}}', nine), /the other 8 on the table/);
+
+  // And no shipped template may produce one of those readings on a one-seat
+  // district. This is the check that would have caught it.
+  for (const t of TEMPLATES) {
+    for (const [key, raw] of Object.entries(t.copy)) {
+      const out = fillTokens(raw, one);
+      assert.ok(!/\ball 1\b/i.test(out), `${t.id}.${key} reads "${out}"`);
+      assert.ok(!/\b1 ovals\b/i.test(out), `${t.id}.${key} reads "${out}"`);
+      assert.ok(!/elects 1\./i.test(out), `${t.id}.${key} reads "${out}"`);
+    }
+  }
+});
+
+test('one name on a ballot card gets a ballot row, not the whole card', () => {
+  const card = (n) => solve({
+    canvas: { w: 1080, h: 1080 }, slate: slate(n), copy: COPY,
+    style: { composition: 'ballot' }, seats: n,
+  }, measure);
+
+  const one = card(1);
+  const r = one.ballot.rows[0];
+  assert.ok(r.h <= 1080 * 0.086, `one row is ${Math.round(r.h)}px tall on a 1080 canvas`);
+  assert.ok(r.oval.ry <= r.h * 0.31, 'the oval grew with the row instead of the type');
+
+  // It sits in the middle of the card rather than pinned to the top of it.
+  const body = one.ballot.body;
+  const above = r.y - body.y;
+  const below = (body.y + body.h) - (r.y + r.h);
+  assert.ok(Math.abs(above - below) < 2, `the single row is not centred: ${Math.round(above)} above, ${Math.round(below)} below`);
+
+  // Nine names still fill the card, so the cap has not made long lists small.
+  const nine = card(9);
+  assert.ok(nine.ballot.rows[8].y + nine.ballot.rows[8].h
+    > nine.ballot.body.y + nine.ballot.body.h * 0.9, 'nine rows no longer fill the card');
+  assert.ok(nine.ballot.rowH <= one.ballot.rowH + 1, 'a longer list got taller rows');
+});

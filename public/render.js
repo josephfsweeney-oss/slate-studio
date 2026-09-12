@@ -600,22 +600,27 @@ function paintBallotRows(ctx, rows, style, opts) {
     const c = r.candidate;
     const namePx = r.namePx ?? Math.min(r.h * 0.46, r.px * 0.82);
     const firstPx = r.firstPx ?? Math.min(r.h * 0.22, r.px * 0.42);
+    /* The name block is centred in the row as a block, not hung off fractions
+     * of the row height. Positioned by fractions, a tall row pulled the first
+     * name and the surname to opposite ends of it. */
+    const stack = (c.first ? firstPx * 1.25 : 0) + namePx;
+    const top = r.y + (r.h - stack) / 2;
     ctx.textAlign = 'left';
     if (c.first) {
       ctx.fillStyle = opts.quiet;
       setFont(ctx, { family: 'Barlow Condensed', weight: 600 }, firstPx, 0.05);
-      ctx.fillText(c.first, r.textX, r.y + r.h * 0.38);
+      ctx.fillText(c.first, r.textX, top + firstPx * 0.86);
     }
     ctx.fillStyle = ink;
     setFont(ctx, { family: 'Anton', weight: 400 }, namePx, -0.005);
-    ctx.fillText(c.last, r.textX, r.y + r.h * (c.first ? 0.90 : 0.68));
+    ctx.fillText(c.last, r.textX, top + stack - namePx * 0.16);
 
     if (opts.party && r.w > namePx * 7) {
       const px = firstPx * 0.92;
       ctx.textAlign = 'right';
       ctx.fillStyle = accent;
       setFont(ctx, { family: 'Barlow Condensed', weight: 700 }, px, 0.12);
-      ctx.fillText('REPUBLICAN', r.x + r.w - px * 0.6, r.y + r.h * 0.62);
+      ctx.fillText('REPUBLICAN', r.x + r.w - px * 0.6, r.y + r.h / 2 + px * 0.34);
     }
     // A hairline between rows, the way a printed ballot separates them.
     if (opts.rule) {

@@ -421,6 +421,8 @@ function solveBallot(spec, measure) {
   const rule = seats > 1 ? `Vote for not more than ${seats}` : 'Vote for one';
   const ruleBlk = fitBlock(measure, rule, COND_BOLD, s * 0.034, copyW, 2, 0.10, true);
 
+  const ballotN = slate.filter((c) => !c.topper).length;
+
   const ctaTxt = String(copy.cta || '').trim();
   const cta = fitBlock(measure, ctaTxt, ANTON, s * 0.036, copyW, 1, 0.02, true);
 
@@ -437,16 +439,30 @@ function solveBallot(spec, measure) {
 
   let copyRect;
   let card;
+  /* How tall the card wants to be, before anything else is decided: the header,
+   * a proper ballot row per name, and a margin. A one-name card pinned to a
+   * third of the piece is mostly empty paper with an oval in it. */
+  const headerH0 = ruleBlk.h + s * 0.024;
+  const idealRowH = s * 0.085;
+  const rowGap = s * 0.012;
+  const naturalCard = headerH0 + ballotN * idealRowH
+    + Math.max(0, ballotN - 1) * rowGap + s * 0.044;
+
   if (wide) {
     const capped = Math.min(copyH, inner.h);
     copyRect = { x: inner.x, y: inner.y + Math.max(0, (inner.h - capped) / 2), w: copyW, h: capped };
-    card = { x: inner.x + copyW + gap, y: inner.y, w: inner.w - copyW - gap, h: inner.h };
+    card = { x: inner.x, y: inner.y, w: inner.w - copyW - gap, h: Math.min(inner.h, naturalCard) };
+    card.x = inner.x + copyW + gap;
+    card.y = inner.y + Math.max(0, (inner.h - card.h) / 2);
   } else {
-    // The card never gets less than a third of the piece: a ballot guide whose
-    // ballot is a sliver is a poster with a rumour of a ballot on it.
-    const cardH = Math.max(inner.h * 0.34, inner.h - copyH - gap * 1.4);
-    copyRect = { x: inner.x, y: inner.y, w: copyW, h: Math.max(1, inner.h - cardH - gap * 1.4) };
-    card = { x: inner.x, y: inner.y + inner.h - cardH, w: inner.w, h: cardH };
+    // Never a sliver, never more than it needs: a ballot guide whose ballot is
+    // a rumour is a poster, and one whose ballot is empty paper is worse.
+    const room = Math.max(inner.h * 0.30, inner.h - copyH - gap * 1.4);
+    const cardH = Math.min(room, naturalCard);
+    const group = copyH + gap * 1.4 + cardH;
+    const top = inner.y + Math.max(0, (inner.h - group) / 2);
+    copyRect = { x: inner.x, y: top, w: copyW, h: copyH };
+    card = { x: inner.x, y: top + copyH + gap * 1.4, w: inner.w, h: cardH };
   }
   const bands = stackBlocks(entries, copyRect.y);
   const copyCramped = bands.height + qrH > copyRect.h + 1;
@@ -459,19 +475,30 @@ function solveBallot(spec, measure) {
 
   // The card: a header rule, then one row per name. Rows shrink to fit rather
   // than spilling, because a ballot with a name missing is worse than a small one.
-  const headerH = ruleBlk.h + s * 0.024;
+  const headerH = headerH0;
   const body = { x: card.x, y: card.y + headerH, w: card.w, h: card.h - headerH };
-  const ballotN = slate.filter((c) => !c.topper).length;
-  const rowGap = Math.min(s * 0.012, body.h * 0.03);
-  const rowH = Math.max(s * 0.030, (body.h - rowGap * (ballotN - 1)) / Math.max(1, ballotN));
+
+  /* A ballot row is a ballot row. Dividing the card evenly between however many
+   * names there are is right for nine and absurd for one: a single row took the
+   * whole card, which gave a half-inch oval and threw the first name and the
+   * surname to opposite ends of five hundred pixels of nothing. The ideal size
+   * is the answer; the even division only ever shrinks it. */
+  // The gap closes up before the rows do, and past that the rows are squeezed
+  // rather than run off the card. The warning below carries the bad news.
+  const gapUsed = Math.min(rowGap, Math.max(0, body.h * 0.03));
+  const even = (body.h - gapUsed * Math.max(0, ballotN - 1)) / Math.max(1, ballotN);
+  const rowH = Math.max(1, Math.min(even, idealRowH));
+  const cramped = rowH < s * 0.030;
   const ovalR = Math.min(rowH * 0.30, card.w * 0.045);
+  const blockH = ballotN * rowH + Math.max(0, ballotN - 1) * gapUsed;
+  const rowsTop = body.y + Math.max(0, (body.h - blockH) / 2);
 
   /* Only the people actually on this ballot line get an oval. A governor at the
    * top of the ticket is on the piece, not on the House ballot, and an oval
    * next to her name would be telling a voter to do something they cannot. */
   const onBallot = slate.filter((c) => !c.topper);
   const rows = onBallot.map((c, i) => {
-    const y = body.y + i * (rowH + rowGap);
+    const y = rowsTop + i * (rowH + gapUsed);
     return {
       candidate: c, x: body.x, y, w: body.w, h: rowH,
       oval: { cx: body.x + card.w * 0.055 + ovalR, cy: y + rowH / 2, rx: ovalR * 1.45, ry: ovalR },
@@ -507,6 +534,7 @@ function solveBallot(spec, measure) {
       ...(ask.truncated ? ['The subhead is too long and was cut.'] : []),
       ...(overflow ? [`${ballotN} names will not fit the ballot card on this canvas. Use a taller one.`] : []),
       ...(copyCramped ? ['The copy is longer than the space left beside the ballot. Cut a line.'] : []),
+      ...(cramped ? [`${ballotN} names on a card this size gives rows too small to read. Use a taller canvas.`] : []),
       ...qrWarnings(qr, qrBlock),
       ...(seats > ballotN ? [`This district elects ${seats} but only ${ballotN} Republicans are on the slate. The card says ${seats}.`] : []),
     ],
