@@ -29,7 +29,15 @@ function call(method, url, body = null) {
   });
 }
 
-const victim = fs.readdirSync(CUTOUTS_DIR).filter((f) => /\.webp$/i.test(f)).sort()[0];
+/* The ops repo carries the code without the 301 portraits, so there may be no
+ * folder and nothing to overwrite. Say so rather than inventing a file: the
+ * test skips on this and prints the reason. */
+const present = fs.existsSync(CUTOUTS_DIR) ? fs.readdirSync(CUTOUTS_DIR) : [];
+const victim = present.filter((f) => /\.webp$/i.test(f)).sort()[0];
+if (!victim) {
+  process.stdout.write(JSON.stringify({ noCutouts: true, dir: CUTOUTS_DIR }));
+  process.exit(0);
+}
 const file = path.join(CUTOUTS_DIR, victim);
 const original = fs.readFileSync(file);
 const planted = Buffer.from('planted by the test, not an image');

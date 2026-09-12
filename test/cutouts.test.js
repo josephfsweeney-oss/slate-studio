@@ -28,8 +28,13 @@ function probe(env = {}) {
   return JSON.parse(out);
 }
 
-test('a portrait can be written and the index follows it', () => {
+/** True in a checkout that carries the code without the portraits. */
+const noCutouts = (r) => Boolean(r.noCutouts);
+const skipReason = 'no public/cutouts in this checkout, so there is nothing to overwrite';
+
+test('a portrait can be written and the index follows it', (t) => {
   const r = probe();
+  if (noCutouts(r)) return t.skip(skipReason);
   assert.equal(r.write.status, 200, r.write.body);
   assert.equal(r.write.json.file, r.victim);
   assert.ok(r.write.json.name, 'the response names the candidate, not just the slug');
@@ -38,8 +43,9 @@ test('a portrait can be written and the index follows it', () => {
   assert.equal(r.restored, true, 'the probe put the original back');
 });
 
-test('a filename that is not a portrait never reaches the disk', () => {
+test('a filename that is not a portrait never reaches the disk', (t) => {
   const r = probe();
+  if (noCutouts(r)) return t.skip(skipReason);
   for (const key of ['traversal', 'dotdot', 'wrongExt']) {
     assert.equal(r[key].status, 400, `${key} was not refused: ${r[key].body}`);
   }
@@ -50,8 +56,9 @@ test('a filename that is not a portrait never reaches the disk', () => {
   assert.equal(r.untouched, true, 'a refused request left the file alone');
 });
 
-test('a public deployment cannot write portraits at all', () => {
+test('a public deployment cannot write portraits at all', (t) => {
   const r = probe({ SLATE_PUBLIC: '1' });
+  if (noCutouts(r)) return t.skip(skipReason);
   assert.equal(r.write.status, 403, r.write.body);
   assert.equal(r.landed, false, 'nothing was written');
   assert.equal(r.getIsRefused.status, 403);
