@@ -1657,6 +1657,12 @@ function bind() {
     saveLocal(); draw();
   });
 
+  $('#mail-art').addEventListener('change', (e) => {
+    state.mail.art = e.target.checked;
+    state.style.mailArt = e.target.checked;
+    saveLocal(); draw();
+  });
+
   for (const [sel, side] of [['#mail-front', 'front'], ['#mail-back', 'back']]) {
     $(sel).addEventListener('click', () => {
       state.mail.side = side;

@@ -542,6 +542,14 @@ decides the shape.
         the row is centred and the words are over the top, which is where
         this started
 
+Every round carries a photograph that matches the issue it argues: the State
+House for the income tax, a framer on a wall for housing, transmission towers
+for energy, Main Street in Nashua for the close. It is the ground of the whole
+piece, edge to edge and under everything, with a veil over it that is heaviest
+at the top where the words are and lightest across the middle where the faces
+stand. `public/art/CREDITS.md` says which photograph is which, who took it and
+where it came from. **Background photo** on the Design panel turns it off.
+
 The candidates are the lowest thing on the piece. The district line and the call
 to action sit above them, and the name band runs off the bottom of the paper, so
 the slate stands on the floor of the piece rather than a quarter inch above it.

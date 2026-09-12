@@ -1328,6 +1328,34 @@ function paintSlateBand(ctx, plan, style, theme, assets, bleed = 0) {
   const ink = theme.primary;
   const dark = b.onDark;
 
+  /* The scene behind the slate. It is drawn to cover its band, cropped rather
+   * than squashed, with a veil over it so a row of cut-out people separates
+   * from whatever is behind them. */
+  const scene = assets && assets.hero;
+  if (b.photo && scene && style.mailArt !== false) {
+    const r = b.photo;
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(r.x - B, r.y - (r.y <= 0 ? B : 0), r.w + B * 2, r.h + (r.y <= 0 ? B : 0));
+    ctx.clip();
+    const k = Math.max((r.w + B * 2) / scene.width, r.h / scene.height);
+    const dw = scene.width * k;
+    const dh = scene.height * k;
+    ctx.drawImage(scene, r.x - B + (r.w + B * 2 - dw) / 2, r.y + (r.h - dh) / 2, dw, dh);
+    /* Heaviest under the words at the top, lightest across the middle where the
+     * faces stand, and back up a little at the foot so the band has something
+     * to sit against. */
+    const veil = ctx.createLinearGradient(0, r.y, 0, r.y + r.h);
+    const [vr, vg, vb] = dark ? [10, 22, 38] : [255, 255, 255];
+    veil.addColorStop(0, `rgba(${vr},${vg},${vb},${dark ? 0.78 : 0.90})`);
+    veil.addColorStop(0.42, `rgba(${vr},${vg},${vb},${dark ? 0.70 : 0.84})`);
+    veil.addColorStop(0.72, `rgba(${vr},${vg},${vb},${dark ? 0.42 : 0.52})`);
+    veil.addColorStop(1, `rgba(${vr},${vg},${vb},${dark ? 0.50 : 0.40})`);
+    ctx.fillStyle = veil;
+    ctx.fillRect(r.x - B, r.y, r.w + B * 2, r.h);
+    ctx.restore();
+  }
+
   /* Left in the column beside a short slate, centred over a full one. The
    * words are a column there, and a centred column of three lines against a
    * left hand edge of faces reads as neither one thing nor the other. */
@@ -1378,10 +1406,13 @@ function paintSlateBand(ctx, plan, style, theme, assets, bleed = 0) {
       const k = slot.h / img.height;
       const dw = img.width * k;
       const cx0 = slot.x + slot.w / 2;
-      if (dw > f.maxW) {
+      /* A back row is cut at the line the row in front of it starts on, so its
+       * body does not hang in the gaps between the people standing in front. */
+      const cut = f.clipH != null && f.clipH < slot.h ? f.clipH : slot.h;
+      if (dw > f.maxW || cut < slot.h) {
         ctx.save();
         ctx.beginPath();
-        ctx.rect(cx0 - f.maxW / 2, slot.y, f.maxW, slot.h);
+        ctx.rect(cx0 - f.maxW / 2, slot.y, f.maxW, cut);
         ctx.clip();
         ctx.drawImage(img, cx0 - dw / 2, slot.y, dw, slot.h);
         ctx.restore();

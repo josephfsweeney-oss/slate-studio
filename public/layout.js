@@ -1806,36 +1806,49 @@ function solveSlateBand(spec, measure, side) {
     return Math.max(...rowsOf.map((r) => natural + (r.length - 1) * natural * 0.94));
   };
 
-  /* Two rows are a montage: the faces stack straight on top of one another and
-   * one band under the whole group carries every name in ballot order. Two
-   * bands, one per row, cut the group in half and read as two slates. */
-  const layoutRows = (bandH, zoneTop, zoneBottom, alignLeft) => {
+  /* Two rows are a montage, the way a team photograph is: the back row stands
+   * behind the front one and comes down into it, so its heads and shoulders
+   * show in the gaps between the people in front and its body does not. A grid
+   * of two rows clear of each other reads as two slates, not as one team. */
+  const ROW_DROP = 0.60;                 // how far the front row sits down the back one
+  const rowPitch = rowCount > 1 ? ROW_DROP : 1;
+  /* Three ways a row can sit in the strip.
+   *   left  the slate keeps the width it needs and a block takes the rest
+   *   fill  nothing is taking the rest, so the slate takes all of it
+   * A row centred with half an inch of air either side reads as a slip. */
+  const layoutRows = (bandH, zoneTop, zoneBottom, mode) => {
     const figZone = Math.max(1, zoneBottom - zoneTop - bandH);
-    const figH = Math.min(figCap, Math.max(1, figZone / rowCount));
-    const groupTop = zoneTop + Math.max(0, figZone - figH * rowCount);
-    const bandY = groupTop + figH * rowCount;
+    const stackH = 1 + (rowCount - 1) * rowPitch;
+    const figH = Math.min(figCap, Math.max(1, figZone / stackH));
+    const groupTop = zoneTop + Math.max(0, figZone - figH * stackH);
+    const bandY = groupTop + figH * stackH;
     const natural = figH / PHOTO_AR;
     const tight = natural * 0.94;              // a little overlap at the shoulder
     const out = [];
     let seen = 0;
     for (let r = 0; r < rowsOf.length; r++) {
       const rn = rowsOf[r].length;
-      const groupW = natural + (rn - 1) * tight;
-      /* Only share the width out when there are more faces than fit. Evenly
-       * spaced across the whole width, three faces left two inches of ground
-       * either side of each and the piece read as half empty. */
-      const spread = groupW > strip.w;
-      const step = spread ? strip.w / rn : tight;
+      /* Only share the width out when there are more faces than fit. */
+      const spread = natural + (rn - 1) * tight > strip.w;
       const cellW = spread ? strip.w / rn : natural;
+      /* Filling means the first face starts at the left margin and the last one
+       * ends at the right, whatever is between them. Shoulder to shoulder if
+       * that is wide enough, a little apart if it is not. */
+      const span = rn > 1 ? (strip.w - cellW) / (rn - 1) : 0;
+      const step = spread ? strip.w / rn
+        : mode === 'fill' ? Math.max(tight, span) : tight;
+      const groupW = (rn - 1) * step + cellW;
       /* A second row is offset half a face, so its people stand in the gaps of
        * the row in front instead of in a grid behind it. A row that already
        * has to share the width out has no gaps to stand in. */
       const stagger = r % 2 === 1 && !spread ? step / 2 : 0;
-      const x0 = stagger + (spread || !alignLeft
-        ? (spread ? strip.x : strip.x + (strip.w - groupW) / 2)
-        : strip.x);
+      const x0 = stagger + strip.x + (spread || mode !== 'centre'
+        ? 0 : (strip.w - groupW) / 2);
       out.push({ members: rowsOf[r], first: seen, rn, spread, step, cellW, x0,
-                 y: groupTop + r * figH, h: figH, bandY, bandH,
+                 y: groupTop + r * figH * rowPitch, h: figH, bandY, bandH,
+                 /* A row with another one in front of it is cut at the line
+                  * that row starts on, so nothing of it hangs in the gaps. */
+                 clipH: r < rowsOf.length - 1 ? figH * rowPitch : figH,
                  right: x0 + (rn - 1) * step + cellW });
       seen += rn;
     }
@@ -1855,8 +1868,8 @@ function solveSlateBand(spec, measure, side) {
    * divided by the slate, which on a centred group of four was three times too
    * wide, and the band came out as one another's names printed on top of each
    * other. */
-  const solveRows = (zoneTop, zoneBottom, alignLeft) => {
-    const first = layoutRows(nominalBandH, zoneTop, zoneBottom, alignLeft);
+  const solveRows = (zoneTop, zoneBottom, mode) => {
+    const first = layoutRows(nominalBandH, zoneTop, zoneBottom, mode);
     const cellW = first.cellW || strip.w;
     const wide = (t, px) => widthAt(measure, t, COND_BOLD, px, 0.03) <= cellW * 0.94;
     const fullNames = slate.map((c) => `${firstLine(c, style)} ${c.last}`.trim());
@@ -1877,7 +1890,7 @@ function solveSlateBand(spec, measure, side) {
      * as two slates. */
     const lineH = bandPx * 1.30;
     const bandH = n ? lineH * rowCount + bandPx : 0;
-    return { laid: layoutRows(bandH, zoneTop, zoneBottom, alignLeft),
+    return { laid: layoutRows(bandH, zoneTop, zoneBottom, mode),
              bandH, bandPx, lineH, texts, dropped };
   };
 
@@ -1925,7 +1938,7 @@ function solveSlateBand(spec, measure, side) {
      * words, so it is settled before a word is measured, and the words are cut
      * to the column the faces leave behind. */
     slateZone = zoneFull;
-    rowsOut = solveRows(slateZone.top, slateZone.bottom, true);
+    rowsOut = solveRows(slateZone.top, slateZone.bottom, 'left');
     align = 'left';
     const colX = rowsOut.laid.right + gutter;
     /* The column stops on top of the band, not at the foot of the paper: the
@@ -2008,9 +2021,11 @@ function solveSlateBand(spec, measure, side) {
       /* Left first, to find out what the slate leaves. If it leaves too little
        * to put anything in, the row goes back to centred: a row of eight with
        * half an inch of air on the right reads as a slip, not as a margin. */
-      let out = solveRows(zone.top, zone.bottom, true);
+      /* Left first, to find out what the slate leaves. If what it leaves is
+       * not worth a block, the slate takes that width too. */
+      let out = solveRows(zone.top, zone.bottom, 'left');
       const spare = strip.x + strip.w - out.laid.right - gutter;
-      if (spare < minAside) out = solveRows(zone.top, zone.bottom, false);
+      if (spare < minAside) out = solveRows(zone.top, zone.bottom, 'fill');
       return { subBlk, subHt, headBlk, bp, rh, hh, zone, out, spare };
     };
 
@@ -2110,6 +2125,7 @@ function solveSlateBand(spec, measure, side) {
          * across. Scaled by height alone a wide crop swallowed its neighbours
          * whole: on Rockingham 25 one shoulder covered the man beside him. */
         maxW: Math.min(r.cellW * (r.spread && r.rn >= 7 ? 1.62 : 1.32), r.h * 0.92),
+        clipH: r.clipH,
         name: { text: texts[k], px: bandPx, dropped },
         nameBox: { x, w: r.cellW, h: lineH,
           y: laid.bandY + bandPx * 0.5 + ri * lineH },
@@ -2163,6 +2179,10 @@ function solveSlateBand(spec, measure, side) {
       figures,
       rows,
       aside,
+      /* The scene: the ground of the whole piece, edge to edge and under
+       * everything. It is veiled where the words are, so a headline is read
+       * rather than picked out of a photograph. */
+      photo: { x: box.x, y: box.y, w, h },
       bandRect: rows.length ? rows[rows.length - 1].band : null,
       seat: seatBlk.lines.length ? { block: seatBlk, y: seatY } : null,
       cta: ctaBlk.lines.length

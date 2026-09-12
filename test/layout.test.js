@@ -975,7 +975,17 @@ test('the slate takes the width it needs and the words take what is left', () =>
       const a = b.aside;
       (seen[side] = seen[side] || []).push(a ? a.tier : 'none');
 
-      if (!a) continue;
+      if (!a) {
+        /* Nothing is taking the leftover, so the slate has it: the first face
+         * starts at the left margin and the last one ends at the right. */
+        const pad = b.pad;
+        const l = Math.min(...b.figures.map((f) => f.slot.x));
+        const r = Math.max(...b.figures.map((f) => f.slot.x + f.slot.w));
+        assert.ok(Math.abs(l - pad) <= 2, `${where} the slate does not start at the margin`);
+        assert.ok(Math.abs(r - (c.w - pad)) <= 2,
+          `${where} the slate does not reach the far margin (${(c.w - pad - r).toFixed(0)}px short)`);
+        continue;
+      }
       assert.ok(['words', 'plate'].includes(a.tier), `${where} unknown block ${a.tier}`);
 
       // The block takes what is left. It never takes a face's ground.
@@ -1023,9 +1033,17 @@ test('two rows are a montage under one band, not two slates', () => {
     assert.equal(b.rows.filter((r) => r.band).length, 1, `${where} drew a band per row`);
     assert.ok(!b.rows[0].band, `${where} put a band between the rows`);
 
-    // The rows sit straight on top of one another, with nothing between them.
-    assert.ok(Math.abs(b.rows[0].y + b.rows[0].h - b.rows[1].y) <= 1,
-      `${where} left a gap between the rows`);
+    /* A team photograph, not a grid. The back row's heads stay above the front
+     * row's, the front row comes up into it rather than clearing it, and the
+     * back row is cut at the line the front row stands on. */
+    assert.ok(b.rows[1].y > b.rows[0].y, `${where} the back row is not above the front`);
+    assert.ok(b.rows[1].y < b.rows[0].y + b.rows[0].h,
+      `${where} the rows clear each other instead of clumping`);
+    const back = b.figures.filter((f) => f.slot.y === b.rows[0].y);
+    assert.ok(back.every((f) => Math.abs(f.slot.y + f.clipH - b.rows[1].y) <= 1),
+      `${where} the back row is not cut at the front row's line`);
+    assert.ok(b.figures.filter((f) => f.slot.y === b.rows[1].y)
+      .every((f) => f.clipH >= f.slot.h - 1), `${where} the front row is cut too`);
 
     /* The second row stands in the gaps of the first, not in a grid behind it:
      * it is offset by half a face. */
