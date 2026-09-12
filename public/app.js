@@ -1133,7 +1133,16 @@ function renderMailPanel() {
 
   const d = district();
   const typed = varsFor(d);
-  $('#mail-vars').innerHTML = !prog ? '' : MAIL_VARS.map((v) => `
+  /* Only the blanks this drop actually has. The programme runs on general
+   * facts, so most drops have none, and five empty fields that fill nothing
+   * read as five things somebody forgot to do. A token typed into the copy
+   * fields brings its own field back. */
+  const copyText = [
+    ...(prog ? prog.pieces.flatMap((pc) => [pc.front, pc.back]) : []),
+    SIDE_COMMON, state.copy,
+  ].flatMap((o) => Object.values(o || {})).join(' ');
+  const wanted = MAIL_VARS.filter((v) => copyText.includes(`{{${v.key}}}`));
+  $('#mail-vars').innerHTML = wanted.map((v) => `
     <label class="f">${esc(v.label)} <span class="hint">${esc(v.hint)}</span>
       <input data-mailvar="${v.key}" placeholder="${esc(v.placeholder)}"
         value="${esc(typed[v.key] || '')}"></label>`).join('');

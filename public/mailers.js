@@ -60,88 +60,88 @@ export const MAIL_PROGRAMS = [{
       id: 'contract', art: 'contract', n: 1, label: 'The Contract',
       front: {
         headline: 'We Put It In Writing',
-        subhead: 'Seven promises, signed and mailed before you vote',
+        subhead: 'Seven promises. Our names on every one.',
       },
       back: {
-        headline: 'Ask The Other Side For Theirs',
-        subhead: 'They will not put a number on it, or a ceiling on your taxes',
+        headline: 'Ask Them For Theirs',
+        subhead: 'They will not put a number on it, or a ceiling on your taxes.',
       },
     },
     {
       id: 'income-tax', art: 'statehouse', n: 2, label: 'No Income Tax',
       front: {
-        headline: 'No Income Tax. No Sales Tax.',
-        subhead: 'Protecting the New Hampshire advantage',
+        headline: 'No Income Tax. Not Ever.',
+        subhead: 'It is the reason New Hampshire is still worth living in.',
       },
       back: {
-        headline: '193 Yes. 148 No. 236 Needed.',
-        subhead: 'CACR 12 would have banned the income tax. It died in the House.',
+        headline: 'Forty-Three Votes Short',
+        subhead: 'We voted to ban the income tax for good. It died in the House.',
       },
     },
     {
       id: 'school-tax', art: 'home', n: 3, label: 'Cap Your School Tax',
       front: {
-        headline: 'Cap The Property Tax',
-        subhead: 'Relief for {{TOWN}} homeowners',
+        headline: 'Your School Tax Gets A Ceiling',
+        subhead: 'Capped at inflation. Not at whatever the district asks for.',
       },
       back: {
         headline: 'We Gave You The Vote',
-        subhead: 'HB 1300 caps school taxes at inflation. It is on your ballot.',
+        subhead: 'The cap is on your ballot. Vote yes, and vote for the people who put it there.',
       },
     },
     {
       id: 'housing', art: 'framing', n: 4, label: 'Free Market Housing',
       front: {
-        headline: 'Build More Homes',
-        subhead: 'So your kids can afford to stay in {{TOWN}}',
+        headline: 'Your Kids Cannot Afford To Live Here',
+        subhead: 'We voted to change that. More homes, built faster.',
       },
       back: {
-        headline: 'Fifteen Bills. More Homes.',
-        subhead: 'The 2025 housing package, passed in one session',
+        headline: 'Fifteen Bills. One Session.',
+        subhead: 'Every one of them makes a house easier to build and cheaper to buy.',
       },
     },
     {
       id: 'energy', art: 'grid', n: 5, label: 'Lower Energy Bills',
       front: {
-        headline: 'Lower Your Electric Bill',
-        subhead: 'More supply, not more mandates on your rate',
+        headline: 'You Pay 27 Percent Over The Country',
+        subhead: 'For the same electricity. That is a policy choice, not the weather.',
       },
       back: {
-        headline: '26 Cents A Kilowatt',
-        subhead: 'New Hampshire pays about 27 percent over the country',
+        headline: 'More Supply. Lower Bills.',
+        subhead: 'We voted for supply. They voted for mandates that land on your bill.',
       },
     },
     {
       id: 'health', art: 'bill', n: 6, label: 'Lower Health Care Costs',
       front: {
         headline: 'Know The Price First',
-        subhead: 'Hospital and insurer prices, posted and public',
+        subhead: 'You would not buy anything else this way.',
       },
       back: {
         headline: 'Prices Out In The Open',
-        subhead: 'HB 705, enacted 2026. Hidden prices protect the system.',
+        subhead: 'Hospitals and insurers post what they charge. Hidden prices protect the system, not you.',
       },
     },
     {
       id: 'parents', art: 'family', n: 7, label: 'Parents Decide',
       front: {
-        headline: 'Parents Decide',
-        subhead: 'Fund students, not systems',
+        headline: 'Parents Decide. Not Bureaucrats.',
+        subhead: 'Every family in New Hampshire, not only the ones who can afford to move.',
       },
       back: {
         headline: '198 To 180. Not One Democrat.',
-        subhead: 'HB 115 opened Education Freedom Accounts to every family',
+        subhead: 'That is the vote that opened Education Freedom Accounts to every family.',
       },
     },
     {
       id: 'close', art: 'town', n: 8, label: 'The Close',
       front: {
         headline: 'Seven Promises. In Writing.',
-        subhead: 'Hold us to every one of them',
+        subhead: 'Hold us to every one of them.',
       },
       back: {
         headline: 'Two Votes. One Ballot.',
-        subhead: 'Vote the slate, and vote yes on the school tax cap',
+        subhead: 'Vote the slate. Vote yes on the school tax cap.',
       },
     },
   ],

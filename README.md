@@ -585,15 +585,25 @@ name band is the plate colour. On a dark ground the headline sits in a solid
 accent block and the band is the accent. **Classic red** and **Classic red on
 navy** are the committee's own mail colours.
 
-Two things the app will not do for you:
+The copy runs on general facts, not on facts about the voter. Every round argues
+a statewide number or a recorded vote: forty-three votes short of banning the
+income tax, twenty-seven percent over the country on electricity, fifteen
+housing bills in one session, 198 to 180 with not one Democrat. Nothing on the
+artwork has to be looked up per district, so a drop builds for all 174 without
+anybody typing anything.
 
-- **The facts it does not hold.** `{{TAX_RATE}}`, `{{OPP_LAST}}`, `{{OPP_VOTE}}`,
-  `{{POLL_HOURS}}` and `{{POLL_PLACE}}` are facts about one district, one
-  opponent or one polling place. Type them in the Mail variables fields. They are
-  kept per district, so Salem's rate never travels to Keene.
-- **The town.** `{{TOWN}}` and `{{PLACE}}` come off the manifest's Towns column.
-  With it empty the district line reads "Rockingham District 25" rather than
-  "Salem Rockingham District 25", which is true and less useful.
+One structure, eight times. The message side says what this costs you. The
+address side proves it and says what to do about it. `public/mailers.js` holds
+every line; every number in it was transcribed from the Granite Guarantee
+artwork. Check them against the journal before a drop goes out.
+
+The token fields (`{{TAX_RATE}}`, `{{OPP_LAST}}`, `{{OPP_VOTE}}`,
+`{{POLL_HOURS}}`, `{{POLL_PLACE}}`) still work, and they are kept per district,
+so Salem's rate never travels to Keene. The panel only shows a field when the
+copy in front of you actually uses that token, so with the programme as written
+it shows none. `{{TOWN}}` and `{{PLACE}}` come off the manifest's Towns column;
+with it empty the district line reads "Rockingham District 25" rather than
+"Salem Rockingham District 25", which is true and less useful.
 
 The carrier's corner prints blank: the mail house sets the indicia, the return
 address, the address block and the barcode.
