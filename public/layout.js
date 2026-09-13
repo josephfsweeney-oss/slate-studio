@@ -2261,28 +2261,56 @@ function solveSlateBand(spec, measure, side) {
     /* The block stands beside every row, not beside the first one, and its foot
      * lands on the same line as the band's. Two rows with a block the height of
      * one read as a third row that fell off. */
-    const r0 = laid.rows[0];
-    const rect = { x: asideX, y: r0.y, w: asideW, h: laid.bandY + lastBandH - r0.y };
+    /* A corner block, not a rectangle floating on the ground. It bleeds off the
+     * top and the right of the piece, the way the name band bleeds off the
+     * left, and its foot lands on the band's line. Set to the top of the first
+     * row it carried a margin above it that nothing else on the side had, and
+     * once the slate gave height back to the pledges its foot stopped a fifth
+     * of an inch above the address panel with nothing in the gap. Four edges,
+     * four different treatments, which is what made it look wrong. */
+    const rect = { x: asideX, y: box.y, w: asideW, h: laid.bandY + lastBandH - box.y };
     const dateText = String(copy.voteDate || '').trim();
     const inset = rect.w * 0.10;
     const tw = Math.max(1, rect.w - inset * 2);
     /* Widest first: a block with room for a sentence gets the supporting line
      * the stack gave up, a narrower one gets the date and how many to mark, and
      * a strip gets the date alone. */
-    const kicker = asideSub
-      ? fitInside(measure, copy.subhead, COND_BOLD,
-        Math.min(box.h * 0.062, tw * 0.088) * density, tw, 4, 0.03, true)
-      : fitInside(measure, 'ELECTION DAY', COND_BOLD,
-        Math.min(box.h * 0.034, tw * 0.105) * density, tw, 1, 0.14, true);
-    /* One line. At two lines the month took the width and left the day sitting
-     * on its own underneath, which reads as a mistake rather than a date. */
-    const date = fitInside(measure, dateText, ANTON,
-      Math.min(box.h * (asideSub ? 0.072 : 0.098), tw * 0.225) * density, tw, 1, -0.005, true);
-    const note = fitInside(measure,
-      n >= 2 && n < COUNT_WORD.length ? `VOTE FOR ALL ${COUNT_WORD[n]}` : '',
-      COND_BOLD, Math.min(box.h * 0.038, tw * 0.125) * density, tw, 2, 0.06, true);
+    /* The election day, the date and how many to mark are what this block is
+     * for, and their ceilings were fractions of the piece's height alone. They
+     * took no account of the block itself, so a district with two on the ballot,
+     * where the slate leaves most of the piece and the block comes out half as
+     * wide again, set its date at the same size as a district with four and
+     * stood half empty.
+     *
+     * Same rule as the lockup: set to the width, then held to the height. Each
+     * line takes the width of the block it is in, which is what makes a short
+     * slate's block carry bigger type, and the stack is then scaled to the
+     * height the block actually has. */
+    const noteText = n >= 2 && n < COUNT_WORD.length ? `VOTE FOR ALL ${COUNT_WORD[n]}` : '';
     const gap = box.h * 0.020;
-    const stackH = (kicker.h ? kicker.h + gap : 0) + date.h + (note.h ? note.h + gap : 0);
+    const fitParts = (k) => {
+      const kick2 = asideSub
+        ? fitInside(measure, copy.subhead, COND_BOLD, tw * 0.088 * k * density, tw, 4, 0.03, true)
+        : fitInside(measure, 'ELECTION DAY', COND_BOLD,
+          tw * 0.105 * k * density, tw, 1, 0.14, true);
+      /* One line for the date. At two the month took the width and left the day
+       * sitting on its own underneath, which reads as a mistake, not a date. */
+      const date2 = fitInside(measure, dateText, ANTON,
+        tw * 0.225 * k * density, tw, 1, -0.005, true);
+      const note2 = fitInside(measure, noteText, COND_BOLD,
+        tw * 0.125 * k * density, tw, 2, 0.06, true);
+      const h2 = (kick2.h ? kick2.h + gap : 0) + date2.h + (note2.h ? note2.h + gap : 0);
+      return { kick2, date2, note2, h2 };
+    };
+    let parts = fitParts(1);
+    /* The stack stands in the block rather than filling it to the walls, so
+     * there is air above the first line and under the last. */
+    const fill = rect.h * 0.82;
+    if (parts.h2 > fill) parts = fitParts(Math.max(0.25, fill / parts.h2));
+    const kicker = parts.kick2;
+    const date = parts.date2;
+    const note = parts.note2;
+    const stackH = parts.h2;
     const top = rect.y + Math.max(0, (rect.h - stackH) / 2);
     let cur = top;
     const place = (blk) => {

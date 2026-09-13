@@ -1527,13 +1527,15 @@ function paintSlateBand(ctx, plan, style, theme, assets, bleed = 0) {
     const a = b.aside;
     const r = a.rect;
     const barW = Math.max(3, r.w * 0.085);
-    const deep = r.h + (a.bleedFoot ? B : 0);
+    /* Off the top and the right of the trim, and off the foot as well where the
+     * band bleeds. */
+    const deep = r.h + B + (a.bleedFoot ? B : 0);
     if (a.tier === 'plate') {
       ctx.fillStyle = dark ? accent : plate;
-      ctx.fillRect(r.x, r.y, r.w, deep);
+      ctx.fillRect(r.x, r.y - B, r.w + B, deep);
     } else {
       ctx.fillStyle = accent;
-      ctx.fillRect(r.x, r.y, barW, deep);
+      ctx.fillRect(r.x, r.y - B, barW, deep);
     }
     const tx = a.tier === 'plate' ? r.x + r.w / 2 : r.x + barW + (r.w - barW) / 2;
     ctx.textAlign = 'center';

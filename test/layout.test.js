@@ -942,6 +942,66 @@ test('the address panel is only on a trim that can carry a real one', () => {
  * side of the piece. Held to the padded strip the block stopped short of the
  * trim while the panel bled to it, and the two read as columns that did not
  * line up. */
+/* Fewer on the ballot means a wider block, and the election information in it
+ * used to be sized off the height alone, so a district with two set its date
+ * at the same size as a district with four and stood half empty. */
+test('the election information grows with the block it stands in', () => {
+  const piece = MAIL_PROGRAMS[0].pieces[0];
+  for (const id of ['mail6', 'mail11']) {
+    const c = CANVASES.find((x) => x.id === id);
+    const at = (n) => {
+      const copy = { ...SIDE_COMMON, ...piece.back };
+      const p = solve({ canvas: { w: c.w, h: c.h }, dpi: c.dpi, slate: slate(n), copy,
+        style: sideStyle(piece, 'back') }, measure);
+      return p.band.aside;
+    };
+    const two = at(2);
+    const four = at(4);
+    assert.ok(two && two.date && four && four.date,
+      `${id}: the block lost its date`);
+    assert.ok(two.rect.w > four.rect.w,
+      `${id}: two on the ballot did not leave a wider block than four`);
+    assert.ok(two.date.block.px > four.date.block.px * 1.2,
+      `${id}: two on the ballot sets the date at ${two.date.block.px.toFixed(0)}px `
+      + `in a ${two.rect.w.toFixed(0)}px block, four at ${four.date.block.px.toFixed(0)}px `
+      + `in a ${four.rect.w.toFixed(0)}px block`);
+    // The width still has the last word: nothing runs out of the block.
+    for (const [n, a] of [[2, two], [4, four]]) {
+      for (const part of [a.kicker, a.date, a.note]) {
+        if (!part) continue;
+        assert.ok(part.block.w <= a.rect.w - a.inset * 2 + 1,
+          `${id} n=${n}: "${part.block.lines[0]}" runs out of the block`);
+      }
+    }
+  }
+});
+
+/* Four edges with four different treatments is what made this block look like
+ * it had been dropped on the piece: a margin above it that nothing else on the
+ * side had, a floating left edge, a flush right edge, and a gap below it. */
+test('the block beside the slate is a corner block', () => {
+  const piece = MAIL_PROGRAMS[0].pieces[0];
+  for (const id of ['mail6', 'mail11']) {
+    const c = CANVASES.find((x) => x.id === id);
+    for (const n of [1, 2, 3, 4]) {
+      const copy = { ...SIDE_COMMON, ...piece.back };
+      const p = solve({ canvas: { w: c.w, h: c.h }, dpi: c.dpi, slate: slate(n), copy,
+        style: sideStyle(piece, 'back') }, measure);
+      const a = p.band.aside;
+      const where = `${id} n=${n}`;
+      if (!a || a.tier === 'words' || !a.rect) continue;
+      // Off the top of the trim, off the right of it.
+      assert.equal(Math.round(a.rect.y), 0, `${where}: the block has a margin above it`);
+      assert.equal(Math.round(a.rect.x + a.rect.w), c.w,
+        `${where}: the block stops short of the right hand trim`);
+      // And its foot lands on the name band's line, not somewhere of its own.
+      assert.ok(Math.abs((a.rect.y + a.rect.h) - (p.band.bandRect.y + p.band.bandRect.h)) <= 1,
+        `${where}: the block's foot is ${Math.round(a.rect.y + a.rect.h)}, `
+        + `the band's is ${Math.round(p.band.bandRect.y + p.band.bandRect.h)}`);
+    }
+  }
+});
+
 test('the block beside the slate runs to the same edge as the address panel', () => {
   const piece = MAIL_PROGRAMS[0].pieces[0];
   for (const id of ['mail6', 'mail11']) {
