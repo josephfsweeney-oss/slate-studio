@@ -25,6 +25,10 @@
   <!-- districts -->
   <aside class="rail" id="rail-left">
     <div class="rail-head">
+      <!-- The phone's picker. Hidden on a desktop, where the listing below is
+           the better control; on a phone the listing is a wall in front of the
+           canvas, so this replaces it. -->
+      <select id="district-pick" class="district-pick" aria-label="District"></select>
       <input id="search" type="search" placeholder="Search district, town or name" autocomplete="off">
       <div id="gap-summary" class="gap-summary" hidden></div>
       <div class="chips">

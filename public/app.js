@@ -527,6 +527,37 @@ function renderDistrictList() {
     );
   }
   $('#districts').innerHTML = html.join('') || '<div class="county">Nothing matches</div>';
+  renderDistrictPick();
+}
+
+/* The same districts as a dropdown, for a phone.
+ *
+ * The listing is a good rail on a desktop and a wall on a phone: a hundred and
+ * seventy four rows stacked above the canvas, so the first thing anybody sees
+ * is a scroll bar rather than the piece they came to look at. Grouped by
+ * county in a native select it is one line, and the phone's own picker is
+ * better at long lists than anything drawn here. It carries the whole catalog
+ * rather than the filtered list, because the filters are the rail's and the
+ * rail is not on screen. */
+function renderDistrictPick() {
+  const sel = $('#district-pick');
+  if (!sel || !state.catalog) return;
+  const out = [];
+  let county = null;
+  for (const d of state.catalog.districts) {
+    if (d.county !== county) {
+      if (county) out.push('</optgroup>');
+      county = d.county;
+      out.push(`<optgroup label="${esc(county)}">`);
+    }
+    const who = d.nominees.map((n) => n.last).join(', ')
+      .toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase());
+    out.push(`<option value="${d.id}"${d.id === state.districtId ? ' selected' : ''}>`
+      + `${esc(county)} ${d.district} — ${esc(who) || 'nobody on the ballot'}</option>`);
+  }
+  if (county) out.push('</optgroup>');
+  sel.innerHTML = '<option value="">Pick a district</option>' + out.join('');
+  sel.value = state.districtId || '';
 }
 
 async function selectDistrict(id) {
@@ -1726,6 +1757,9 @@ function syncControls() {
 }
 
 function bind() {
+  $('#district-pick').addEventListener('change', (e) => {
+    if (e.target.value) selectDistrict(e.target.value);
+  });
   $('#districts').addEventListener('click', (e) => {
     const tick = e.target.closest('[data-tick]');
     if (tick) {

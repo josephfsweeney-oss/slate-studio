@@ -202,12 +202,51 @@ button,.ghost{cursor:pointer;border-radius:8px;padding:8px 13px;border:1px solid
   main{grid-template-columns:260px minmax(0,1fr) 300px}
   :root{--rail:260px}
 }
+/* The phone's district picker. The rail's listing is the control on a desktop,
+   so this is not drawn there. */
+.district-pick{display:none;width:100%;padding:9px 10px;border:1px solid var(--line);
+  border-radius:8px;background:#fff;font:inherit;font-size:15px}
+
 @media (max-width:900px){
   body{height:auto;display:block;overflow:visible}
   main{display:block;overflow:visible}
   .rail{border:0;border-top:1px solid var(--line)}
   .stage{overflow:visible}
   .canvas-wrap{height:62vh}
+
+  /* A hundred and seventy four rows stacked above the canvas put a scroll bar
+     where the piece should be. On a phone the districts are one line, the
+     phone draws the picker itself, and the graphic is the first thing on the
+     screen under it. The search box and the filter chips go with the listing:
+     they filter a list that is not there, and the picker carries the lot. */
+  #rail-left{border-top:0}
+  .district-pick{display:block}
+  #rail-left #search,
+  #rail-left .chips,
+  #rail-left #districts,
+  #rail-left .gap-summary{display:none}
+  .rail-head{border-bottom:0}
+
+  /* And the chrome above the canvas comes down with it. On a phone the title
+     wrapped to two lines with the pixel size beside it, which is another
+     hundred pixels of things nobody came for standing between the picker and
+     the piece. The canvas takes the room instead. */
+  .bar{height:auto;min-height:46px;padding:6px 12px;gap:10px;flex-wrap:wrap}
+  .brand{font-size:17px}
+  .source{display:none}
+  .stage{padding:10px 12px}
+  .stage-head{display:block;margin-bottom:8px}
+  .stage h1{font-size:19px;line-height:1.1}
+  .stage .sub{font-size:12px}
+  .stage-size{margin:2px 0 0;font-size:11px}
+  /* Sized to what is in it rather than to a share of the screen: a square
+     graphic in a 62vh box is a square graphic with a letterbox of checks
+     around it. The canvas comes out of its absolute corner to do that, or it
+     contributes no height and the box collapses to a line. It is still held
+     to the screen, so a story does not run to twice the phone. */
+  .canvas-wrap{height:auto;min-height:0;padding:8px;display:block}
+  #preview{position:static;inset:auto;display:block;margin:0 auto;
+    width:auto;height:auto;max-width:100%;max-height:68vh}
 }
 
 /* The mail programme sits above the copy boxes because it owns them: pick a
