@@ -90,11 +90,11 @@ export const MAIL_PROGRAMS = [{
       },
     },
     {
-      id: 'school-tax', art: 'home', n: 3, label: 'Cap Your School Tax',
+      id: 'school-tax', art: 'home', n: 3, label: 'Cap Your Property Tax',
       contrast: {
         mark: 'stairs',
         art: 'c-house',
-        kicker: 'Your school tax has no ceiling',
+        kicker: 'Your property tax has no ceiling',
         headline: 'It Climbs Every Single Year',
         versus: [
           { dir: 'no', text: 'Democrats will let it keep climbing' },
@@ -103,7 +103,7 @@ export const MAIL_PROGRAMS = [{
         source: 'HB 1300.',
       },
       front: {
-        headline: 'Your School Tax Gets A Ceiling',
+        headline: 'Your Property Tax Gets A Ceiling',
         subhead: 'Capped at inflation. Not at whatever the district asks for.',
       },
       back: {
@@ -112,25 +112,25 @@ export const MAIL_PROGRAMS = [{
       },
     },
     {
-      id: 'housing', art: 'framing', n: 4, label: 'Free Market Housing',
+      id: 'housing', art: 'house', n: 4, label: 'Free Market Housing',
       contrast: {
         mark: 'sold',
-        art: 'c-build',
-        kicker: 'Nothing got built',
-        headline: 'Priced Out Of The Town They Grew Up In',
+        art: 'c-home',
+        kicker: 'Red tape, not lumber, is what stops a house',
+        headline: 'Cut The Red Tape. Build The Homes.',
         versus: [
-          { dir: 'no', text: 'Democrats will keep saying no to new housing' },
-          { dir: 'yes', text: 'Republicans passed fifteen housing bills in one session' },
+          { dir: 'no', text: 'Democrats will keep the rules that stop a house going up' },
+          { dir: 'yes', text: 'Republicans are cutting the red tape that holds the market back' },
         ],
         source: 'The 2025 housing package. Fifteen bills in one session.',
       },
       front: {
         headline: 'Your Kids Cannot Afford To Live Here',
-        subhead: 'Republicans voted to change that. More homes, built faster.',
+        subhead: 'Republicans are cutting the red tape that holds the housing market back.',
       },
       back: {
         headline: 'Fifteen Bills. One Session.',
-        subhead: 'House Republicans worked with Governor Ayotte to move all fifteen.',
+        subhead: 'House Republicans worked with Governor Ayotte to cut the red tape.',
       },
     },
     {
@@ -207,7 +207,7 @@ export const MAIL_PROGRAMS = [{
       },
       back: {
         headline: 'Vote All The Way Down',
-        subhead: 'Give Governor Ayotte the House she needs, and yes on the school tax cap.',
+        subhead: 'Give Governor Ayotte the House she needs, and yes on the property tax cap.',
       },
     },
   ],
@@ -290,7 +290,7 @@ export const SHARED_BACK_ART = '/art/portsmouth.webp';
  * is the version to run when the drop is worth the plates. */
 export const SHARED_BACK = {
   headline: 'Seven Promises. In Writing.',
-  subhead: 'No income tax. A cap on your school tax. More homes. Lower bills.',
+  subhead: 'No income tax. A cap on your property tax. More homes. Lower bills.',
 };
 
 export const MAIL_VARS = [

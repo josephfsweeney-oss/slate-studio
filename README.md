@@ -571,8 +571,8 @@ people on it, and it carries a drawing rather than a photograph:
 | Round | Mark | What it draws |
 |---|---|---|
 | No Income Tax | `form` | A return with the line that matters filled in for you |
-| Cap Your School Tax | `stairs` | A staircase with no top step |
-| Free Market Housing | `sold` | The sign that went up before your kids could bid |
+| Cap Your Property Tax | `stairs` | A staircase with no top step |
+| Free Market Housing | `sold` | A single family home behind a picket fence |
 | Lower Energy Bills | `meter` | A bill that climbs, with this month on the end of it |
 | Lower Health Care Costs | `redacted` | An invoice with the prices taken out |
 | Parents Decide | `door` | The schoolhouse door, with somebody standing in it |

@@ -300,7 +300,7 @@ function scheduleDraw() {
 }
 
 /* The typed variables for this district. They are kept per district because a
- * school tax rate and a polling place are facts about one town, and carrying
+ * property tax rate and a polling place are facts about one town, and carrying
  * Salem's rate onto a Keene piece is how a wrong number gets printed. */
 const varsFor = (d) => (d ? state.mailVars[d.id] || {} : {});
 
