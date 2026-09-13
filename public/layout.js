@@ -1800,8 +1800,22 @@ function solveSlateBand(spec, measure, side) {
    * message side, the lower left corner on the address side, which is the only
    * part of that side the carrier is not standing in. */
   const foot = h - pad * 1.15;
+  /* On the address side the words live in the strip beside the carrier's
+   * corner, which starts at the top line of the panel. That put the faces on
+   * the top 56 per cent of the piece whatever else the side was carrying, and
+   * a side carrying seven pledges had to set them at ten point to fit them
+   * underneath. The pledges are the argument, so the slate gives some height
+   * back when they are on the piece. */
+  const hasList = Array.isArray(copy.list)
+    && copy.list.some((t) => String(t || '').trim());
+  /* Not on a short slate. With two or three on the ballot the faces are the
+   * design and the block beside them already takes the width, so the height
+   * taken here came straight off the portraits and their names. The reserve
+   * comes in as the slate fills the piece. */
+  const listReserve = panel && hasList ? h * 0.10 * Math.min(1, Math.max(0, n - 2) / 2) : 0;
+  const stackTop = panel ? panel.y - listReserve : 0;
   const stackBox = panel
-    ? { x: pad, y: panel.y, w: panel.x - pad * 2, h: h - panel.y - pad * 0.5 }
+    ? { x: pad, y: stackTop, w: panel.x - pad * 2, h: h - stackTop - pad * 0.5 }
     : { x: inner.x, y: inner.y, w: inner.w, h: foot - inner.y };
 
   const onDark = luminance(style.bgType === 'transparent' ? '#FFFFFF'
@@ -1984,11 +1998,20 @@ function solveSlateBand(spec, measure, side) {
    * message goes back over the top and the block carries the date. A full slate
    * leaves nothing, and the row is centred, which is where this started. */
   const zoneFull = { top: inner.y,
-    bottom: panel ? panel.y - box.h * 0.022 : foot };
+    bottom: panel ? stackTop - box.h * 0.022 : foot };
   /* What the leftover has to be worth before it is used: wide enough to set a
    * date in, and a sixth of the strip, so it reads as a block and not as a
-   * margin somebody forgot to close. */
-  const minAside = Math.max(box.h * 0.30, (inner.w) * 0.17);
+   * margin somebody forgot to close.
+   *
+   * And it costs more the longer the slate is. A block beside two faces takes
+   * room nobody wanted; beside eight it takes room off all eight of them, and
+   * eight small faces with a date beside them is a worse piece than eight
+   * larger faces across the width. Left as a flat threshold this depended on
+   * arithmetic elsewhere: making the checklist bigger shortened the faces,
+   * which freed width, which handed an eight candidate slate a block it has no
+   * business keeping. */
+  const minAside = Math.max(box.h * 0.30, (inner.w) * 0.17)
+    * (1 + Math.max(0, n - 4) * 0.22);
   const freeFull = strip.w - groupWidthAt(zoneFull.top, zoneFull.bottom, nominalBandH) - gutter;
   /* Beside the faces is a message side idea. The address side has the carrier's
    * corner in the bottom right, so its words stay in the lower left. */
@@ -2083,27 +2106,44 @@ function solveSlateBand(spec, measure, side) {
      * only, where there is a full column to set it in. */
     const listIn = Array.isArray(copy.list)
       ? copy.list.map((t) => String(t || '').trim()).filter(Boolean) : [];
-    let list = null;
-    let listH = 0;
-    if (listIn.length) {
+    /* Built at a scale rather than once, because how big the list may be
+     * depends on what it leaves the headline, and what it leaves the headline
+     * depends on how big it is. The pass settles it. */
+    const buildList = (scale) => {
+      if (!listIn.length) return { list: null, listH: 0 };
       const cols = listIn.length > 4 ? 2 : 1;
       const rws = Math.ceil(listIn.length / cols);
       const colGap = wordsBox.w * 0.045;
       const cw = (wordsBox.w - colGap * (cols - 1)) / cols;
-      const tick = cw * 0.058;
-      const tw = Math.max(1, cw - tick * 2.0);
-      const start = Math.min(box.h * 0.032 * textScale, tw * 0.055) * density;
+      /* The pledges are the argument on this side, not a caption under it. At
+       * a twentieth of the column they came out near ten point on an 11 x 5.5,
+       * which nobody reads off a mailer at arm's length. The tick is sized off
+       * the type rather than the column, so the mark and the line it marks grow
+       * together. */
+      const start = Math.min(box.h * 0.044 * textScale, cw * 0.078) * density * scale;
+      const tick = start * 1.05;
+      const tw = Math.max(1, cw - tick * 1.7);
       /* One size for every line. Fitted one at a time, a short promise sat next
        * to a long one at twice the size and the list read as a ransom note. */
-      const px = Math.min(...listIn.map(
+      let px = Math.min(...listIn.map(
         (t) => fitInside(measure, t, COND_BOLD, start, tw, 1, 0.02, true).px));
+      /* And held to a share of the piece. The list is an argument, not the
+       * whole side: left to grow it took height off the slate zone, the faces
+       * came in narrower, and a slate of eight stopped filling the width. */
+      const LEAD = 1.48;
+      const roomForList = box.h * 0.30 - box.h * 0.024;
+      const deep = rws * px * LEAD;
+      if (deep > roomForList) px *= roomForList / deep;
       const items = listIn.map((t) => fitInside(measure, t, COND_BOLD, px, tw, 1, 0.02, true));
-      const rowH = px * 1.48;
-      list = { cols, rws, colGap, cw, tick, tw, px, rowH, items };
-      listH = rws * rowH + box.h * 0.024;
-    }
+      const rowH = px * LEAD;
+      return {
+        list: { cols, rws, colGap, cw, tick, tw, px, rowH, items },
+        listH: rws * rowH + box.h * 0.024,
+      };
+    };
 
-    const stackedPass = (dropSub) => {
+    const stackedPass = (dropSub, listScale = 1) => {
+      const { list, listH } = buildList(listScale);
       let subBlk = dropSub ? EMPTY_SUB : fitBlock(measure, copy.subhead, COND_BOLD,
         box.h * (panel ? 0.036 : 0.050) * density * textScale,
         wordsBox.w * 0.98, panel ? 1 : 2, 0.045, true);
@@ -2144,7 +2184,7 @@ function solveSlateBand(spec, measure, side) {
        * sit under them, the district line and the call to action, goes above
        * them instead, and the slate stands on the foot of the paper. */
       const zone = panel
-        ? { top: inner.y, bottom: panel.y - box.h * 0.022 }
+        ? { top: inner.y, bottom: stackTop - box.h * 0.022 }
         : { top: inner.y + hh + subHt + listH + seatH + ctaH, bottom: foot };
       /* Left first, to find out what the slate leaves. If it leaves too little
        * to put anything in, the row goes back to centred: a row of eight with
@@ -2163,6 +2203,19 @@ function solveSlateBand(spec, measure, side) {
     if (pass.spare / strip.w >= 0.34 && pass.subBlk.lines.length) {
       asideSub = pass.subBlk;
       pass = stackedPass(true);
+    }
+    /* The headline leads the list it introduces. A list set as large as the
+     * column allows took the headline's room with it, and the side came out
+     * with a heading smaller than its own bullets. So where the headline has
+     * come out short, the list gives room back until it leads again. */
+    const HEAD_LEAD = 1.35;
+    if (pass.list && pass.headBlk.px) {
+      let scale = 1;
+      let guard = 0;
+      while (pass.headBlk.px < pass.list.px * HEAD_LEAD && scale > 0.5 && guard++ < 6) {
+        scale *= Math.max(0.82, pass.headBlk.px / (pass.list.px * HEAD_LEAD));
+        pass = stackedPass(!!asideSub, scale);
+      }
     }
     sub = pass.subBlk; subH = pass.subHt;
     head = pass.headBlk; blockPad = pass.bp; ruleH = pass.rh; headH = pass.hh;
@@ -2186,9 +2239,20 @@ function solveSlateBand(spec, measure, side) {
   const lastPad = firsts ? firstPx * 0.5 : bandPx * 0.5;
 
   const asideX = laid.right + gutter;
-  const asideW = strip.x + strip.w - asideX;
-  const frac = asideW / strip.w;
-  const tier = sideBySide ? 'words' : (!n || asideW < minAside) ? 'none' : 'plate';
+  /* The block runs out to the edge of the piece, not to the edge of the padded
+   * strip. Held to the strip it stopped 132px short of the trim while the
+   * address panel directly under it bled to the edge, so the right hand side
+   * read as two columns that did not line up. Everything else on this side
+   * bleeds; the block does too. */
+  /* Two numbers, not one. What is left inside the padded strip decides whether
+   * there is a block at all, which is the flex rule: the more candidates, the
+   * less room, until the block goes. Once it exists it occupies out to the
+   * trim. Deciding on the bled width let an eight candidate slate keep a block
+   * it has no room for. */
+  const asideRoom = strip.x + strip.w - asideX;
+  const asideW = w - asideX;
+  const frac = asideRoom / strip.w;
+  const tier = sideBySide ? 'words' : (!n || asideRoom < minAside) ? 'none' : 'plate';
 
   let aside = null;
   if (tier === 'words') {

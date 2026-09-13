@@ -938,6 +938,74 @@ test('the address panel is only on a trim that can carry a real one', () => {
   }
 });
 
+/* The block beside the slate and the address panel under it are the right hand
+ * side of the piece. Held to the padded strip the block stopped short of the
+ * trim while the panel bled to it, and the two read as columns that did not
+ * line up. */
+test('the block beside the slate runs to the same edge as the address panel', () => {
+  const piece = MAIL_PROGRAMS[0].pieces[0];
+  for (const id of ['mail6', 'mail11']) {
+    const c = CANVASES.find((x) => x.id === id);
+    for (const n of [1, 2, 3, 4]) {
+      const copy = { ...SIDE_COMMON, ...piece.back };
+      const p = solve({ canvas: { w: c.w, h: c.h }, dpi: c.dpi, slate: slate(n), copy,
+        style: sideStyle(piece, 'back') }, measure);
+      const a = p.band.aside;
+      const where = `${id} n=${n}`;
+      if (!a || a.tier === 'words' || !a.rect) continue;
+      assert.equal(Math.round(a.rect.x + a.rect.w), c.w,
+        `${where}: the block stops ${Math.round(c.w - a.rect.x - a.rect.w)}px short of the trim`);
+      assert.equal(Math.round(a.rect.x + a.rect.w),
+        Math.round(p.mailPanel.x + p.mailPanel.w),
+        `${where}: the block and the address panel end on different lines`);
+      // And it still clears the carrier's corner.
+      assert.ok(a.rect.y + a.rect.h <= p.mailPanel.y + 1,
+        `${where}: the block is in the carrier's corner`);
+    }
+  }
+});
+
+/* The pledges are the argument on the address side, not a caption under it.
+ * Sized off a twentieth of their column they came out near ten point on an
+ * 11 x 5.5, which nobody reads off a mailer at arm's length. */
+test('the pledges are readable, and the headline still leads them', () => {
+  const piece = MAIL_PROGRAMS[0].pieces.find((x) => x.id === 'contract');
+  assert.ok(Array.isArray(piece.back.list) && piece.back.list.length === 7,
+    'the opening round lost the seven pledges off its address side');
+
+  for (const id of ['mail11', 'mail6']) {
+    const c = CANVASES.find((x) => x.id === id);
+    for (const n of [1, 2, 3, 4, 6, 8]) {
+      const copy = { ...SIDE_COMMON, ...piece.back };
+      const p = solve({ canvas: { w: c.w, h: c.h }, dpi: c.dpi, slate: slate(n), copy,
+        style: sideStyle(piece, 'back') }, measure);
+      const b = p.band;
+      const where = `${id} n=${n}`;
+      assert.ok(b.list, `${where}: the pledges are not on the piece`);
+      assert.equal(b.list.items.length, 7, `${where}: ${b.list.items.length} pledges, not seven`);
+
+      /* Twelve point at three hundred dots is fifty pixels. From three on the
+       * ballot up: with one or two the faces are the design and the slate keeps
+       * the height rather than giving it to the list. */
+      if (n >= 3) {
+        assert.ok(b.list.px >= 50,
+          `${where}: the pledges are ${(b.list.px / c.dpi * 72).toFixed(1)}pt`);
+      }
+
+      /* And the heading over them is bigger than they are. A side with a
+       * heading smaller than its own bullets has them the wrong way round. */
+      assert.ok(b.head.block.px >= b.list.px * 1.2,
+        `${where}: the headline is ${b.head.block.px.toFixed(0)}px over `
+        + `${b.list.px.toFixed(0)}px pledges`);
+
+      // Nothing in the list crosses into the carrier's corner.
+      const right = b.list.x !== undefined ? b.list.x + b.top.w : b.top.x + b.top.w;
+      assert.ok(right <= p.mailPanel.x + 1,
+        `${where}: the pledges run into the carrier's corner`);
+    }
+  }
+});
+
 /* ------------------------------------------------------------ the mail band */
 
 test('every mail side puts the slate, a headline and a call to action on the piece', () => {
@@ -1014,7 +1082,15 @@ test('every mail side puts the slate, a headline and a call to action on the pie
           // words take the corner the carrier is not standing in.
           assert.ok(b.bandRect.y + b.bandRect.h <= p.mailPanel.y + 1,
             `${where} the slate crosses the carrier line`);
-          assert.ok(b.head.y >= p.mailPanel.y - 1, `${where} the words are not below the line`);
+          /* The words stay out of the carrier's corner. That means below the
+           * panel's top line, or clear of its left edge: the panel is a
+           * rectangle in the lower right, not a band across the piece, so a
+           * left hand column is free to start above it. A side carrying the
+           * pledges does exactly that, because the slate gives height back. */
+          const clearBelow = b.head.y >= p.mailPanel.y - 1;
+          const clearLeft = b.top.x + b.top.w <= p.mailPanel.x + 1;
+          assert.ok(clearBelow || clearLeft,
+            `${where} the words are in the carrier's corner`);
         }
         // One row, both sides, however many are on the slate.
         assert.equal(b.rows.length, 1, `${where} came out in ${b.rows.length} rows`);
