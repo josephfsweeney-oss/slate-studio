@@ -1,5 +1,5 @@
 /* Slate Studio front end. */
-import { solve, BRAND } from './layout.js';
+import { solve, BRAND, canCarryMailPanel } from './layout.js';
 import { paint, makeMeasurer } from './render.js';
 import {
   CANVASES, TEMPLATES, PALETTES, GROUNDS, TOKENS, TOPPERS,
@@ -1652,7 +1652,24 @@ function syncControls() {
       + 'ballot line, so she gets no oval and is not counted in the seats.'
     : '';
   $('#btn-print').hidden = !isPrintCanvas();
-  $('#mail-fields').hidden = state.style.mailPanel !== 'right';
+
+  /* The address panel is four inches by two and a quarter of postal geometry.
+   * On a trim that cannot carry it the layout leaves it off, so the control
+   * says so rather than reading as a setting that did nothing. */
+  const rec = canvasRec();
+  const mailable = canCarryMailPanel(
+    { dpi: rec.dpi || 0 },
+    state.canvasId === 'custom' ? state.cw : rec.w,
+    state.canvasId === 'custom' ? state.ch : rec.h);
+  const panelOpt = $('#mailpanel').querySelector('option[value="right"]');
+  if (panelOpt) {
+    panelOpt.disabled = !mailable;
+    panelOpt.textContent = mailable
+      ? 'Right side, this is the mail panel'
+      : 'Right side, this is the mail panel (not on this size)';
+  }
+  $('#mail-panel-note').hidden = mailable || state.style.mailPanel !== 'right';
+  $('#mail-fields').hidden = state.style.mailPanel !== 'right' || !mailable;
   $('#composition').value = state.style.composition;
   $('#align').value = state.style.align;
   $('#density').value = state.style.density;

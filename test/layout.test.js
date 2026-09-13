@@ -902,6 +902,42 @@ test('the names are set as large as their cell carries', () => {
   }
 });
 
+/* The address panel is postal geometry, not decoration. It used to be drawn on
+ * whatever trim was asked for and scaled down to fit, so a 24 x 18 yard sign, a
+ * 320 x 50 mobile banner and an Instagram story all carried an "address panel"
+ * no printer could use. */
+test('the address panel is only on a trim that can carry a real one', () => {
+  const piece = MAIL_PROGRAMS[0].pieces.find((x) => x.id === 'income-tax');
+  const style = sideStyle(piece, 'back', true);
+  assert.equal(style.mailPanel, 'right', 'the address side stopped asking for a panel');
+  const copy = { ...SIDE_COMMON, ...sideCopyFor(piece, 'back', true) };
+  const list = slate(2);
+
+  const got = new Set();
+  for (const c of CANVASES) {
+    const p = solve({ canvas: { w: c.w, h: c.h }, dpi: c.dpi || 0, slate: list, copy, style },
+      measure);
+    if (!p.mailPanel) continue;
+    got.add(c.id);
+    /* Whatever carries one carries the real thing: four inches by two and a
+     * quarter, in the lower right corner, at the trim's own resolution. */
+    const m = p.mailPanel;
+    assert.ok(c.dpi, `${c.id} drew a panel with no resolution to measure it in`);
+    assert.equal(Math.round(m.w / c.dpi * 100) / 100, 4, `${c.id} panel is not 4in across`);
+    assert.equal(Math.round(m.h / c.dpi * 100) / 100, 2.25, `${c.id} panel is not 2.25in down`);
+    assert.equal(Math.round(m.x + m.w), c.w, `${c.id} panel is off the right edge`);
+    assert.equal(Math.round(m.y + m.h), c.h, `${c.id} panel is off the bottom edge`);
+  }
+
+  for (const id of ['mail6', 'mail11']) {
+    assert.ok(got.has(id), `${id} is a mailer and lost its address panel`);
+  }
+  for (const id of ['1x1', 'story', '16x9', 'email', 'lead', 'mobile', 'skyline',
+                    'sign', 'sign-p', 'road', 'hanger']) {
+    assert.ok(!got.has(id), `${id} is not mail and still got an address panel`);
+  }
+});
+
 /* ------------------------------------------------------------ the mail band */
 
 test('every mail side puts the slate, a headline and a call to action on the piece', () => {

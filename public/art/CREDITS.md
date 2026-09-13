@@ -53,3 +53,15 @@ Unsplash asks applications that use its API to register a download when a photo
 is taken. These were fetched from the image CDN rather than through the download
 endpoint, which needs an API key this app does not hold. If the committee wants
 that call made, it needs an Unsplash application key.
+
+## The state outline
+
+The New Hampshire silhouette drawn in `public/render.js` is the US Census
+Bureau's own state boundary, generalised to twenty-eight points and projected
+equirectangular at the state's mid latitude. Census TIGER boundary files are
+United States Government work and carry no copyright.
+
+It replaced an outline drawn from memory, which was not the shape of New
+Hampshire and read as a blunt wedge. If the committee has its own state mark,
+use that instead: a mark on a New Hampshire mailer is either the state or it is
+a mistake every Granite Stater can see.

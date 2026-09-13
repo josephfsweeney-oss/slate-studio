@@ -45,16 +45,39 @@ export const MAIL_PANEL = { wIn: 4.0, hIn: 2.25 };
 /** Kept for the older fraction-based callers. */
 export const MAIL_PANEL_FRACTION = MAIL_PANEL.wIn / 11;
 
-/** Where the panel sits, in pixels. Uses the canvas dpi when it has one, and
- *  falls back to the same proportions of an 11 x 5.5 when it does not. */
+/* What the Postal Service carries. A card, a letter or a flat is at least
+ * 5 x 3.5 inches and at most 15 x 12. Anything outside that is not mail. */
+const MAILABLE = { minW: 5, minH: 3.5, maxW: 15, maxH: 12 };
+
+/** Whether a trim can carry a real address panel.
+ *
+ *  The panel is postal geometry, not decoration: four inches by two and a
+ *  quarter of indicia, return address, address block and barcode clear zone.
+ *  It used to be drawn on anything, scaled down to whatever was left, so a
+ *  24 x 18 yard sign and a 320 x 50 mobile banner both got one. A panel
+ *  scaled to two inches is not a panel. The printer cannot use it and the
+ *  Postal Service will not carry it.
+ *
+ *  So it needs three things: a real inch measure, a trim that goes through
+ *  the mail, and room for the four inches by two and a quarter at full size. */
+export function canCarryMailPanel(spec, w, h) {
+  const dpi = spec.dpi || 0;
+  if (!dpi) return false;                       // a screen trim has no inches
+  const inW = w / dpi; const inH = h / dpi;
+  const long = Math.max(inW, inH); const short = Math.min(inW, inH);
+  if (long < MAILABLE.minW || short < MAILABLE.minH) return false;
+  if (long > MAILABLE.maxW || short > MAILABLE.maxH) return false;
+  return MAIL_PANEL.wIn * dpi <= w * 0.52 && MAIL_PANEL.hIn * dpi <= h * 0.62;
+}
+
+/** Where the panel sits, in pixels. Null on any trim that cannot carry one. */
 export function mailPanelRect(spec, w, h) {
   if ((spec.style || {}).mailPanel !== 'right') return null;
-  const dpi = spec.dpi || 0;
-  const pw = dpi ? MAIL_PANEL.wIn * dpi : w * (MAIL_PANEL.wIn / 11);
-  const ph = dpi ? MAIL_PANEL.hIn * dpi : h * (MAIL_PANEL.hIn / 5.5);
-  const width = Math.min(pw, w * 0.52);
-  const height = Math.min(ph, h * 0.62);
-  return { x: w - width, y: h - height, w: width, h: height, dpi: dpi || w / 11 };
+  if (!canCarryMailPanel(spec, w, h)) return null;
+  const dpi = spec.dpi;
+  const width = MAIL_PANEL.wIn * dpi;
+  const height = MAIL_PANEL.hIn * dpi;
+  return { x: w - width, y: h - height, w: width, h: height, dpi };
 }
 
 export const PHOTO_AR = 1.25;   // portrait tile is 4:5, height / width
@@ -2187,8 +2210,10 @@ function solveSlateBand(spec, measure, side) {
         Math.min(box.h * 0.062, tw * 0.088) * density, tw, 4, 0.03, true)
       : fitInside(measure, 'ELECTION DAY', COND_BOLD,
         Math.min(box.h * 0.034, tw * 0.105) * density, tw, 1, 0.14, true);
+    /* One line. At two lines the month took the width and left the day sitting
+     * on its own underneath, which reads as a mistake rather than a date. */
     const date = fitInside(measure, dateText, ANTON,
-      Math.min(box.h * (asideSub ? 0.072 : 0.098), tw * 0.225) * density, tw, 2, -0.005, true);
+      Math.min(box.h * (asideSub ? 0.072 : 0.098), tw * 0.225) * density, tw, 1, -0.005, true);
     const note = fitInside(measure,
       n >= 2 && n < COUNT_WORD.length ? `VOTE FOR ALL ${COUNT_WORD[n]}` : '',
       COND_BOLD, Math.min(box.h * 0.038, tw * 0.125) * density, tw, 2, 0.06, true);
@@ -2219,7 +2244,12 @@ function solveSlateBand(spec, measure, side) {
   /* The band is the floor of the piece and runs the whole width of it, except
    * where the block beside the slate takes over: there it stops at the block's
    * edge and the two make one shape. */
-  const bandRight = aside && aside.tier !== 'words' ? asideX : w;
+  /* The band stops short of the block beside it. Both are set in the plate
+   * colour, so run together they made one navy L rather than a name band and a
+   * date block. The gutter between the faces and the block is what tells them
+   * apart. */
+  const bandRight = aside && aside.tier !== 'words'
+    ? laid.right + gutter * 0.28 : w;
   /* The name strip: one band, one line in it for each row of faces, and every
    * name under the face it belongs to. */
   for (let ri = 0; ri < laid.rows.length; ri++) {
@@ -2592,7 +2622,9 @@ function solveGuarantee(spec, measure) {
     wy += t.px * LINE + (i === 0 ? gapH : 0);
   });
   y += titleH;
-  const divider = { y: y + divH * 0.45, markW: s * 0.030,
+  /* The mark is New Hampshire, which is half as wide as it is tall, so it
+   * needs the width a rounder mark did not. */
+  const divider = { y: y + divH * 0.45, markW: s * 0.040,
     gap: s * 0.022, w: inner.w * 0.62, cx: inner.x + inner.w / 2 };
 
   const dpi = spec.dpi || 0;

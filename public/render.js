@@ -1837,19 +1837,42 @@ function swoosh(ctx, r, up, colour) {
  * bottom and the Connecticut River up the west. It is a mark at the size it is
  * used, not a map, and it is drawn rather than traced because the committee's
  * own outline has not come across yet. Send the file and this goes. */
+/* New Hampshire, from the Census Bureau's own state boundary, simplified to
+ * twenty-eight points and projected equirectangular at the state's mid
+ * latitude so it is not stretched. The notch at the top, the river line down
+ * the west, the straight Maine line, the seacoast, the Massachusetts line
+ * across the foot. Public domain.
+ *
+ * What was here before was drawn from memory: a fourteen point blob with a
+ * symmetric point on top that was not New Hampshire and did not look like it.
+ * A state mark on a New Hampshire mailer either is the state or it is a
+ * mistake every Granite Stater can see. */
 const NH = [
-  [0.44, 0.00], [0.55, 0.24], [0.63, 0.44], [0.72, 0.62], [0.80, 0.74],
-  [0.90, 0.86], [0.97, 0.95], [0.62, 0.97], [0.26, 0.98], [0.05, 0.95],
-  [0.12, 0.72], [0.17, 0.52], [0.25, 0.30], [0.33, 0.13],
+  [0.7946, 0.0000], [0.8214, 0.2479], [0.8571, 0.7521], [0.9435, 0.7962],
+  [0.9345, 0.8340], [1.0000, 0.8613], [0.9375, 0.9328], [0.8839, 0.9265],
+  [0.7381, 0.9643], [0.6786, 1.0000], [0.0476, 0.9874], [0.0000, 0.9580],
+  [0.0060, 0.9013], [0.0536, 0.8803], [0.0476, 0.8256], [0.0893, 0.6639],
+  [0.1845, 0.5882], [0.2321, 0.5021], [0.2798, 0.4706], [0.2768, 0.3761],
+  [0.4583, 0.3403], [0.5476, 0.2752], [0.4970, 0.2122], [0.5714, 0.1492],
+  [0.5655, 0.1113], [0.6429, 0.0126], [0.7679, 0.0231],
 ];
 
+/** The state is half as wide as it is tall. Every caller used to pass its own
+ *  box and get whatever stretch that implied. */
+export const NH_AR = 0.5078;
+
+/** Fits the state inside the box, centred, at its own proportions. */
 function paintState(ctx, x, y, wide, tall, colour) {
+  const fitW = Math.min(wide, tall * NH_AR);
+  const fitH = fitW / NH_AR;
+  const ox = x + (wide - fitW) / 2;
+  const oy = y + (tall - fitH) / 2;
   ctx.save();
   ctx.fillStyle = colour;
   ctx.beginPath();
   NH.forEach(([px, py], i) => {
-    const ax = x + px * wide;
-    const ay = y + py * tall;
+    const ax = ox + px * fitW;
+    const ay = oy + py * fitH;
     if (i === 0) ctx.moveTo(ax, ay); else ctx.lineTo(ax, ay);
   });
   ctx.closePath();
@@ -1877,8 +1900,12 @@ function paintGuarantee(ctx, plan, style, theme, bleed = 0) {
   ctx.fillRect(-B, -B, w + B * 2, h + B * 2);
 
   // The state, oversized and faint, sitting off the right hand edge.
-  const wmH = h * 1.06;
-  paintState(ctx, w * 0.70, -h * 0.03, wmH * 0.62, wmH,
+  /* Sized off the height, held to a share of the width, and hung off the right
+   * hand edge. Sized off the height alone it ran clean off a square trim and
+   * what was left read as a grey smudge rather than the state. */
+  const wmW = Math.min(h * 1.06 * NH_AR, w * 0.44);
+  const wmH = wmW / NH_AR;
+  paintState(ctx, w - wmW * 0.86, (h - wmH) / 2, wmW, wmH,
     onDark ? 'rgba(255,255,255,.05)' : 'rgba(18,49,78,.045)');
 
   // The frame.
@@ -1922,8 +1949,8 @@ function paintGuarantee(ctx, plan, style, theme, bleed = 0) {
     ctx.fillRect(d.cx - d.w / 2, d.y, half, t);
     ctx.fillRect(d.cx + d.w / 2 - half, d.y, half, t);
   }
-  paintState(ctx, d.cx - d.markW / 2, d.y - d.markW * 0.78,
-    d.markW, d.markW * 1.58, mark);
+  const mH = d.markW / NH_AR;
+  paintState(ctx, d.cx - d.markW / 2, d.y - mH * 0.46, d.markW, mH, mark);
 
   // The four words, in a solid bar across the foot of the frame.
   if (g.bar) {
