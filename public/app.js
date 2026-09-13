@@ -19,6 +19,19 @@ const $$ = (s) => [...document.querySelectorAll(s)];
  * A deployment for another committee sets SLATE_DISCLAIMER instead. */
 const DEFAULT_DISCLAIMER = 'Paid for by Committee to Elect House Republicans, 75 S Main Street Unit 7 Box 159, Concord, NH 03301. Jason Osborne, Chairman.';
 
+/* What the app opens on. MaidmentGPT is the committee's own slate graphic, so
+ * it is what a district should look like before anybody touches a control.
+ * Read off the template record rather than copied out of it, so the default and
+ * the template can never drift apart. */
+const DEFAULT_TEMPLATE = 'maidment';
+const defaultTemplate = () => TEMPLATES.find((t) => t.id === DEFAULT_TEMPLATE) || null;
+
+/* Bumped when the defaults change. A browser holding an older blob keeps its
+ * districts, its running order and its portrait picks, and takes the new copy,
+ * colours and layout: otherwise the last thing anybody opened is the thing the
+ * app opens on for ever. */
+const STATE_VERSION = 2;
+
 const COPY_FIELDS = ['kicker', 'headline', 'subhead', 'details', 'cta', 'footer',
   'disclaimer', 'returnAddress', 'indicia', 'values', 'record', 'callout', 'contrast',
   'stat', 'source', 'url'];
@@ -58,20 +71,25 @@ const state = {
   reps: {},              // districtId -> Set of names ticked as sitting members
   canvasId: '1x1',
   cw: 1080, ch: 1080,
+  templateId: DEFAULT_TEMPLATE,
   copy: {
-    kicker: '', headline: '', subhead: '', details: '', cta: '', footer: '', disclaimer: '',
+    ...{ kicker: '', headline: '', subhead: '', details: '', cta: '', footer: '' },
+    ...(defaultTemplate()?.copy || {}),
+    disclaimer: DEFAULT_DISCLAIMER,
     values: '', record: '', callout: '', contrast: '', stat: '', source: '', url: '',
     returnAddress: 'Committee to Elect House Republicans\n75 S Main Street Unit 7 Box 159\nConcord, NH 03301',
     indicia: 'NONPROFIT ORG\nU.S. POSTAGE\nPAID\nPERMIT NO. ___',
   },
-  // Defaults are the Granite Guarantee sheet: green and navy on white.
+  /* Defaults are MaidmentGPT: the committee's own slate graphic, on a square,
+   * which is what a district looks like before anybody touches a control. */
   style: {
     composition: 'auto', align: 'auto', plate: true, density: 1,
     headScale: 1, textScale: 1,
-    paletteId: 'guarantee', ground: 'palette',
+    paletteId: 'maidment', ground: 'palette',
     bgType: 'solid', bgColor: '#FFFFFF', bgColor2: '#235E3B', bgDim: 0.45,
     accent: '#2F7C4E', plateColor: '#12314E', plateAccent: '#95DAB1',
     bar: ['#2F7C4E', '#12314E'],
+    ...(defaultTemplate()?.style || {}),
     faceSource: 'cutouts', mailPanel: 'none', spotlight: '',
     topper: '', topperAt: 'first',
     flagBar: true, headlineShadow: true, twoTone: true, honorific: true,
@@ -106,6 +124,7 @@ function shareLink() {
 const saveLocal = () => {
   try {
     localStorage.setItem('slate-studio', JSON.stringify({
+      v: STATE_VERSION, templateId: state.templateId,
       districtId: state.districtId, canvasId: state.canvasId, cw: state.cw, ch: state.ch,
       copy: state.copy, style: state.style, waiveDisclaimer: state.waiveDisclaimer,
       drop: Object.fromEntries(Object.entries(state.drop).map(([k, v]) => [k, [...v]])),
@@ -119,14 +138,22 @@ const saveLocal = () => {
 function loadLocal() {
   try {
     const s = JSON.parse(localStorage.getItem('slate-studio') || '{}');
+    /* A blob written before the defaults changed keeps what is the operator's
+     * own work, and gives up what is a default: the copy, the colours, the
+     * layout, the canvas and whichever mail piece happened to be open last.
+     * Without this the app opens on whatever the last session left behind, and
+     * changing what it opens on reaches nobody who has ever used it. */
+    const fresh = s.v !== STATE_VERSION;
     Object.assign(state, {
       districtId: s.districtId ?? null,
-      canvasId: s.canvasId ?? state.canvasId,
-      cw: s.cw ?? state.cw, ch: s.ch ?? state.ch,
-      copy: { ...state.copy, ...(s.copy || {}) },
-      style: { ...state.style, ...(s.style || {}) },
+      templateId: fresh ? state.templateId : (s.templateId ?? state.templateId),
+      canvasId: fresh ? state.canvasId : (s.canvasId ?? state.canvasId),
+      cw: fresh ? state.cw : (s.cw ?? state.cw),
+      ch: fresh ? state.ch : (s.ch ?? state.ch),
+      copy: fresh ? state.copy : { ...state.copy, ...(s.copy || {}) },
+      style: fresh ? state.style : { ...state.style, ...(s.style || {}) },
       waiveDisclaimer: Boolean(s.waiveDisclaimer),
-      mail: { ...state.mail, ...(s.mail || {}) },
+      mail: fresh ? state.mail : { ...state.mail, ...(s.mail || {}) },
       mailVars: s.mailVars || {},
       order: s.order || {}, tags: s.tags || {},
       drop: Object.fromEntries(Object.entries(s.drop || {}).map(([k, v]) => [k, new Set(v)])),
@@ -1617,6 +1644,9 @@ function fillSpotlightPicker() {
 
 function syncControls() {
   $('#canvas').value = state.canvasId;
+  /* The template box says which template is actually loaded, so the app does
+   * not open on MaidmentGPT while the control reads "Start blank". */
+  $('#template').value = state.templateId || '';
   $('#custom-size').hidden = state.canvasId !== 'custom';
   $('#cw').value = state.cw; $('#ch').value = state.ch;
   for (const k of COPY_FIELDS) {
@@ -1829,6 +1859,7 @@ function bind() {
   }
 
   $('#template').addEventListener('change', (e) => {
+    state.templateId = e.target.value;
     const t = TEMPLATES.find((x) => x.id === e.target.value);
     if (!t) return;
     // A template and a programme piece cannot both own the copy boxes.

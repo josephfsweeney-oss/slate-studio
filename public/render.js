@@ -1885,6 +1885,102 @@ function paintState(ctx, x, y, wide, tall, colour) {
 /* The Granite Guarantee on its own: a frame, the masthead between two rules,
  * the two words stacked, a divider with the state in it, and the four words
  * across the foot. */
+/** MaidmentGPT ships its own ink, sampled off the committee's own pieces. */
+export const MAIDMENT_INK = {
+  ground: '#00351B', edge: '#002912', navy: '#001E38', sage: '#BCCEC0',
+};
+
+/* MaidmentGPT: forest green ground, a stack of names set to the column, the
+ * office on a navy block, and the slate cut out along the foot. */
+function paintMaidment(ctx, plan, style, theme, assets, bleed = 0) {
+  const m = plan.maidment;
+  const { w, h } = plan.canvas;
+  const B = bleed;
+  const ground = style.bgColor || MAIDMENT_INK.ground;
+  const edge = style.bgColor2 || MAIDMENT_INK.edge;
+  const navy = style.plateColor || MAIDMENT_INK.navy;
+  const sage = style.plateAccent || MAIDMENT_INK.sage;
+  const ANTON_F = { family: 'Anton', weight: 400 };
+  const COND_F = { family: 'Barlow Condensed', weight: 700 };
+
+  /* The ground, with the vignette the committee's pieces carry: near flat, a
+   * shade lighter through the middle than at the corners. */
+  ctx.fillStyle = ground;
+  ctx.fillRect(-B, -B, w + B * 2, h + B * 2);
+  const g = ctx.createRadialGradient(w * 0.46, h * 0.40, 0,
+    w * 0.46, h * 0.40, Math.max(w, h) * 0.78);
+  g.addColorStop(0, ground);
+  g.addColorStop(1, edge);
+  ctx.fillStyle = g;
+  ctx.fillRect(-B, -B, w + B * 2, h + B * 2);
+
+  /* The slate, standing on the foot of the piece and cropped by it. Drawn
+   * before the words so a shoulder never lands on a name. */
+  for (const f of m.figures) {
+    const img = assets.portraits && assets.portraits[f.candidate.name];
+    if (!img) continue;
+    const slot = f.slot;
+    const k = slot.h / img.height;
+    const dw = img.width * k;
+    const cx = slot.x + slot.w / 2;
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(cx - f.maxW / 2, slot.y, f.maxW, slot.h + B);
+    ctx.clip();
+    ctx.drawImage(img, cx - dw / 2, slot.y, dw, slot.h);
+    ctx.restore();
+  }
+
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'alphabetic';
+
+  // The district line.
+  if (m.kicker) {
+    const k = m.kicker;
+    setFont(ctx, COND_F, k.px, k.ls);
+    ctx.fillStyle = sage;
+    ctx.fillText(k.text, m.col.x, k.y + k.px);
+  }
+
+  // The names. One size, left aligned, ragged right, set tight.
+  setFont(ctx, ANTON_F, m.namePx, -0.01);
+  ctx.fillStyle = BRAND.white;
+  for (const r of m.rows) ctx.fillText(r.text, m.col.x, r.y + m.namePx * 0.80);
+
+  // The office, on a solid navy block that hugs its own words.
+  if (m.block) {
+    const b = m.block;
+    ctx.fillStyle = navy;
+    ctx.fillRect(b.x, b.y, b.w, b.h);
+    setFont(ctx, COND_F, b.px, b.ls);
+    ctx.fillStyle = sage;
+    ctx.fillText(b.text, b.x + b.h * 0.31, b.y + (b.h + b.px * 0.74) / 2);
+  }
+
+  // The ballot line.
+  if (m.vote) {
+    setFont(ctx, COND_F, m.vote.px, m.vote.ls);
+    ctx.fillStyle = BRAND.white;
+    ctx.fillText(m.vote.text, m.col.x, m.vote.y + m.vote.px);
+  }
+
+  /* The disclaimer, across the foot on its own scrim. It lands on the slate,
+   * and legal text nobody can read is a liability rather than a design. */
+  if (m.disclaimer) {
+    const d = m.disclaimer;
+    ctx.fillStyle = 'rgba(0,18,9,.55)';
+    ctx.fillRect(-B, d.y, w + B * 2, d.h + B);
+    setFont(ctx, COND_F, d.px, 0.01);
+    ctx.fillStyle = BRAND.white;
+    ctx.textAlign = 'center';
+    const lines = d.lines && d.lines.length ? d.lines : [d.text];
+    const top = d.y + (d.h - d.lh * lines.length) / 2;
+    lines.forEach((l, i) => ctx.fillText(l, w / 2, top + d.lh * (i + 0.78)));
+    ctx.textAlign = 'left';
+  }
+  if ('letterSpacing' in ctx) ctx.letterSpacing = '0px';
+}
+
 function paintGuarantee(ctx, plan, style, theme, bleed = 0) {
   const g = plan.guarantee;
   const { w, h } = plan.canvas;
@@ -2205,6 +2301,14 @@ export function paint(ctx, plan, style, assets = {}, copy = {}, bleed = 0) {
     paintQr(ctx, plan.qr, theme, plan);
     paintDisclaimer(ctx, plan, style, theme);
     paintHangerDie(ctx, plan, style);
+    ctx.restore();
+    return theme;
+  }
+
+  /* MaidmentGPT lays its own ground: a forest green field with a vignette, and
+   * the slate drawn into it before the words. */
+  if (plan.maidment) {
+    paintMaidment(ctx, plan, style, theme, assets, bleed);
     ctx.restore();
     return theme;
   }

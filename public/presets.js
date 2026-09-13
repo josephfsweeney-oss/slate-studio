@@ -56,6 +56,39 @@ export const TOKENS = [
 
 export const TEMPLATES = [
   {
+    /* MaidmentGPT: the committee's own slate graphic as a template.
+     *
+     * Type dominant. The names are the image, so there is no headline slot to
+     * fill: the ballot supplies the copy that matters. Four text slots, each
+     * with a budget the layout enforces and warns on.
+     *
+     *   kicker      the district line   22 characters
+     *   subhead     the office          28 characters
+     *   cta         the ballot line     30 characters
+     *   disclaimer  supplied verbatim by the committee, never written here
+     *
+     * Everything else is locked: the ground, the navy block, the sage, the
+     * tight name stack and the slate along the foot. A district changes the
+     * names and the district line and nothing else. */
+    id: 'maidment',
+    label: 'MaidmentGPT slate',
+    copy: {
+      kicker: '{{COUNTY}} {{DISTRICT}}',
+      headline: '',
+      subhead: 'For State Representative',
+      details: '',
+      cta: 'Vote Republican November 3',
+      footer: '',
+    },
+    style: {
+      composition: 'maidment',
+      bgType: 'gradient', bgColor: '#00351B', bgColor2: '#002912',
+      accent: '#001E38', plateColor: '#001E38', plateAccent: '#BCCEC0',
+      plate: false, flagBar: false, twoTone: false, honorific: false,
+      mailPanel: 'none',
+    },
+  },
+  {
     id: 'meet',
     label: 'Meet the slate',
     copy: {
@@ -333,6 +366,20 @@ export const PALETTES = [
     bgType: 'solid', bgColor: '#12314E',
     accent: '#2F7C4E', plateColor: '#0D2740', plateAccent: '#95DAB1',
     bar: ['#2F7C4E', '#95DAB1'],
+  },
+  {
+    /* MaidmentGPT. Sampled off the committee's own slate graphics: a forest
+     * green field, a very deep navy for the office block, and a sage that
+     * carries on both. */
+    id: 'maidment', label: 'MaidmentGPT green', ground: 'dark',
+    bgType: 'gradient', bgColor: '#00351B', bgColor2: '#002912',
+    /* The navy is the block colour and the sage is the type that goes on it.
+     * Sage as the accent reads right on this template, which never fills a
+     * block with it, and fails everywhere else: white on a sage block is
+     * 1.65 to 1, and every other composition puts its call to action on the
+     * accent. The colour test caught that before it shipped. */
+    accent: '#001E38', plateColor: '#001E38', plateAccent: '#BCCEC0',
+    bar: ['#001E38', '#BCCEC0'],
   },
   {
     id: 'pine', label: 'Pine', ground: 'dark',

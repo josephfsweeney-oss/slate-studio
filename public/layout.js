@@ -124,6 +124,9 @@ function qrFor(measure, copy, spec, s, maxSide, maxW) {
 
 const ANTON = { family: 'Anton', weight: 400 };
 const COND_BOLD = { family: 'Barlow Condensed', weight: 700 };
+/** Cap height as a fraction of type size, measured in the browser. A ratio
+ *  read off a piece of artwork is a cap height; setFont wants a type size. */
+const COND_CAP = 1 / 0.710;
 const COND_MED = { family: 'Barlow Condensed', weight: 500 };
 const COND_SEMI = { family: 'Barlow Condensed', weight: 600 };
 
@@ -279,7 +282,7 @@ function idealTile(n, s) {
 
 export const COMPOSITIONS = ['stack', 'banner', 'split', 'slateOnly', 'palmcard',
   'palmback', 'ballot', 'spotlight', 'versus', 'strip', 'stat', 'receipt', 'typeled',
-  'promise', 'proof', 'poster', 'contrast', 'guarantee'];
+  'promise', 'proof', 'poster', 'contrast', 'guarantee', 'maidment'];
 
 /* The palm card is a designed template rather than a solved one: a fixed stack
  * of bands, in a fixed order, the way a rack card is read top to bottom. The
@@ -2608,6 +2611,273 @@ function solveContrast(spec, measure) {
   };
 }
 
+
+/* ---------------------------------------------------------------- MaidmentGPT
+ *
+ * The committee's own slate graphic, as a template. Type dominant: the names
+ * are the image. A forest green ground, the district line in sage over a stack
+ * of names set to the column, the office on a navy block, the ballot date
+ * under it, and the slate cut out along the foot running off the trim.
+ *
+ * The measurements come off the four pieces the committee has run, not off a
+ * guess. Two of them hold across every one: the names advance at 0.78 of their
+ * own size, which is tight enough that the caps nearly touch, and the stack is
+ * set to the width of its column and then held to the height of the space it
+ * stands in. That second rule is what makes a square and a story look like the
+ * same design at different sizes: on a square the stack has to come down to
+ * fit and the names end near 170px on an 1080, on a story it does not and they
+ * end near 245. Both match the pieces to within a few per cent.
+ *
+ * The slots, with the budgets a template needs to be a template:
+ *
+ *   kicker      the district line      22 characters
+ *   (names)     the slate itself       1 to 8, from the ballot
+ *   subhead     the office             28 characters
+ *   cta         the ballot line        30 characters
+ *   disclaimer  supplied, never written      fixed text from the committee
+ */
+/* Every one of these is measured off the committee's own pieces rather than
+ * chosen, and then divided by the cap height of the face that actually sets
+ * it: Anton's caps are 0.860 of its size and Barlow Condensed Bold's are
+ * 0.710, so a ratio taken off the artwork is not a ratio you can hand to
+ * setFont. Doing that from a remembered 0.712 for Anton put the line advance
+ * at 0.78 and the three names printed through one another. */
+const MAIDMENT = {
+  LINE: 0.916,         // name advance, as a fraction of the name size
+  KICKER: 0.407,       // district line, against the name size
+  VOTE: 0.496,         // the ballot line
+  BLOCK: 0.451,        // navy block height
+  OFFICE: 0.62,        // office type inside its block
+  GAP: 0.085,          // between the parts of the stack
+  FACE: 0.42,          // the share of a tall piece the faces stand in
+  COL: 0.44,           // the type column on a wide piece
+};
+
+function solveMaidment(spec, measure) {
+  const { w, h } = spec.canvas;
+  const style = spec.style || {};
+  const copy = spec.copy || {};
+  const slate = spec.slate || [];
+  const n = slate.length;
+  const density = style.density ?? 1;
+  const textScale = clampScale(style.textScale);
+  const headScale = clampScale(style.headScale);
+  const box = { x: 0, y: 0, w, h };
+  const s = Math.min(w, h);
+  const M = MAIDMENT;
+
+  const pad = s * 0.040 * density;
+  /* Wide runs the faces up the right hand side; anything squarer stands them
+   * along the foot. The committee's own set has both.
+   *
+   * Only a short slate goes beside the words, though. Eight faces in half the
+   * width of a link card are hundred pixel slivers with no heads in them. Past
+   * four, a wide trim stands them along the foot like every other shape. */
+  const wide = w / h >= 1.35 && n <= 4;
+
+  /* The disclaimer first. It is required on a finished ad under RSA 664:14 and
+   * it is the one thing on the piece that may not be squeezed, so it takes its
+   * strip before anything else is placed. It sits over the foot of the faces,
+   * so it carries its own scrim: legal text on a shoulder is a liability. */
+  /* Set to the trim, not to a fraction of it. The committee's line is 125
+   * characters, and at a flat fraction of the short side it ran off both edges
+   * of a square. RSA 664:14 wants it legible, so it is fitted to the width and
+   * allowed a second line rather than shrunk until it fits on one: illegible
+   * legal text is a liability, not a design. */
+  const disc = String(copy.disclaimer || '').trim();
+  const discBlk = disc
+    ? fitBlock(measure, disc, COND_BOLD, s * 0.030 * textScale * density,
+      w * 0.94, 2, 0.01, false)
+    : { lines: [], px: 0, lh: 0, h: 0 };
+  const discPx = discBlk.px;
+  const discH = disc ? discBlk.h + discPx * 0.85 : 0;
+
+  const colW = (wide ? (w - pad * 2) * M.COL : w - pad * 2);
+  const col = { x: pad, w: Math.max(1, colW) };
+
+  /* Where the faces stand, and what is left for the words. */
+  const faceRect = wide
+    ? { x: pad + colW + (w - pad * 2) * 0.045, y: 0,
+        w: w - (pad + colW + (w - pad * 2) * 0.045), h }
+    : { x: 0, y: h - h * M.FACE, w, h: h * M.FACE };
+  /* The slate is laid before the words, because the words stand on it. A long
+   * slate holds its faces shorter than the band they are in, so squaring the
+   * stack up to the band left a strip of bare green between the ballot line and
+   * the heads. */
+  const figures = layMaidmentFaces(slate, faceRect, wide, n);
+  const zone = { top: pad,
+    bottom: wide ? h - discH - pad * 0.4
+      : (figures.list.length ? figures.list[0].slot.y : faceRect.y) - s * 0.012 };
+
+  /** The size that sets this line to exactly `width`. */
+  const fillWidth = (text, font, width, ls) => {
+    const at100 = widthAt(measure, String(text || '').toUpperCase(), font, 100, ls);
+    return at100 > 0 ? (width / at100) * 100 : 0;
+  };
+
+  /* The names, one to a line, in ballot order. Set to the column and then held
+   * to the height, which is the whole of it: one size for all of them, chosen
+   * by the longest, left aligned and ragged right. */
+  const names = slate.map((c) => `${firstLine(c, style)} ${c.last}`.trim().toUpperCase())
+    .filter(Boolean);
+  const shortNames = slate.map((c) => String(c.last || '').trim().toUpperCase())
+    .filter(Boolean);
+  let lines = names;
+  let namePx = lines.length
+    ? Math.min(...lines.map((t) => fillWidth(t, ANTON, col.w, -0.01))) : 0;
+
+  const kickText = String(copy.kicker || '').trim().toUpperCase();
+  const officeText = String(copy.subhead || '').trim().toUpperCase();
+  const voteText = String(copy.cta || '').trim().toUpperCase();
+
+  /* Everything else on the stack is a ratio of the name size, so the whole
+   * block scales as one thing rather than four things that happen to be near
+   * each other. Each one is then held to the column as well: a district with
+   * one short name on the ballot sets that name across the whole column, and
+   * half the name size is a ballot line that runs off the trim. It did. */
+  const capAt = (text, font, ls, ratio, px) => {
+    if (!text) return 0;
+    const want = px * ratio * textScale;
+    const at100 = widthAt(measure, text, font, 100, ls);
+    return at100 > 0 ? Math.min(want, (col.w / at100) * 100) : want;
+  };
+  const partsAt = (px) => ({
+    gap: px * M.GAP,
+    kick: capAt(kickText, COND_BOLD, 0.16, M.KICKER, px),
+    vote: capAt(voteText, COND_BOLD, 0.02, M.VOTE, px),
+    /* The block hugs its words and the words are held to the column, so the
+     * block never runs wider than the names above it. */
+    office: officeText
+      ? Math.min(px * M.BLOCK,
+        capAt(officeText, COND_BOLD, 0.045, M.BLOCK * M.OFFICE, px) / M.OFFICE) : 0,
+  });
+  const stackAt = (px) => {
+    const q = partsAt(px);
+    return (q.kick ? q.kick * COND_CAP + q.gap : 0)
+      + lines.length * px * M.LINE
+      + (q.office ? q.gap + q.office : 0)
+      + (q.vote ? q.gap + q.vote * COND_CAP : 0);
+  };
+
+  const room = Math.max(1, zone.bottom - zone.top);
+  namePx *= headScale;
+  let want = stackAt(namePx);
+  if (want > room) namePx *= room / want;
+  /* A long slate on a small trim drives the names under the floor a voter can
+   * read from a phone. Surnames alone are what a ballot matches on, so they go
+   * first rather than the size going further. */
+  const floor = s * 0.030;
+  if (namePx < floor && shortNames.length === lines.length) {
+    lines = shortNames;
+    namePx = Math.min(...lines.map((t) => fillWidth(t, ANTON, col.w, -0.01))) * headScale;
+    want = stackAt(namePx);
+    if (want > room) namePx *= room / want;
+  }
+  const dropped = lines !== names;
+
+  const parts = partsAt(namePx);
+  const gap = parts.gap;
+  const kickPx = parts.kick;
+  const votePx = parts.vote;
+  const blockH = parts.office;
+  const officePx = blockH ? blockH * M.OFFICE : 0;
+  const officeW = officeText
+    ? widthAt(measure, officeText, COND_BOLD, officePx, 0.045) + blockH * 0.62 : 0;
+
+  const stackH = stackAt(namePx);
+  /* The stack stands on the slate, not in the middle of the field. Centred, a
+   * story left a third of the piece as bare green between the ballot line and
+   * the faces, which is the one thing none of the committee's pieces has. Set
+   * on the floor it reads the same on a square, where the stack fills the zone
+   * anyway, and right on a story. */
+  let y = zone.top + Math.max(0, room - stackH);
+
+  const kicker = kickText
+    ? { text: kickText, px: kickPx, ls: 0.16, y } : null;
+  if (kicker) y += kickPx * COND_CAP + gap;
+
+  const nameTop = y;
+  const rows = lines.map((t, i) => ({ text: t, y: y + i * namePx * M.LINE }));
+  y += lines.length * namePx * M.LINE;
+
+  const block = officeText
+    ? { x: col.x, y: y + gap, w: Math.min(officeW, col.w), h: blockH,
+        px: officePx, ls: 0.045, text: officeText } : null;
+  if (block) y = block.y + block.h;
+
+  const vote = voteText ? { text: voteText, px: votePx, ls: 0.02, y: y + gap } : null;
+  if (vote) y = vote.y + votePx * COND_CAP;
+
+  const dpi = spec.dpi || 0;
+
+  return {
+    canvas: { w, h },
+    composition: 'maidment',
+    pad, gap, s, scale: 1,
+    grid: { cols: n, rows: 1, tileW: figures.cellW, tileH: figures.figH },
+    slateRect: faceRect,
+    tiles: [],
+    deck: null,
+    copy: null,
+    mailPanel: null,
+    qr: null,
+    maidment: {
+      box, col, wide, zone, kicker, rows, nameTop, namePx, dropped,
+      block, vote, faceRect, figures: figures.list,
+      disclaimer: disc
+        ? { text: disc, lines: discBlk.lines, px: discPx, lh: discBlk.lh,
+            h: discH, y: h - discH, truncated: !!discBlk.truncated } : null,
+    },
+    disclaimer: null,
+    warnings: [
+      ...(!n ? ['Nobody on the piece. A slate graphic with no slate is a background.'] : []),
+      ...(!kickText ? ['No district line. This piece tells a voter which ballot it is about.'] : []),
+      ...(!officeText ? ['No office. The block under the names is what it is for.'] : []),
+      ...(!voteText ? ['No ballot line. Every piece in this set says when to vote.'] : []),
+      ...(!disc ? ['No disclaimer. RSA 664:14 requires one on a finished ad, and this '
+        + 'piece is finished artwork, not an asset layer.'] : []),
+      ...(dropped ? ['The slate is long for this trim, so the names are surnames only.'] : []),
+      ...(kickText.length > 22
+        ? [`The district line is ${kickText.length} characters. The slot holds 22.`] : []),
+      ...(officeText.length > 28
+        ? [`The office line is ${officeText.length} characters. The slot holds 28.`] : []),
+      ...(voteText.length > 30
+        ? [`The ballot line is ${voteText.length} characters. The slot holds 30.`] : []),
+      ...(dpi && namePx < s * 0.055
+        ? ['The names are small for this trim. Eight on a square is a lot to carry.'] : []),
+      ...(n > 8 ? [`${n} on the ballot. This template is drawn for eight.`] : []),
+      ...(discBlk.truncated
+        ? ['The disclaimer does not fit in two lines at a size anybody can read. '
+          + 'RSA 664:14 wants it legible, so put this piece on a wider trim.'] : []),
+    ],
+  };
+}
+
+/** The slate along the foot, or up the side: bottom aligned, overlapping, and
+ *  running off the trim. No plates and no captions, because the names are
+ *  already the biggest thing on the piece. */
+function layMaidmentFaces(slate, rect, wide, n) {
+  if (!n) return { list: [], cellW: 0, figH: 0 };
+  /* They stand as tall as the band and are cropped at the sides rather than
+   * scaled down, so every head is the same size. A slate of eight overlaps
+   * more than a slate of two, which is what keeps them one group. */
+  const lap = n <= 2 ? 0.06 : n <= 4 ? 0.10 : 0.16;
+  const cellW = rect.w / (n - (n - 1) * lap);
+  const step = cellW * (1 - lap);
+  /* Held to the cell as well as to the band. A portrait scaled to the height
+   * of a tall band and then clipped to a narrow cell is a vertical strip of
+   * somebody's cheek, which is what eight of them on a link card came out as.
+   * Standing on the foot of the band is what keeps them a row of people. */
+  const figH = Math.min(rect.h, cellW * 2.4);
+  const top = rect.y + rect.h - figH;
+  const list = slate.map((c, i) => ({
+    candidate: c,
+    slot: { x: rect.x + i * step, y: top, w: cellW, h: figH },
+    maxW: cellW * 1.30,
+  }));
+  return { list, cellW, figH };
+}
+
 /** The drawings the contrast side can carry. The painter holds the geometry. */
 export const CONTRAST_MARKS = ['form', 'meter', 'sold', 'stairs', 'door', 'redacted'];
 
@@ -3021,6 +3291,7 @@ function solveAll(spec, measure) {
   if (comp === 'poster') return solvePoster(spec, measure);
   if (comp === 'contrast') return solveContrast(spec, measure);
   if (comp === 'guarantee') return solveGuarantee(spec, measure);
+  if (comp === 'maidment') return solveMaidment(spec, measure);
   if (!hasCopy) comp = 'slateOnly';
 
   // Reserve the disclaimer strip first. It is required on a finished ad under

@@ -1066,6 +1066,151 @@ test('the pledges are readable, and the headline still leads them', () => {
   }
 });
 
+/* ------------------------------------------------------------- MaidmentGPT */
+
+const maidmentTpl = () => TEMPLATES.find((t) => t.id === 'maidment');
+const maidmentCopy = (d) => {
+  const t = maidmentTpl();
+  const copy = { disclaimer: 'Paid for by Committee to Elect House Republicans, '
+    + '75 S Main Street Unit 7 Box 159, Concord, NH 03301. Jason Osborne, Chairman.' };
+  for (const [k, v] of Object.entries(t.copy)) copy[k] = fillTokens(v, d);
+  return copy;
+};
+const maidmentDistrict = (n) => ({ id: 'r25', county: 'Strafford', district: 4,
+  seats: n, towns: ['Barrington'], nominees: slate(n) });
+
+test('MaidmentGPT is the template the app opens on', () => {
+  const t = maidmentTpl();
+  assert.ok(t, 'the MaidmentGPT template is gone');
+  assert.equal(TEMPLATES[0].id, 'maidment', 'MaidmentGPT is not the first template');
+  assert.equal(t.style.composition, 'maidment', 'the template lost its layout');
+  assert.ok(COMPOSITIONS.includes('maidment'), 'the layout is not a composition');
+
+  // The default lives in app.js, read off this record rather than copied.
+  const app = fs.readFileSync(path.join(ROOT, 'public', 'app.js'), 'utf8');
+  assert.match(app, /DEFAULT_TEMPLATE = 'maidment'/, 'the app does not default to it');
+  assert.match(app, /STATE_VERSION/,
+    'nothing forces a browser holding an older blob to pick the new default up');
+
+  /* The colour it ships is the one the committee prints, and the accent is the
+   * block colour rather than the type that goes on the block: every other
+   * composition fills its call to action with the accent. */
+  const pal = PALETTES.find((x) => x.id === 'maidment');
+  assert.ok(pal, 'the MaidmentGPT palette is gone');
+  assert.equal(pal.plateAccent, '#BCCEC0', 'the sage is not the accent type');
+});
+
+test('MaidmentGPT holds every line inside its column, at any slate size', () => {
+  const COND = { family: 'Barlow Condensed', weight: 700 };
+  const ANTON_F = { family: 'Anton', weight: 400 };
+  /* Same width the solver measures, tracking included: the names are set at
+   * -0.01 and the sage lines are letterspaced out, so a raw measure is wrong in
+   * both directions. */
+  const wide = (t, font, px, ls) =>
+    measure(t, font) / 100 * px + ls * px * Math.max(0, t.length - 1);
+  for (const id of ['1x1', 'story', 'link', '16x9', 'x-post']) {
+    const c = CANVASES.find((x) => x.id === id);
+    for (const n of [1, 2, 3, 4, 5, 6, 8]) {
+      const d = maidmentDistrict(n);
+      const p = solve({ canvas: { w: c.w, h: c.h }, dpi: c.dpi || 0, slate: d.nominees,
+        copy: maidmentCopy(d), style: maidmentTpl().style }, measure);
+      const m = p.maidment;
+      const where = `${id} n=${n}`;
+      assert.ok(m, `${where} did not solve as MaidmentGPT`);
+      assert.equal(p.tiles.length, 0, `${where} drew a boxed tile`);
+
+      // Everybody is on it, once, in ballot order.
+      assert.equal(m.figures.length, n, `${where} lost somebody`);
+      assert.deepEqual(m.figures.map((f) => f.candidate.name), d.nominees.map((x) => x.name),
+        `${where} is not in ballot order`);
+      assert.equal(m.rows.length, n, `${where} carries ${m.rows.length} names for ${n}`);
+
+      // Nothing runs out of the column it is set in.
+      const right = m.col.x + m.col.w;
+      for (const r of m.rows) {
+        const w = wide(r.text, ANTON_F, m.namePx, -0.01);
+        assert.ok(m.col.x + w <= right + 1,
+          `${where}: "${r.text}" runs ${(m.col.x + w - right).toFixed(0)}px past the column`);
+      }
+      if (m.kicker) {
+        assert.ok(wide(m.kicker.text, COND, m.kicker.px, m.kicker.ls) <= m.col.w + 1,
+          `${where}: the district line runs past the column`);
+      }
+      if (m.vote) {
+        assert.ok(wide(m.vote.text, COND, m.vote.px, m.vote.ls) <= m.col.w + 1,
+          `${where}: the ballot line runs past the column`);
+      }
+      if (m.block) {
+        assert.ok(m.block.x + m.block.w <= right + 1,
+          `${where}: the office block runs past the column`);
+        assert.ok(wide(m.block.text, COND, m.block.px, m.block.ls) <= m.block.w + 1,
+          `${where}: the office words run out of their own block`);
+      }
+
+      /* The names stack rather than print through one another. Anton's caps are
+       * 0.860 of its size, so anything under that advance overlaps, and a line
+       * advance taken off the artwork without dividing by the cap height is
+       * exactly how they did. */
+      for (let i = 1; i < m.rows.length; i++) {
+        const step = m.rows[i].y - m.rows[i - 1].y;
+        assert.ok(step >= m.namePx * 0.87,
+          `${where}: the names advance ${(step / m.namePx).toFixed(3)} of their size`);
+      }
+
+      // The stack stays inside the piece, above the slate, in order.
+      const top = m.kicker ? m.kicker.y : m.rows[0].y;
+      assert.ok(top >= -1, `${where}: the stack starts off the top`);
+      const foot = m.vote ? m.vote.y + m.vote.px
+        : (m.block ? m.block.y + m.block.h : m.rows[m.rows.length - 1].y + m.namePx);
+      assert.ok(foot <= m.zone.bottom + 2,
+        `${where}: the stack runs ${(foot - m.zone.bottom).toFixed(0)}px past its zone`);
+      if (m.block) assert.ok(m.block.y >= m.rows[m.rows.length - 1].y,
+        `${where}: the office block is above the names`);
+
+      // The slate stands on the foot of the piece and inside its sides.
+      for (const f of m.figures) {
+        assert.ok(f.slot.y + f.slot.h <= c.h + 1, `${where}: a face hangs past the foot`);
+        assert.ok(f.slot.x >= -1 && f.slot.x + f.slot.w <= c.w + 1,
+          `${where}: a face is off the side`);
+        assert.ok(f.slot.h <= f.slot.w * 2.45,
+          `${where}: a face is a ${(f.slot.h / f.slot.w).toFixed(1)}:1 strip, not a portrait`);
+      }
+
+      /* The disclaimer is required and legible. RSA 664:14 wants it on the
+       * finished ad, and a line 125 characters long set to a flat fraction of
+       * the short side ran off both edges of a square. */
+      assert.ok(m.disclaimer, `${where}: no disclaimer on a finished ad`);
+      assert.ok(m.disclaimer.lines.length >= 1 && m.disclaimer.lines.length <= 2,
+        `${where}: the disclaimer runs to ${m.disclaimer.lines.length} lines`);
+      assert.equal(m.disclaimer.lines.join(' '), m.disclaimer.text,
+        `${where}: wrapping changed the disclaimer's words`);
+      const dw = Math.max(...m.disclaimer.lines.map(
+        (l) => wide(l, COND, m.disclaimer.px, 0.01)));
+      assert.ok(dw <= c.w + 1,
+        `${where}: the disclaimer is ${(dw - c.w).toFixed(0)}px wider than the trim`);
+      assert.ok(m.disclaimer.y + m.disclaimer.h <= c.h + 1,
+        `${where}: the disclaimer hangs off the foot`);
+    }
+  }
+});
+
+test('MaidmentGPT says so when a slot is over its budget', () => {
+  const c = CANVASES.find((x) => x.id === '1x1');
+  const d = maidmentDistrict(3);
+  const at = (over) => solve({ canvas: { w: c.w, h: c.h }, slate: d.nominees,
+    copy: { ...maidmentCopy(d), ...over }, style: maidmentTpl().style }, measure).warnings;
+
+  assert.equal(at({}).length, 0, 'the template warns on copy that is inside every budget');
+  assert.ok(at({ kicker: 'A'.repeat(30) }).some((x) => /district line is 30/.test(x)),
+    'a district line over budget passed without a word');
+  assert.ok(at({ subhead: 'B'.repeat(40) }).some((x) => /office line is 40/.test(x)),
+    'an office line over budget passed without a word');
+  assert.ok(at({ cta: 'C'.repeat(40) }).some((x) => /ballot line is 40/.test(x)),
+    'a ballot line over budget passed without a word');
+  assert.ok(at({ disclaimer: '' }).some((x) => /RSA 664:14/.test(x)),
+    'a finished ad with no disclaimer passed without a word');
+});
+
 /* ------------------------------------------------------------ the mail band */
 
 test('every mail side puts the slate, a headline and a call to action on the piece', () => {
