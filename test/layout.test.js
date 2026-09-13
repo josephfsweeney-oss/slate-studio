@@ -1160,10 +1160,65 @@ test('the lockup is set to the width and held to the height', () => {
     assert.ok(g.titleTop >= g.frame.y, `${where}: the lockup starts above the frame`);
     if (g.kick) assert.ok(g.kick.y >= g.frame.y, `${where}: the masthead is outside the frame`);
 
-    // The four words are there, and they are four.
-    assert.ok(g.bar, `${where} lost the bar`);
-    assert.equal(g.bar.items.length, 4, `${where}: the bar carries ${g.bar.items.length} phrases`);
-    assert.ok(g.bar.y + g.bar.h <= g.frame.y + g.frame.h + 1, `${where}: the bar is outside the frame`);
+    /* The four words are on the piece either way: lying in a bar across the
+     * foot of a poster, or standing in a column down the side of a split. */
+    const four = g.bar ? g.bar.items : (g.promise ? g.promise.items : null);
+    assert.ok(four, `${where} lost the four words`);
+    assert.equal(four.length, 4, `${where} carries ${four.length} phrases, not four`);
+    assert.equal(Boolean(g.bar), g.layout === 'poster',
+      `${where}: a ${g.layout} should ${g.layout === 'poster' ? 'have' : 'not have'} a bar`);
+    if (g.bar) {
+      assert.ok(g.bar.y + g.bar.h <= g.frame.y + g.frame.h + 1,
+        `${where}: the bar is outside the frame`);
+    } else {
+      const pn = g.promise.panel;
+      assert.ok(pn.x >= g.inner.x - 1 && pn.x + pn.w <= g.inner.x + g.inner.w + 1,
+        `${where}: the column is outside the frame`);
+      assert.ok(pn.y + pn.h <= g.frame.y + g.frame.h + 1,
+        `${where}: the column runs past the frame`);
+      // The mark and the column do not overlap.
+      const markRight = g.markCol.x + g.markCol.w;
+      assert.ok(markRight <= pn.x + 1,
+        `${where}: the mark runs ${(markRight - pn.x).toFixed(0)}px into the column`);
+      for (const it of g.promise.items) {
+        assert.ok(it.y >= pn.y - 1 && it.y + g.promise.px <= pn.y + pn.h + 1,
+          `${where}: "${it.text}" is outside the column`);
+      }
+    }
+  }
+});
+
+/* On a landscape trim two words stacked and set to the full width are taller
+ * than the panel, so the height binds and the shrink that follows leaves the
+ * mark at under half the width with a white gutter either side. */
+test('the lockup fills a landscape trim instead of floating in it', () => {
+  const piece = MAIL_PROGRAMS[0].pieces.find((x) => x.id === 'contract');
+  const copy = { ...SIDE_COMMON, ...sideCopyFor(piece, 'front', true) };
+  const style = sideStyle(piece, 'front', true);
+  const ANTON_F = { family: 'Anton', weight: 400 };
+  const widthOf = (t, px) => measure(t.toUpperCase(), ANTON_F) / 100 * px;
+
+  for (const id of ['mail11', 'mail6', '16x9', 'link']) {
+    const c = CANVASES.find((x) => x.id === id);
+    const p = solve({ canvas: { w: c.w, h: c.h }, dpi: c.dpi || 0, slate: [], copy, style },
+      measure);
+    const g = p.guarantee;
+    assert.equal(g.layout, 'split', `${id} is landscape and did not split`);
+    const widest = Math.max(...g.title.map((t) => widthOf(t.text, t.px)));
+    assert.ok(widest >= g.markCol.w * 0.92,
+      `${id}: the mark fills ${(widest / g.markCol.w * 100).toFixed(0)}% of its column`);
+    // And it uses most of the piece across, not a block in the middle.
+    assert.ok(widest >= c.w * 0.40,
+      `${id}: the mark is ${(widest / c.w * 100).toFixed(0)}% of the width of the piece`);
+  }
+
+  /* A square and a story keep the poster: there the stack fills the width on
+   * its own and the bar under it is the right place for the four words. */
+  for (const id of ['1x1', 'story']) {
+    const c = CANVASES.find((x) => x.id === id);
+    const p = solve({ canvas: { w: c.w, h: c.h }, dpi: c.dpi || 0, slate: [], copy, style },
+      measure);
+    assert.equal(p.guarantee.layout, 'poster', `${id} split when it should stay a poster`);
   }
 });
 

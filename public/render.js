@@ -1923,13 +1923,17 @@ function paintGuarantee(ctx, plan, style, theme, bleed = 0) {
     setFont(ctx, COND_BOLD_F, k.px, k.ls);
     ctx.fillStyle = ink;
     ctx.fillText(k.text, g.cx, k.y + k.px);
-    const rw = (g.inner.w - k.w) / 2 - k.px * 0.9;
+    /* The rules run to the edges of the column the masthead sits over, not the
+     * whole inner box. Across the whole box the right hand rule ran out over
+     * the promise column beside it. */
+    const col = g.markCol || g.inner;
+    const rw = (col.w - k.w) / 2 - k.px * 0.9;
     if (rw > k.px * 0.4) {
       ctx.fillStyle = mark;
       const ry = k.y + k.px * 0.62;
       const t = Math.max(2, k.px * 0.085);
-      ctx.fillRect(g.inner.x, ry, rw, t);
-      ctx.fillRect(g.inner.x + g.inner.w - rw, ry, rw, t);
+      ctx.fillRect(col.x, ry, rw, t);
+      ctx.fillRect(col.x + col.w - rw, ry, rw, t);
     }
   }
 
@@ -1951,6 +1955,26 @@ function paintGuarantee(ctx, plan, style, theme, bleed = 0) {
   }
   const mH = d.markW / NH_AR;
   paintState(ctx, d.cx - d.markW / 2, d.y - mH * 0.46, d.markW, mH, mark);
+
+  /* The four words standing in a column down the right, on a split. Each one
+   * on a rule in the accent, so the column reads as four promises and not one
+   * paragraph. */
+  if (g.promise) {
+    const q = g.promise;
+    ctx.fillStyle = plate;
+    ctx.fillRect(q.panel.x, q.panel.y, q.panel.w, q.panel.h);
+    setFont(ctx, ANTON_F, q.px, 0.01);
+    ctx.textAlign = 'left';
+    const tx = q.panel.x + q.inset;
+    const rule = Math.max(2, q.px * 0.075);
+    for (const it of q.items) {
+      ctx.fillStyle = mark;
+      ctx.fillRect(tx, it.y, q.panel.w - q.inset * 2, rule);
+      ctx.fillStyle = BRAND.white;
+      ctx.fillText(it.text.toUpperCase(), tx, it.y + rule + q.px * 0.98);
+    }
+    ctx.textAlign = 'center';
+  }
 
   // The four words, in a solid bar across the foot of the frame.
   if (g.bar) {

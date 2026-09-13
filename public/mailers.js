@@ -58,7 +58,10 @@ export const MAIL_PROGRAMS = [{
   pieces: [
     {
       id: 'contract', shape: 'guarantee', art: 'contract', n: 1, label: 'The Contract',
-      palette: 'guarantee', canvas: 'mail6',
+      /* 11 x 5.5, which is the trim the opener prints on. The lockup splits on
+       * a landscape trim: the mark holds the left at full height and the four
+       * words stand in a column down the right. */
+      palette: 'guarantee', canvas: 'mail11',
       /* The guarantee as the committee publishes it, in the committee's own
        * words and its own order. Seven promises, numbered, nobody's face on it.
        * The address side carries the slate. */
@@ -100,7 +103,9 @@ export const MAIL_PROGRAMS = [{
     },
     {
       id: 'income-tax', art: 'statehouse', n: 2, label: 'No Income Tax',
-      palette: 'granite', canvas: 'mail11',
+      /* 11 x 6, so the opener and the round behind it do not land the same
+       * size two weeks running. */
+      palette: 'granite', canvas: 'mail6',
       contrast: {
         mark: 'form',
         art: 'c-tax',
@@ -123,7 +128,7 @@ export const MAIL_PROGRAMS = [{
     },
     {
       id: 'school-tax', art: 'home', n: 3, label: 'Cap Your Property Tax',
-      palette: 'classic', canvas: 'mail6',
+      palette: 'classic', canvas: 'mail11',
       contrast: {
         mark: 'stairs',
         art: 'c-house',
@@ -146,7 +151,7 @@ export const MAIL_PROGRAMS = [{
     },
     {
       id: 'housing', art: 'house', n: 4, label: 'Free Market Housing',
-      palette: 'guarantee', canvas: 'mail11',
+      palette: 'guarantee', canvas: 'mail6',
       contrast: {
         mark: 'sold',
         art: 'c-home',
@@ -169,7 +174,7 @@ export const MAIL_PROGRAMS = [{
     },
     {
       id: 'energy', art: 'grid', n: 5, label: 'Lower Energy Bills',
-      palette: 'navy', canvas: 'mail6',
+      palette: 'navy', canvas: 'mail11',
       contrast: {
         mark: 'meter',
         art: 'c-meters',
@@ -192,7 +197,7 @@ export const MAIL_PROGRAMS = [{
     },
     {
       id: 'health', art: 'bill', n: 6, label: 'Lower Health Care Costs',
-      palette: 'classic', canvas: 'mail11',
+      palette: 'classic', canvas: 'mail6',
       contrast: {
         mark: 'redacted',
         art: 'c-hospital',
@@ -215,7 +220,7 @@ export const MAIL_PROGRAMS = [{
     },
     {
       id: 'parents', art: 'family', n: 7, label: 'Parents Decide',
-      palette: 'granite', canvas: 'mail6',
+      palette: 'granite', canvas: 'mail11',
       contrast: {
         mark: 'door',
         art: 'c-classroom',
@@ -238,7 +243,7 @@ export const MAIL_PROGRAMS = [{
     },
     {
       id: 'close', shape: 'ballot', art: 'town', n: 8, label: 'The Close',
-      palette: 'classic-navy', canvas: 'mail11',
+      palette: 'classic-navy', canvas: 'mail6',
       /* The closing round shows the ballot itself, marked. Eight weeks of the
        * same shape is one piece arriving eight times; the last one in the door
        * is the one that has to look like an instruction. */

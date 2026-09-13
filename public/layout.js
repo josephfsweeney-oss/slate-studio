@@ -2552,15 +2552,27 @@ function solveGuarantee(spec, measure) {
     return at100 > 0 ? (width / at100) * 100 : 0;
   };
 
-  /* The bar at the foot, first. It sits inside the frame and runs its full
-   * width, which is what the committee's own artwork does. */
   const items = (Array.isArray(copy.list) ? copy.list : String(copy.footer || '').split('\u00b7'))
     .map((t) => String(t || '').trim().toUpperCase()).filter(Boolean);
   const dot = '  \u00b7  ';
-  const barText = items.join(dot);
-  const barPx = Math.min(box.h * 0.062 * density * textScale,
-    fillWidth(barText, ANTON, frame.w * 0.90, 0.02));
-  const bar = barText
+
+  /* Two words stacked and each set to the full width is taller than it is
+   * wide, so on a landscape trim the height binds and the shrink that follows
+   * leaves the mark at under half the width with a white gutter either side.
+   * On a mail piece that reads as a small sign floating on a big card.
+   *
+   * So a landscape trim splits: the mark holds the left at full height, and
+   * the four words stand in a column down the right instead of lying in a bar
+   * across the foot. On an 11 x 5.5 that takes the caps from 1.76 inches to
+   * over two and uses the whole piece. A square or a story keeps the poster:
+   * there the stack fills the width on its own and a bar under it is right. */
+  const wide = w / h >= 1.5;
+
+  /* The bar at the foot. It sits inside the frame and runs its full width,
+   * which is what the committee's own artwork does. Not on a split. */
+  const barPx = wide ? 0 : Math.min(box.h * 0.062 * density * textScale,
+    fillWidth(items.join(dot), ANTON, frame.w * 0.90, 0.02));
+  const bar = !wide && items.length
     ? { x: frame.x, y: frame.y + frame.h - barPx * 2.1, w: frame.w, h: barPx * 2.1,
         px: barPx, items, dot } : null;
   const barTop = bar ? bar.y : frame.y + frame.h;
@@ -2569,22 +2581,33 @@ function solveGuarantee(spec, measure) {
 
   const kickText = String(copy.kicker || '').trim().toUpperCase();
   const kickPx = Math.min(box.h * 0.052 * density * textScale,
-    fillWidth(kickText, COND_BOLD, inner.w * 0.62, 0.22));
+    fillWidth(kickText, COND_BOLD, (wide && items.length
+      ? inner.w * (1 - 0.30 - 0.048) : inner.w) * 0.74, 0.22));
   const kickW = widthAt(measure, kickText, COND_BOLD, kickPx, 0.22);
   const kick = kickText ? { px: kickPx, ls: 0.22, text: kickText, w: kickW } : null;
 
-  /* Two words, each set to the full width, which is what makes them a lockup
-   * rather than two headlines that happen to be stacked. */
+  /* On a split the mark takes the left and the four words take the right. On a
+   * poster the mark takes the lot and the four words lie in the bar. */
+  const promiseW = wide && items.length ? inner.w * 0.30 : 0;
+  const colGap = promiseW ? inner.w * 0.060 : 0;
+  const markCol = { x: inner.x, w: inner.w - promiseW - colGap };
+  const cx = markCol.x + markCol.w / 2;
+
+  /* Two words, each set to the full width of the column they are in, which is
+   * what makes them a lockup rather than two headlines that happen to be
+   * stacked. */
   const words = String(copy.headline || '').split(/\n|\s+/).filter(Boolean).slice(0, 2);
   const title = words.map((t, i) => ({
     text: t.toUpperCase(),
-    px: fillWidth(t, ANTON, inner.w, -0.012),
+    px: fillWidth(t, ANTON, markCol.w, -0.012),
     accent: i === 0,
   }));
 
   /* The divider: a rule either side of a small mark, under the lockup. */
   const divH = s * 0.070;
-  const kickH = kick ? kick.px * 2.3 : 0;
+  /* More air under the masthead on a split, where the mark runs the full height
+   * of the column and its caps came up under the rules. */
+  const kickH = kick ? kick.px * (promiseW ? 3.2 : 2.3) : 0;
   const LINE = 0.82;
   /* Two words in the same face, each set to the same width, read as one block,
    * and at a line advance of 0.82 the feet of the first word sat on the caps of
@@ -2598,7 +2621,10 @@ function solveGuarantee(spec, measure) {
    * a landscape panel is taller than the panel, and two of them stacked came
    * out on top of each other and off both ends. The width gives the size; the
    * height is what decides whether the lockup can have it. */
-  const room = Math.max(1, barTop - inner.y - kickH - divH);
+  /* With no bar the words stop at the foot of the inner box, not at the frame,
+   * or they run into the margin the frame is drawn to leave. */
+  const floor = bar ? bar.y : Math.min(barTop, inner.y + inner.h);
+  const room = Math.max(1, floor - inner.y - kickH - divH);
   const small = title.length ? Math.min(...title.map((t) => t.px)) : 0;
   const wanted = title.reduce((a, t) => a + t.px * LINE, 0) + gapOf(small);
   const shrink = Math.min(1, wanted > 0 ? room / wanted : 1);
@@ -2608,7 +2634,7 @@ function solveGuarantee(spec, measure) {
   const gapH = gapOf(title.length ? Math.min(...title.map((t) => t.px)) : 0);
   const titleH = title.reduce((a, t) => a + t.px * LINE, 0) + gapH;
   const stackH = kickH + titleH + divH;
-  const top = inner.y + Math.max(0, (barTop - inner.y - stackH) / 2);
+  const top = inner.y + Math.max(0, (floor - inner.y - stackH) / 2);
 
   let y = top;
   const kickAt = kick ? { ...kick, y } : null;
@@ -2625,7 +2651,30 @@ function solveGuarantee(spec, measure) {
   /* The mark is New Hampshire, which is half as wide as it is tall, so it
    * needs the width a rounder mark did not. */
   const divider = { y: y + divH * 0.45, markW: s * 0.040,
-    gap: s * 0.022, w: inner.w * 0.62, cx: inner.x + inner.w / 2 };
+    gap: s * 0.022, w: markCol.w * 0.62, cx };
+
+  /* The four words down the right, in a solid plate, on a split. */
+  let promise = null;
+  if (promiseW) {
+    const bodyTop = inner.y + kickH;
+    const bodyH = Math.max(1, floor - bodyTop);
+    const inset = promiseW * 0.11;
+    const tw = Math.max(1, promiseW - inset * 2);
+    const LEAD = 1.85;
+    let px = Math.min(box.h * 0.100 * density * textScale,
+      ...items.map((t) => fillWidth(t, ANTON, tw, 0.01)));
+    const needed = items.length * px * LEAD;
+    if (needed > bodyH * 0.90) px *= (bodyH * 0.90) / needed;
+    const lineH = px * LEAD;
+    const blockH = items.length * lineH;
+    promise = {
+      panel: { x: inner.x + inner.w - promiseW, y: bodyTop, w: promiseW, h: bodyH },
+      inset, px, lineH,
+      items: items.map((t, i) => ({
+        text: t, y: bodyTop + (bodyH - blockH) / 2 + i * lineH,
+      })),
+    };
+  }
 
   const dpi = spec.dpi || 0;
   return {
@@ -2640,7 +2689,7 @@ function solveGuarantee(spec, measure) {
     mailPanel: null,
     qr: null,
     guarantee: { box, frame, inner, kick: kickAt, title, titleTop, divider, bar,
-                 cx: inner.x + inner.w / 2 },
+                 promise, markCol, layout: promiseW ? 'split' : 'poster', cx },
     disclaimer: null,
     warnings: [
       ...(!title.length ? ['The lockup has no words in it.'] : []),
