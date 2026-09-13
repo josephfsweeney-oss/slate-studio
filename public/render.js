@@ -1697,6 +1697,115 @@ const MARKS = {
   },
 };
 
+/* ---------------------------------------------------------------- the swoosh
+ *
+ * The arrow beside a comparison line. Not a shaft with a triangle on it: a
+ * curved body that thickens into the head, with streaks trailing behind it, so
+ * a bill going up looks like it is going up fast.
+ *
+ * Everything is worked in pixels rather than in a unit square, because a unit
+ * square scaled to a wide box skews every normal in it and the body comes out
+ * thicker on one side than the other.
+ */
+const cubic = (p, t) => {
+  const u = 1 - t;
+  const a = u * u * u;
+  const b = 3 * u * u * t;
+  const c = 3 * u * t * t;
+  const d = t * t * t;
+  return [a * p[0][0] + b * p[1][0] + c * p[2][0] + d * p[3][0],
+          a * p[0][1] + b * p[1][1] + c * p[2][1] + d * p[3][1]];
+};
+
+const cubicTan = (p, t) => {
+  const u = 1 - t;
+  const a = 3 * u * u;
+  const b = 6 * u * t;
+  const c = 3 * t * t;
+  return [a * (p[1][0] - p[0][0]) + b * (p[2][0] - p[1][0]) + c * (p[3][0] - p[2][0]),
+          a * (p[1][1] - p[0][1]) + b * (p[2][1] - p[1][1]) + c * (p[3][1] - p[2][1])];
+};
+
+/** A tapered ribbon along a curve: thin at the tail, w1 across at the head. */
+function ribbon(ctx, p, w0, w1) {
+  const N = 26;
+  const left = [];
+  const right = [];
+  for (let i = 0; i <= N; i++) {
+    const t = i / N;
+    const [x, y] = cubic(p, t);
+    const [tx, ty] = cubicTan(p, t);
+    const len = Math.hypot(tx, ty) || 1;
+    const nx = -ty / len;
+    const ny = tx / len;
+    const w = (w0 + (w1 - w0) * (t * t)) / 2;
+    left.push([x + nx * w, y + ny * w]);
+    right.push([x - nx * w, y - ny * w]);
+  }
+  ctx.beginPath();
+  ctx.moveTo(left[0][0], left[0][1]);
+  for (const [x, y] of left.slice(1)) ctx.lineTo(x, y);
+  for (let i = right.length - 1; i >= 0; i--) ctx.lineTo(right[i][0], right[i][1]);
+  ctx.closePath();
+  ctx.fill();
+}
+
+/* The body, then three streaks behind it, in a unit box the caller scales. The
+ * up arrow is the same drawing with the box turned over. */
+const SWOOSH = {
+  body: { p: [[0.00, 0.04], [0.34, 0.06], [0.42, 0.40], [0.62, 0.60]], w0: 0.03, w1: 0.20 },
+  head: { len: 0.34, half: 0.23, lap: 0.09 },
+  streaks: [
+    { p: [[0.00, 0.20], [0.26, 0.23], [0.38, 0.46], [0.52, 0.58]], w0: 0.02, w1: 0.09 },
+    { p: [[0.03, 0.34], [0.24, 0.37], [0.34, 0.52], [0.44, 0.61]], w0: 0.02, w1: 0.07 },
+    { p: [[0.09, 0.47], [0.23, 0.49], [0.30, 0.57], [0.36, 0.63]], w0: 0.02, w1: 0.055 },
+  ],
+  flecks: [[0.00, 0.44, 0.055], [0.04, 0.58, 0.042]],
+};
+
+/** Draw the swoosh inside a box. up turns the whole drawing over. */
+function swoosh(ctx, r, up, colour) {
+  const X = (x) => r.x + x * r.w;
+  const Y = (y) => r.y + (up ? 1 - y : y) * r.h;
+  const px = (pts) => pts.map(([x, y]) => [X(x), Y(y)]);
+  const S = Math.min(r.w, r.h);
+
+  ctx.fillStyle = colour;
+  for (const st of SWOOSH.streaks) ribbon(ctx, px(st.p), st.w0 * S, st.w1 * S);
+  for (const [fx, fy, fw] of SWOOSH.flecks) {
+    const w = fw * S;
+    ctx.beginPath();
+    ctx.ellipse(X(fx) + w, Y(fy), w, w * 0.22, up ? -0.5 : 0.5, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  const body = px(SWOOSH.body.p);
+  ribbon(ctx, body, SWOOSH.body.w0 * S, SWOOSH.body.w1 * S);
+
+  // The head, squared off across the end of the body and pointing where it goes.
+  const [hx, hy] = body[3];
+  const [tx, ty] = cubicTan(body, 1);
+  const len = Math.hypot(tx, ty) || 1;
+  const ux = tx / len;
+  const uy = ty / len;
+  const nx = -uy;
+  const ny = ux;
+  const half = SWOOSH.head.half * S;
+  const reach = SWOOSH.head.len * S;
+  /* The base sits back along the curve so it overlaps the body it grows out of.
+   * Squared off exactly at the end, the head is wider than the body there and
+   * the join prints as a step on one shoulder. */
+  const back = SWOOSH.head.lap * S;
+  const bx = hx - ux * back;
+  const by = hy - uy * back;
+  ctx.beginPath();
+  ctx.moveTo(bx + nx * half, by + ny * half);
+  ctx.lineTo(bx - nx * half, by - ny * half);
+  ctx.lineTo(bx + ux * (reach + back), by + uy * (reach + back));
+  ctx.closePath();
+  ctx.fill();
+}
+
 /* The message side of an issue round, with nobody's face on it. Dark on
  * purpose: it must not look like the side with the people on it. */
 function paintContrast(ctx, plan, style, theme, assets, bleed = 0) {
@@ -1771,17 +1880,9 @@ function paintContrast(ctx, plan, style, theme, assets, bleed = 0) {
        * cost going up or down takes an arrow; anything else takes a cross or a
        * tick, because an arrow pointing at a school choice means nothing. */
       const against = r.dir === 'up' || r.dir === 'no';
-      const sw = aw * 0.36;
       ctx.fillStyle = against ? bad : mark;
       if (r.dir === 'down' || r.dir === 'up') {
-        const up = r.dir === 'up';
-        ctx.fillRect(ax + (aw - sw) / 2, y + ah * (up ? 0.40 : 0.08), sw, ah * 0.52);
-        ctx.beginPath();
-        ctx.moveTo(ax, y + ah * (up ? 0.46 : 0.54));
-        ctx.lineTo(ax + aw, y + ah * (up ? 0.46 : 0.54));
-        ctx.lineTo(ax + aw / 2, y + ah * (up ? 0.04 : 0.96));
-        ctx.closePath();
-        ctx.fill();
+        swoosh(ctx, { x: ax, y, w: aw, h: ah }, r.dir === 'up', against ? bad : mark);
       } else if (r.dir === 'no') {
         const t = aw * 0.20;
         const cx0 = ax + aw / 2;

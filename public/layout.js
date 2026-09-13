@@ -2279,8 +2279,10 @@ function solveContrast(spec, measure) {
   const vsIn = Array.isArray(copy.versus) ? copy.versus.filter((v) => v && v.text) : [];
   let versus = null;
   if (vsIn.length) {
-    const arrowW = colW * 0.105;
-    const vgap = colW * 0.038;
+    /* A swoosh needs a box to swing in. A tick needs less, but one column width
+     * for both keeps the two lines starting on the same edge. */
+    const arrowW = colW * 0.155;
+    const vgap = colW * 0.030;
     const tw = Math.max(1, colW - arrowW - vgap);
     const pad = box.h * 0.026;
     const rows = [];
@@ -2288,7 +2290,7 @@ function solveContrast(spec, measure) {
     for (const v of vsIn) {
       const block = fitInside(measure, v.text, COND_BOLD,
         Math.min(box.h * 0.060, tw * 0.070) * density, tw, 2, 0.02, true);
-      const rh = Math.max(block.h, arrowW * 1.20);
+      const rh = Math.max(block.h, arrowW * 0.88);
       rows.push({ dir: DIRS.includes(v.dir) ? v.dir : 'down', block, dy: vy, h: rh });
       vy += rh + pad;
     }

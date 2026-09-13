@@ -601,7 +601,9 @@ Theirs is always first and ours always answers, because the answer is the half
 you want read last.
 
 The mark says which is which before a word of it is read. A cost going up or
-down takes an arrow, so the energy round runs arrows. Everything else takes a
+down takes a swoosh: a curved body that thickens into the head with streaks
+trailing behind it, drawn in `public/render.js`, so a bill going up looks like it
+is going up fast. The energy round runs those. Everything else takes a
 cross or a tick, because an arrow pointing at a school choice means nothing.
 Against is red, for is the readable accent.
 
