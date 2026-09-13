@@ -1718,6 +1718,12 @@ function solvePoster(spec, measure) {
  */
 /* The words for a count, so the piece can tell a voter how many to mark
  * without printing a numeral in a sentence. */
+/** The size dials, held inside what a piece can actually carry. */
+const clampScale = (v) => {
+  const n = Number(v);
+  return Number.isFinite(n) ? Math.max(0.6, Math.min(2, n)) : 1;
+};
+
 /** What a line in a comparison can be marked with. The first two are against. */
 export const CONTRAST_DIRS = ['up', 'no', 'down', 'yes'];
 const DIRS = CONTRAST_DIRS;
@@ -1758,6 +1764,14 @@ function solveSlateBand(spec, measure, side) {
   const pad = w * 0.040 * density;
   const inner = { x: pad, y: pad * 1.15, w: w - pad * 2, h: h - pad * 2.0 };
   const cx = inner.x + inner.w / 2;
+
+  /* Two dials on top of the fit. The engine sizes everything to the space it
+   * has; these move the ceiling it is allowed to reach, so a headline can be
+   * asked for bigger and a supporting line for smaller. Neither pushes type
+   * past the width it has to fit in: what is asked for is a ceiling, and the
+   * width still wins. */
+  const textScale = clampScale(style.textScale);
+  const headScale = clampScale(style.headScale);
 
   /* Where the words go when they sit over the faces: the whole column on the
    * message side, the lower left corner on the address side, which is the only
@@ -1878,7 +1892,8 @@ function solveSlateBand(spec, measure, side) {
     const wide = (t, px) => widthAt(measure, t, COND_BOLD, px, 0.03) <= cellW * 0.94;
     const fullNames = slate.map((c) => `${firstLine(c, style)} ${c.last}`.trim());
     const shortNames = slate.map((c) => String(c.last || '').trim());
-    const startPx = Math.min(box.h * (n <= 2 ? 0.042 : 0.028), cellW * 0.155) * density;
+    const startPx = Math.min(box.h * (n <= 2 ? 0.042 : 0.028) * textScale,
+      cellW * 0.155) * density;
     const floorPx = startPx * 0.62;
     let bandPx = startPx;
     let texts = fullNames;
@@ -1929,7 +1944,7 @@ function solveSlateBand(spec, measure, side) {
   let checklistH = 0;
 
   const fitHead = (width, room, maxLines) => {
-    let px = Math.min(box.h * 0.150 * density, Math.max(room, box.h * 0.035));
+    let px = Math.min(box.h * 0.150 * density * headScale, Math.max(room, box.h * 0.035));
     let blk = fitBlock(measure, copy.headline, ANTON, px, width, maxLines, -0.012, true);
     let guard = 0;
     while (blk.h > room && px > box.h * 0.035 && guard++ < 60) {
@@ -1953,14 +1968,14 @@ function solveSlateBand(spec, measure, side) {
     wordsBox = { x: colX, y: inner.y, w: strip.x + strip.w - colX,
       h: rowsOut.laid.bandY - inner.y - box.h * 0.016 };
 
-    ctaBlk = fitInside(measure, ctaText, ANTON, box.h * 0.082 * density,
+    ctaBlk = fitInside(measure, ctaText, ANTON, box.h * 0.082 * density * textScale,
       wordsBox.w * 0.94, 1, 0.005, true);
     ctaH = ctaBlk.h ? ctaBlk.px * 1.58 : 0;
-    seatBlk = fitBlock(measure, seatLine, ANTON, box.h * 0.046 * density,
+    seatBlk = fitBlock(measure, seatLine, ANTON, box.h * 0.046 * density * textScale,
       wordsBox.w, 1, 0.01, true);
     seatH = seatBlk.h ? seatBlk.h + box.h * 0.016 : 0;
 
-    sub = fitBlock(measure, copy.subhead, COND_BOLD, box.h * 0.046 * density,
+    sub = fitBlock(measure, copy.subhead, COND_BOLD, box.h * 0.046 * density * textScale,
       wordsBox.w * 0.98, 4, 0.045, true);
     subH = sub.h ? sub.h + box.h * 0.024 : 0;
     let headRoom = Math.max(box.h * 0.035,
@@ -1981,11 +1996,11 @@ function solveSlateBand(spec, measure, side) {
     /* The call to action is the last thing anybody reads and the only thing on
      * the piece that tells them what to do, so it takes all the size the column
      * will give it and stops at the width. */
-    ctaBlk = fitInside(measure, ctaText, ANTON, box.h * (panel ? 0.072 : 0.092) * density,
+    ctaBlk = fitInside(measure, ctaText, ANTON, box.h * (panel ? 0.072 : 0.092) * density * textScale,
       wordsBox.w * 0.94, 1, 0.005, true);
     ctaH = ctaBlk.h ? ctaBlk.px * 1.58 : 0;
     seatBlk = fitBlock(measure, seatLine, ANTON,
-      box.h * (panel ? 0.042 : 0.058) * density, wordsBox.w, 1, 0.01, true);
+      box.h * (panel ? 0.042 : 0.058) * density * textScale, wordsBox.w, 1, 0.01, true);
     seatH = seatBlk.h ? seatBlk.h + box.h * 0.014 : 0;
 
     /* Run twice at most. The first pass finds out how much width the slate
@@ -2007,7 +2022,7 @@ function solveSlateBand(spec, measure, side) {
       const cw = (wordsBox.w - colGap * (cols - 1)) / cols;
       const tick = cw * 0.058;
       const tw = Math.max(1, cw - tick * 2.0);
-      const start = Math.min(box.h * 0.032, tw * 0.055) * density;
+      const start = Math.min(box.h * 0.032 * textScale, tw * 0.055) * density;
       /* One size for every line. Fitted one at a time, a short promise sat next
        * to a long one at twice the size and the list read as a ransom note. */
       const px = Math.min(...listIn.map(
@@ -2020,14 +2035,18 @@ function solveSlateBand(spec, measure, side) {
 
     const stackedPass = (dropSub) => {
       let subBlk = dropSub ? EMPTY_SUB : fitBlock(measure, copy.subhead, COND_BOLD,
-        box.h * (panel ? 0.036 : 0.050) * density, wordsBox.w * 0.98, panel ? 1 : 2, 0.045, true);
+        box.h * (panel ? 0.036 : 0.050) * density * textScale,
+        wordsBox.w * 0.98, panel ? 1 : 2, 0.045, true);
       let subHt = subBlk.h ? subBlk.h + box.h * (panel ? 0.016 : 0.024) : 0;
 
       /* A short slate gets a taller floor, because four big faces are the
        * design. A piece carrying a checklist gives some of that back: the list
        * is why the piece went out. */
+      /* Asking for a bigger headline is asking the faces to give up the room
+       * it needs. The floor moves with the dial, so the ask is honoured rather
+       * than swallowed by a reserve nobody can see. */
       const faceFloorRow = box.h * (list ? 0.24
-        : rowCount > 1 ? 0.20 : (n <= 4 ? 0.36 : 0.26));
+        : rowCount > 1 ? 0.20 : (n <= 4 ? 0.36 : 0.26)) / Math.max(1, headScale);
       let room = panel
         ? wordsBox.h - subHt - seatH - ctaH
         : Math.max(box.h * 0.10,
@@ -2271,13 +2290,15 @@ function solveContrast(spec, measure) {
   const pad = w * 0.042 * density;
   const inner = { x: pad, y: pad * 1.15, w: w - pad * 2, h: h - pad * 2.3 };
   const gutter = w * 0.030;
+  const textScale = clampScale(style.textScale);
+  const headScale = clampScale(style.headScale);
 
   /* The foot, measured first: the call to action is the one line on this side
    * that is not an argument, and it never gives up its height. */
-  const ctaBlk = fitInside(measure, copy.cta, ANTON, box.h * 0.090 * density,
+  const ctaBlk = fitInside(measure, copy.cta, ANTON, box.h * 0.090 * density * textScale,
     inner.w * 0.94, 1, 0.005, true);
   const ctaH = ctaBlk.h ? ctaBlk.px * 1.58 : 0;
-  const srcBlk = fitInside(measure, copy.source, COND_BOLD, box.h * 0.028 * density,
+  const srcBlk = fitInside(measure, copy.source, COND_BOLD, box.h * 0.028 * density * textScale,
     inner.w, 2, 0.02, true);
   const srcH = srcBlk.h ? srcBlk.h + box.h * 0.014 : 0;
 
@@ -2298,15 +2319,15 @@ function solveContrast(spec, measure) {
       : { x: markX, y: box.y, w: w - markX, h: Math.max(1, footTop - box.y) } };
   const colW = art ? inner.w * 0.62 : (mark.id ? inner.w - markW - gutter : inner.w);
 
-  const kick = fitInside(measure, copy.kicker, COND_BOLD, box.h * 0.038 * density,
+  const kick = fitInside(measure, copy.kicker, COND_BOLD, box.h * 0.038 * density * textScale,
     colW, 2, 0.16, true);
   const kickH = kick.h ? kick.h + box.h * 0.024 : 0;
 
   const num = fitInside(measure, copy.number, ANTON,
-    Math.min(box.h * 0.34, colW * 0.62) * density, colW, 1, -0.02, true);
+    Math.min(box.h * 0.34 * headScale, colW * 0.62) * density, colW, 1, -0.02, true);
   const numH = num.h ? num.h + box.h * 0.016 : 0;
 
-  const cap = fitInside(measure, copy.subhead, COND_BOLD, box.h * 0.042 * density,
+  const cap = fitInside(measure, copy.subhead, COND_BOLD, box.h * 0.042 * density * textScale,
     colW, 3, 0.03, true);
   const capH = cap.h ? cap.h + box.h * 0.018 : 0;
 
@@ -2326,7 +2347,7 @@ function solveContrast(spec, measure) {
     let vy = 0;
     for (const v of vsIn) {
       const block = fitInside(measure, v.text, COND_BOLD,
-        Math.min(box.h * 0.060, tw * 0.070) * density, tw, 2, 0.02, true);
+        Math.min(box.h * 0.060 * textScale, tw * 0.070) * density, tw, 2, 0.02, true);
       const rh = Math.max(block.h, arrowW * 0.80);
       rows.push({ dir: DIRS.includes(v.dir) ? v.dir : 'down', block, dy: vy, h: rh });
       vy += rh + pad;
@@ -2339,7 +2360,7 @@ function solveContrast(spec, measure) {
    * a line it can be read at. */
   const room = Math.max(box.h * 0.06,
     footTop - inner.y - kickH - numH - versusH - capH - box.h * 0.02);
-  let headPx = Math.min(box.h * 0.135 * density, Math.max(room, box.h * 0.05));
+  let headPx = Math.min(box.h * 0.135 * density * headScale, Math.max(room, box.h * 0.05));
   let head = fitBlock(measure, copy.headline, ANTON, headPx, colW, 3, -0.012, true);
   let guard = 0;
   while (head.h > room && headPx > box.h * 0.05 && guard++ < 60) {

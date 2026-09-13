@@ -58,6 +58,7 @@ export const MAIL_PROGRAMS = [{
   pieces: [
     {
       id: 'contract', art: 'contract', n: 1, label: 'The Contract',
+      palette: 'guarantee', canvas: 'mail6',
       front: {
         headline: 'We Put It In Writing',
         /* The piece that opens the programme has to say what is in it. A
@@ -80,6 +81,7 @@ export const MAIL_PROGRAMS = [{
     },
     {
       id: 'income-tax', art: 'statehouse', n: 2, label: 'No Income Tax',
+      palette: 'granite', canvas: 'mail11',
       contrast: {
         mark: 'form',
         art: 'c-tax',
@@ -102,6 +104,7 @@ export const MAIL_PROGRAMS = [{
     },
     {
       id: 'school-tax', art: 'home', n: 3, label: 'Cap Your Property Tax',
+      palette: 'classic', canvas: 'mail6',
       contrast: {
         mark: 'stairs',
         art: 'c-house',
@@ -124,6 +127,7 @@ export const MAIL_PROGRAMS = [{
     },
     {
       id: 'housing', art: 'house', n: 4, label: 'Free Market Housing',
+      palette: 'guarantee', canvas: 'mail11',
       contrast: {
         mark: 'sold',
         art: 'c-home',
@@ -146,6 +150,7 @@ export const MAIL_PROGRAMS = [{
     },
     {
       id: 'energy', art: 'grid', n: 5, label: 'Lower Energy Bills',
+      palette: 'navy', canvas: 'mail6',
       contrast: {
         mark: 'meter',
         art: 'c-meters',
@@ -168,6 +173,7 @@ export const MAIL_PROGRAMS = [{
     },
     {
       id: 'health', art: 'bill', n: 6, label: 'Lower Health Care Costs',
+      palette: 'classic', canvas: 'mail11',
       contrast: {
         mark: 'redacted',
         art: 'c-hospital',
@@ -190,6 +196,7 @@ export const MAIL_PROGRAMS = [{
     },
     {
       id: 'parents', art: 'family', n: 7, label: 'Parents Decide',
+      palette: 'granite', canvas: 'mail6',
       contrast: {
         mark: 'door',
         art: 'c-classroom',
@@ -211,7 +218,17 @@ export const MAIL_PROGRAMS = [{
       },
     },
     {
-      id: 'close', art: 'town', n: 8, label: 'The Close',
+      id: 'close', shape: 'ballot', art: 'town', n: 8, label: 'The Close',
+      palette: 'classic-navy', canvas: 'mail11',
+      /* The closing round shows the ballot itself, marked. Eight weeks of the
+       * same shape is one piece arriving eight times; the last one in the door
+       * is the one that has to look like an instruction. */
+      ballot: {
+        kicker: 'November 3',
+        headline: 'Support The Whole Ticket',
+        subhead: 'Governor Ayotte needs a Republican House. Vote every Republican on your ballot.',
+        details: 'Fill the oval beside every name. Then keep going down the ballot.',
+      },
       front: {
         headline: 'Support The Whole Ticket',
         subhead: 'Governor Ayotte needs a Republican House. Vote every Republican on your ballot.',
@@ -246,6 +263,11 @@ export function pieceById(programId, pieceId) {
 
 /** The style for one side of a piece. */
 export function sideStyle(piece, side, useContrast) {
+  /* A round can give its message side a shape of its own. Eight weeks of the
+   * same shape is one piece arriving eight times. */
+  if (useContrast && side !== 'back' && piece && piece.shape && piece[piece.shape]) {
+    return { ...LOOK, composition: piece.shape, mailPanel: 'none' };
+  }
   /* The message side of an issue round can drop the faces and make the case
    * instead. The address side always carries the slate: a piece that never
    * shows the team is not a slate piece. */
@@ -268,9 +290,19 @@ export function sideStyle(piece, side, useContrast) {
 
 /** The copy a side carries: the contrast block when it is on, else the issue. */
 export function sideCopyFor(piece, side, useContrast) {
-  if (useContrast && side !== 'back' && piece && piece.contrast) return piece.contrast;
+  if (!piece) return null;
+  if (useContrast && side !== 'back') {
+    if (piece.shape && piece[piece.shape]) return piece[piece.shape];
+    if (piece.contrast) return piece.contrast;
+  }
   return piece[side];
 }
+
+/** The colourway and the trim a round is drawn in, or nulls for the default. */
+export const pieceLook = (piece) => ({
+  palette: (piece && piece.palette) || null,
+  canvas: (piece && piece.canvas) || null,
+});
 
 /** The bundled photograph for a piece, or null. */
 export const artUrl = (piece) => (piece && piece.art ? `/art/${piece.art}.webp` : null);

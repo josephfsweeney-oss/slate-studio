@@ -7,7 +7,7 @@ import { solve, bestGrid, PHOTO_AR, PLATE_AR, COMPOSITIONS, CONTRAST_MARKS,
   CONTRAST_DIRS } from '../public/layout.js';
 import { nameParts, slugify } from '../public/names.js';
 import { fillTokens, CANVASES, TEMPLATES, PALETTES } from '../public/presets.js';
-import { MAIL_PROGRAMS, SIDE_COMMON, sideStyle, sideCopyFor } from '../public/mailers.js';
+import { MAIL_PROGRAMS, SIDE_COMMON, sideStyle, sideCopyFor, pieceLook } from '../public/mailers.js';
 
 /* Stand-in for canvas measureText: width of the string at 100px. Anton is the
  * wider face, so the proportions stay roughly honest. */
@@ -999,6 +999,88 @@ test('the push token stays in the browser and never reaches this app', () => {
   assert.match(html, /Contents set to\s*\n?\s*read and write/);
 });
 
+test('eight drops do not arrive as one piece eight times', () => {
+  const rounds = MAIL_PROGRAMS[0].pieces;
+  assert.equal(rounds.length, 8);
+
+  const looks = rounds.map((p) => pieceLook(p));
+  for (let i = 0; i < rounds.length; i++) {
+    const l = looks[i];
+    const id = rounds[i].id;
+    assert.ok(l.palette, `${id} has no colourway`);
+    assert.ok(l.canvas, `${id} has no trim`);
+    assert.ok(PALETTES.some((x) => x.id === l.palette), `${id}: no palette called ${l.palette}`);
+    assert.ok(CANVASES.some((x) => x.id === l.canvas), `${id}: no canvas called ${l.canvas}`);
+  }
+
+  // Nothing arrives twice running in the same colourway or the same trim.
+  for (let i = 1; i < looks.length; i++) {
+    assert.notEqual(looks[i].palette, looks[i - 1].palette,
+      `${rounds[i].id} repeats the colourway before it`);
+    assert.notEqual(looks[i].canvas, looks[i - 1].canvas,
+      `${rounds[i].id} repeats the trim before it`);
+  }
+
+  /* And the message side changes shape through the drop, which is the thing
+   * colour alone cannot do. */
+  const shapes = new Set(rounds.map((p) => sideStyle(p, 'front', true).composition));
+  assert.ok(shapes.size >= 3,
+    `the drop runs on ${shapes.size} shape(s): ${[...shapes].join(', ')}`);
+  assert.ok(shapes.has('ballot'), 'the closing round does not show the ballot');
+
+  // Every shape a round asks for is one the engine can actually solve.
+  for (const p of rounds) {
+    const comp = sideStyle(p, 'front', true).composition;
+    assert.ok(COMPOSITIONS.includes(comp), `${p.id} asks for a shape called ${comp}`);
+    assert.ok(sideCopyFor(p, 'front', true), `${p.id} has no copy for its message side`);
+  }
+});
+
+test('the size dials move the ceiling, and the width still wins', () => {
+  const c = CANVASES.find((x) => x.id === 'mail6');
+  // A round whose message side is a band, so there is a headline to move.
+  const piece = MAIL_PROGRAMS[0].pieces.find((x) => x.id === 'contract');
+  const list = slate(4);
+  const copy = { ...SIDE_COMMON, ...piece.front };
+  const at = (style) => solve({ canvas: { w: c.w, h: c.h }, dpi: c.dpi, slate: list, copy,
+    style: { ...sideStyle(piece, 'front', true), ...style } }, measure);
+
+  const base = at({});
+  const big = at({ headScale: 1.6 });
+  const small = at({ headScale: 0.7 });
+  assert.ok(big.band.head.block.px > base.band.head.block.px,
+    'asking for a bigger headline did nothing');
+  assert.ok(small.band.head.block.px < base.band.head.block.px,
+    'asking for a smaller headline did nothing');
+
+  // A bigger headline takes its room from the faces, which is the honest trade.
+  assert.ok(big.band.figures[0].slot.h < base.band.figures[0].slot.h,
+    'the headline grew and nothing gave the room up');
+
+  // The body dial moves the district line and the names with it.
+  const bodyUp = at({ textScale: 1.4 });
+  const bodyDown = at({ textScale: 0.7 });
+  assert.ok(bodyUp.band.seat.block.px > base.band.seat.block.px, 'the district line did not grow');
+  assert.ok(bodyDown.band.seat.block.px < base.band.seat.block.px, 'the district line did not shrink');
+  assert.ok(bodyDown.band.figures[0].name.px < base.band.figures[0].name.px,
+    'the name band ignored the dial');
+
+  /* Out of range is held, not honoured, and a piece still comes out the other
+   * side with everything on it wherever the dials are set. */
+  for (const style of [{}, { headScale: 5 }, { headScale: 0.01 },
+    { textScale: 9 }, { textScale: 0 }, { headScale: 2, textScale: 1.6 }]) {
+    const p = at(style);
+    const b = p.band;
+    const where = JSON.stringify(style);
+    assert.ok(b.head && b.cta && b.seat, `${where} lost a block`);
+    assert.ok(b.head.block.px > 0 && b.cta.block.px > 0, `${where} sized something to nothing`);
+    assert.ok(b.cta.y + b.cta.h <= b.bandRect.y + 1, `${where} put the foot below the slate`);
+    assert.ok(b.head.y >= 0, `${where} pushed the headline off the top`);
+    assert.ok(b.figures.length === 4, `${where} lost somebody`);
+    for (const f of b.figures) assert.ok(f.slot.h > 0, `${where} sized a face to nothing`);
+  }
+});
+
 test('every issue round names them first and answers second', () => {
   /* Copy is not all strings. A comparison is a list of lines with a direction on
    * each, and the filler used to turn it into an empty string, which took the
@@ -1081,7 +1163,7 @@ test('nothing is set in a colour that cannot be read on the ground under it', as
 test('the issue rounds argue on one side and carry the team on the other', () => {
   const c = CANVASES.find((x) => x.id === 'mail6');
   const list = slate(4);
-  const seen = { contrast: 0, slate: 0 };
+  const seen = { contrast: 0, slate: 0, shaped: 0 };
   for (const piece of MAIL_PROGRAMS[0].pieces) {
     for (const side of ['front', 'back']) {
       const copy = { ...SIDE_COMMON, ...sideCopyFor(piece, side, true) };
@@ -1094,6 +1176,13 @@ test('the issue rounds argue on one side and carry the team on the other', () =>
       if (side === 'back') {
         assert.ok(p.band, `${where} dropped the slate off the address side`);
         assert.equal(p.band.figures.length, 4, `${where} lost somebody`);
+        continue;
+      }
+      if (piece.shape) {
+        // A round with a shape of its own: not a band, and nobody's face on it.
+        seen.shaped++;
+        assert.ok(!p.band, `${where} asked for ${piece.shape} and got a band`);
+        assert.equal(p.composition, piece.shape, `${where} did not come out as ${piece.shape}`);
         continue;
       }
       if (!piece.contrast) { seen.slate++; assert.ok(p.band, `${where} is not a slate side`); continue; }
@@ -1140,7 +1229,8 @@ test('the issue rounds argue on one side and carry the team on the other', () =>
     }
   }
   assert.equal(seen.contrast, 6, 'six issue rounds should argue');
-  assert.equal(seen.slate, 2, 'the contract and the close keep the slate on both sides');
+  assert.equal(seen.slate, 1, 'the opening round keeps the slate on both sides');
+  assert.equal(seen.shaped, 1, 'the closing round shows the ballot');
 });
 
 test('the slate takes the width it needs and the words take what is left', () => {

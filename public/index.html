@@ -83,6 +83,8 @@
           <label class="f">Piece <select id="mail-piece"></select></label>
           <label class="inline"><input type="checkbox" id="mail-shared-back" checked>
             One back for the whole drop</label>
+          <label class="inline"><input type="checkbox" id="mail-look" checked>
+            Give each round its own colourway and trim</label>
           <label class="inline"><input type="checkbox" id="mail-contrast" checked>
             Contrast on the message side of the issue rounds: the case against
             them, no candidates, the slate on the address side</label>
@@ -196,6 +198,11 @@
         <select id="align"><option value="auto">Auto</option><option value="left">Left</option><option value="center">Centered</option></select>
       </label>
       <label class="f">Breathing room <input id="density" type="range" min="0.75" max="1.3" step="0.05"></label>
+      <label class="f">Headline size <input id="head-scale" type="range" min="0.6" max="2" step="0.05"></label>
+      <label class="f">Body size <input id="text-scale" type="range" min="0.6" max="1.6" step="0.05"></label>
+      <p class="hint">Both are ceilings, not sizes. A line still has to fit the width
+        it is set in, so asking for bigger only gets bigger while there is room across.
+        A bigger headline takes its room from the faces.</p>
       <label class="inline"><input type="checkbox" id="plate" checked> Name plates under each portrait</label>
       <label class="inline"><input type="checkbox" id="flagbar" checked> Flag bar along the bottom</label>
       <label class="inline"><input type="checkbox" id="honorific" checked> Put Rep. in front of sitting members</label>

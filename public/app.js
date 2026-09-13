@@ -5,7 +5,7 @@ import {
   CANVASES, TEMPLATES, PALETTES, GROUNDS, TOKENS, TOPPERS,
   fillTokens, buildFilename, buildName, canvasById, topperById,
 } from './presets.js';
-import { MAIL_PROGRAMS, MAIL_VARS, SHARED_BACK, SHARED_BACK_ART, SIDE_COMMON, artUrl, contrastArtUrl, sideCopyFor,
+import { MAIL_PROGRAMS, MAIL_VARS, SHARED_BACK, SHARED_BACK_ART, SIDE_COMMON, artUrl, contrastArtUrl, sideCopyFor, pieceLook,
   programById, pieceById, sideStyle } from './mailers.js';
 import { makeZip } from './zip.js';
 import * as gh from './github.js';
@@ -67,6 +67,7 @@ const state = {
   // Defaults are the Granite Guarantee sheet: green and navy on white.
   style: {
     composition: 'auto', align: 'auto', plate: true, density: 1,
+    headScale: 1, textScale: 1,
     paletteId: 'guarantee', ground: 'palette',
     bgType: 'solid', bgColor: '#FFFFFF', bgColor2: '#235E3B', bgDim: 0.45,
     accent: '#2F7C4E', plateColor: '#12314E', plateAccent: '#95DAB1',
@@ -1236,6 +1237,16 @@ function applyMailSide() {
   const piece = mailPiece();
   if (!piece) return;
   const side = state.mail.side === 'back' ? 'back' : 'front';
+  /* The colourway and the trim the round is drawn in. Eight weeks of the same
+   * ground in the same shape is one piece arriving eight times, so the drop
+   * changes both as it goes. A palette the user picked by hand is theirs; this
+   * only moves when the piece does. */
+  const look = pieceLook(piece);
+  if (look.palette && state.mail.look !== false) {
+    const pal = PALETTES.find((x) => x.id === look.palette);
+    if (pal) applyPalette(pal);
+  }
+  if (look.canvas && state.mail.look !== false) state.canvasId = look.canvas;
   state.copy = sideCopy(piece, side);
   Object.assign(state.style, sideStyle(piece, side, state.mail.contrast !== false));
   state.style.ground = 'palette';
@@ -1645,6 +1656,8 @@ function syncControls() {
   $('#composition').value = state.style.composition;
   $('#align').value = state.style.align;
   $('#density').value = state.style.density;
+  $('#head-scale').value = state.style.headScale ?? 1;
+  $('#text-scale').value = state.style.textScale ?? 1;
   for (const [sel, key] of COLOR_FIELDS) {
     $(sel).value = state.style[key];
     $(sel + '-hex').value = state.style[key].toUpperCase();
@@ -1751,6 +1764,12 @@ function bind() {
 
   $('#mail-contrast').addEventListener('change', (e) => {
     state.mail.contrast = e.target.checked;
+    applyMailSide();
+    renderMailPanel(); syncControls(); saveLocal(); draw();
+  });
+
+  $('#mail-look').addEventListener('change', (e) => {
+    state.mail.look = e.target.checked;
     applyMailSide();
     renderMailPanel(); syncControls(); saveLocal(); draw();
   });
@@ -1897,6 +1916,8 @@ function bind() {
     });
   }
   $('#density').addEventListener('input', (e) => { state.style.density = +e.target.value; scheduleDraw(); });
+  $('#head-scale').addEventListener('input', (e) => { state.style.headScale = +e.target.value; scheduleDraw(); });
+  $('#text-scale').addEventListener('input', (e) => { state.style.textScale = +e.target.value; scheduleDraw(); });
   for (const [sel, key] of [['#plate', 'plate'], ['#flagbar', 'flagBar'], ['#hshadow', 'headlineShadow'],
     ['#twotone', 'twoTone'], ['#honorific', 'honorific']]) {
     $(sel).addEventListener('change', async (e) => {
