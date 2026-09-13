@@ -84,7 +84,18 @@ export const MAIL_PROGRAMS = [{
       },
       back: {
         headline: 'Republicans Are Fighting For New Hampshire',
-        subhead: 'Lower costs. No new taxes. Safer streets. More freedom.',
+        /* The seven, in the corner the carrier is not standing in. The front of
+         * this round is the lockup and the four words; this is where the
+         * promises themselves are actually read. */
+        list: [
+          'Ban an income tax. Forever',
+          'Cap your property tax',
+          'Cut even more red tape',
+          'Lower energy bills',
+          'Lower health care costs',
+          'Parents decide',
+          'Support public safety',
+        ],
       },
     },
     {
@@ -254,8 +265,11 @@ export const MAIL_PROGRAMS = [{
  * the call to action says when. A side of this programme that does not tell
  * somebody when to vote has not finished. */
 export const SIDE_COMMON = {
-  footer: '{{PLACE}}',
-  cta: 'Vote Republican Down The Ballot November 3',
+  /* No district line. A voter knows the town they live in and does not know
+   * which numbered House district it sits in, so the line cost a piece a
+   * quarter inch and told nobody anything. */
+  footer: '',
+  cta: 'Vote Republican Up & Down The Ballot Nov. 3rd',
   /* The date on its own, for the block that stands beside a short slate. The
    * call to action carries it in a sentence; the block carries it big. */
   voteDate: 'November 3',
