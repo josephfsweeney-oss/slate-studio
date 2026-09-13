@@ -1818,8 +1818,34 @@ function swoosh(ctx, r, up, colour) {
   ctx.restore();
 }
 
-/* The guarantee itself: the lockup on the left, the promises numbered down the
- * right, and the line that names them across the foot. */
+/* The state, simplified: a wedge with the Canada point at the top, the Maine
+ * border and the seacoast down the east, the Massachusetts line across the
+ * bottom and the Connecticut River up the west. It is a mark at the size it is
+ * used, not a map, and it is drawn rather than traced because the committee's
+ * own outline has not come across yet. Send the file and this goes. */
+const NH = [
+  [0.44, 0.00], [0.55, 0.24], [0.63, 0.44], [0.72, 0.62], [0.80, 0.74],
+  [0.90, 0.86], [0.97, 0.95], [0.62, 0.97], [0.26, 0.98], [0.05, 0.95],
+  [0.12, 0.72], [0.17, 0.52], [0.25, 0.30], [0.33, 0.13],
+];
+
+function paintState(ctx, x, y, wide, tall, colour) {
+  ctx.save();
+  ctx.fillStyle = colour;
+  ctx.beginPath();
+  NH.forEach(([px, py], i) => {
+    const ax = x + px * wide;
+    const ay = y + py * tall;
+    if (i === 0) ctx.moveTo(ax, ay); else ctx.lineTo(ax, ay);
+  });
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+}
+
+/* The Granite Guarantee on its own: a frame, the masthead between two rules,
+ * the two words stacked, a divider with the state in it, and the four words
+ * across the foot. */
 function paintGuarantee(ctx, plan, style, theme, bleed = 0) {
   const g = plan.guarantee;
   const { w, h } = plan.canvas;
@@ -1829,68 +1855,86 @@ function paintGuarantee(ctx, plan, style, theme, bleed = 0) {
   const ground = cardStock(style);
   const onDark = luminance(ground) <= 0.45;
   const ink = onDark ? BRAND.white : plate;
-  const lift = readableOn(accent, ground, style.plateAccent, 4.5);
-  const mark = onDark ? lift : accent;
+  const mark = onDark ? readableOn(accent, ground, style.plateAccent, 4.5) : accent;
   const ANTON_F = { family: 'Anton', weight: 400 };
   const COND_BOLD_F = { family: 'Barlow Condensed', weight: 700 };
 
   ctx.fillStyle = ground;
   ctx.fillRect(-B, -B, w + B * 2, h + B * 2);
 
-  ctx.textBaseline = 'alphabetic';
+  // The state, oversized and faint, sitting off the right hand edge.
+  const wmH = h * 1.06;
+  paintState(ctx, w * 0.70, -h * 0.03, wmH * 0.62, wmH,
+    onDark ? 'rgba(255,255,255,.05)' : 'rgba(18,49,78,.045)');
 
-  /* The kicker, with a rule either side of it, which is the committee's own
-   * treatment and the thing that makes it read as a masthead. */
+  // The frame.
+  const f = g.frame;
+  ctx.strokeStyle = mark;
+  ctx.lineWidth = f.t;
+  ctx.strokeRect(f.x + f.t / 2, f.y + f.t / 2, f.w - f.t, f.h - f.t);
+
+  ctx.textBaseline = 'alphabetic';
+  ctx.textAlign = 'center';
+
+  /* The masthead, with a rule running out to each side of it. */
   if (g.kick) {
     const k = g.kick;
     setFont(ctx, COND_BOLD_F, k.px, k.ls);
-    ctx.textAlign = 'left';
     ctx.fillStyle = ink;
-    const tx = g.left.x;
-    ctx.fillText(k.text, tx, k.y + k.px);
-    ctx.fillStyle = mark;
-    ctx.fillRect(tx, k.y + k.px * 1.62, g.left.w * 0.30, Math.max(2, k.px * 0.11));
+    ctx.fillText(k.text, g.cx, k.y + k.px);
+    const rw = (g.inner.w - k.w) / 2 - k.px * 0.9;
+    if (rw > k.px * 0.4) {
+      ctx.fillStyle = mark;
+      const ry = k.y + k.px * 0.62;
+      const t = Math.max(2, k.px * 0.085);
+      ctx.fillRect(g.inner.x, ry, rw, t);
+      ctx.fillRect(g.inner.x + g.inner.w - rw, ry, rw, t);
+    }
   }
 
   // The lockup: the first word in the accent, the second in the plate colour.
   let ty = g.titleTop;
   for (const t of g.title) {
-    setFont(ctx, ANTON_F, t.px, -0.015);
-    ctx.textAlign = 'left';
+    setFont(ctx, ANTON_F, t.px, -0.012);
     ctx.fillStyle = t.accent ? mark : ink;
-    ctx.fillText(t.text, g.left.x, ty + t.px * 0.74);
-    ty += t.px * 0.80;
+    ctx.fillText(t.text, g.cx, ty + t.px * 0.76);
+    ty += t.px * 0.82;
   }
 
-  /* The promises. A number in a solid square, the promise beside it, and a
-   * hairline under each one so the eye can run down them. */
-  for (const r of g.rows) {
-    ctx.fillStyle = mark;
-    ctx.fillRect(r.chip.x, r.chip.y, r.chip.w, r.chip.h);
-    ctx.fillStyle = onDark ? plate : BRAND.white;
-    setFont(ctx, ANTON_F, g.numPx, 0);
-    ctx.textAlign = 'center';
-    ctx.fillText(r.n, r.chip.x + r.chip.w / 2, r.chip.y + (r.chip.h + g.numPx * 0.72) / 2);
-
+  // The divider: a rule either side of the state.
+  const d = g.divider;
+  const half = (d.w - d.markW) / 2 - d.gap;
+  if (half > 0) {
+    const t = Math.max(2, h * 0.0035);
     ctx.fillStyle = ink;
-    setFont(ctx, ANTON_F, g.rowPx, -0.005);
-    ctx.textAlign = 'left';
-    ctx.fillText(r.text, r.textX, r.y + (r.h + g.rowPx * 0.72) / 2);
-
-    ctx.fillStyle = onDark ? 'rgba(255,255,255,.18)' : 'rgba(18,49,78,.14)';
-    ctx.fillRect(r.chip.x, r.y + r.h - Math.max(1, h * 0.0016), g.right.w, Math.max(1, h * 0.0016));
+    ctx.fillRect(d.cx - d.w / 2, d.y, half, t);
+    ctx.fillRect(d.cx + d.w / 2 - half, d.y, half, t);
   }
+  paintState(ctx, d.cx - d.markW / 2, d.y - d.markW * 0.78,
+    d.markW, d.markW * 1.58, mark);
 
-  // The line that names them, in a solid bar off both edges of the paper.
+  // The four words, in a solid bar across the foot of the frame.
   if (g.bar) {
+    const b = g.bar;
     ctx.fillStyle = plate;
-    ctx.fillRect(-B, g.bar.y, w + B * 2, g.bar.h + B);
-    ctx.fillStyle = mark;
-    ctx.fillRect(-B, g.bar.y, w + B * 2, Math.max(3, h * 0.006));
-    ctx.fillStyle = BRAND.white;
-    setFont(ctx, ANTON_F, g.bar.px, 0.02);
-    ctx.textAlign = 'center';
-    ctx.fillText(g.bar.text, w / 2, g.bar.y + (g.bar.h + g.bar.px * 0.74) / 2);
+    ctx.fillRect(b.x, b.y, b.w, b.h);
+    setFont(ctx, ANTON_F, b.px, 0.02);
+    /* The dots between are the accent and the words are white, so the bar reads
+     * as four promises rather than one long line. */
+    const parts = [];
+    b.items.forEach((t, i) => {
+      if (i) parts.push({ t: b.dot, dot: true });
+      parts.push({ t, dot: false });
+    });
+    const widths = parts.map((p) => ctx.measureText(p.t).width);
+    const total = widths.reduce((a, x) => a + x, 0);
+    let x = b.x + (b.w - total) / 2;
+    ctx.textAlign = 'left';
+    parts.forEach((p, i) => {
+      ctx.fillStyle = p.dot ? mark : BRAND.white;
+      ctx.fillText(p.t, x, b.y + (b.h + b.px * 0.74) / 2);
+      x += widths[i];
+    });
   }
   if ('letterSpacing' in ctx) ctx.letterSpacing = '0px';
 }

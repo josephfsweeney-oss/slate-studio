@@ -1036,6 +1036,44 @@ test('eight drops do not arrive as one piece eight times', () => {
   }
 });
 
+test('the lockup is set to the width and held to the height', () => {
+  const piece = MAIL_PROGRAMS[0].pieces.find((x) => x.id === 'contract');
+  const copy = { ...SIDE_COMMON, ...sideCopyFor(piece, 'front', true) };
+  const style = sideStyle(piece, 'front', true);
+  assert.equal(style.composition, 'guarantee', 'the opening round lost its lockup');
+
+  /* Every trim it could be drawn at, including the wide short one where a word
+   * set to the full width is taller than the panel it is on. */
+  for (const id of ['mail6', 'mail11', 'email', '16x9', '1x1', 'story']) {
+    const c = CANVASES.find((x) => x.id === id);
+    if (!c) continue;
+    const p = solve({ canvas: { w: c.w, h: c.h }, dpi: c.dpi || 0, slate: [], copy, style },
+      measure);
+    const g = p.guarantee;
+    const where = `${id}`;
+    assert.ok(g, `${where} did not solve as a lockup`);
+    assert.equal(p.tiles.length, 0, `${where} drew a tile on the lockup`);
+
+    assert.equal(g.title.length, 2, `${where} lost half the lockup`);
+    for (const t of g.title) assert.ok(t.px > 0, `${where} sized a word to nothing`);
+    assert.ok(g.title[0].accent && !g.title[1].accent,
+      `${where}: the first word carries the accent and the second does not`);
+
+    // It fits between the masthead and the bar, and inside the frame.
+    const bottom = g.titleTop + g.title.reduce((a, t) => a + t.px * 0.82, 0);
+    const floor = g.bar ? g.bar.y : g.frame.y + g.frame.h;
+    assert.ok(bottom <= floor + 1,
+      `${where}: the lockup runs ${(bottom - floor).toFixed(0)}px past the bar`);
+    assert.ok(g.titleTop >= g.frame.y, `${where}: the lockup starts above the frame`);
+    if (g.kick) assert.ok(g.kick.y >= g.frame.y, `${where}: the masthead is outside the frame`);
+
+    // The four words are there, and they are four.
+    assert.ok(g.bar, `${where} lost the bar`);
+    assert.equal(g.bar.items.length, 4, `${where}: the bar carries ${g.bar.items.length} phrases`);
+    assert.ok(g.bar.y + g.bar.h <= g.frame.y + g.frame.h + 1, `${where}: the bar is outside the frame`);
+  }
+});
+
 test('the size dials move the ceiling, and the width still wins', () => {
   const c = CANVASES.find((x) => x.id === 'mail6');
   /* A band, so there is a headline and a row of faces to move. Every round's

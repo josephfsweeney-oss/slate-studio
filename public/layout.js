@@ -1944,14 +1944,22 @@ function solveSlateBand(spec, measure, side) {
   let checklistH = 0;
 
   const fitHead = (width, room, maxLines) => {
-    let px = Math.min(box.h * 0.150 * density * headScale, Math.max(room, box.h * 0.035));
-    let blk = fitBlock(measure, copy.headline, ANTON, px, width, maxLines, -0.012, true);
-    let guard = 0;
-    while (blk.h > room && px > box.h * 0.035 && guard++ < 60) {
-      px *= 0.94;
-      blk = fitBlock(measure, copy.headline, ANTON, px, width, maxLines, -0.012, true);
-    }
-    return blk;
+    const once = (start) => {
+      let px = Math.max(box.h * 0.035, start);
+      let blk = fitBlock(measure, copy.headline, ANTON, px, width, maxLines, -0.012, true);
+      let guard = 0;
+      while (blk.h > room && px > box.h * 0.035 && guard++ < 60) {
+        px *= 0.94;
+        blk = fitBlock(measure, copy.headline, ANTON, px, width, maxLines, -0.012, true);
+      }
+      return blk;
+    };
+    const base = once(Math.min(box.h * 0.150 * density, Math.max(room, box.h * 0.035)));
+    if (headScale === 1 || !base.px) return base;
+    /* The dial is a multiple of the size the fit chose, not of the ceiling it
+     * started from. On a long headline the ceiling never binds, and a dial that
+     * only moves a ceiling nobody reaches does nothing at all. */
+    return once(base.px * headScale);
   };
 
   if (sideBySide) {
@@ -2360,13 +2368,18 @@ function solveContrast(spec, measure) {
    * a line it can be read at. */
   const room = Math.max(box.h * 0.06,
     footTop - inner.y - kickH - numH - versusH - capH - box.h * 0.02);
-  let headPx = Math.min(box.h * 0.135 * density * headScale, Math.max(room, box.h * 0.05));
-  let head = fitBlock(measure, copy.headline, ANTON, headPx, colW, 3, -0.012, true);
-  let guard = 0;
-  while (head.h > room && headPx > box.h * 0.05 && guard++ < 60) {
-    headPx *= 0.94;
-    head = fitBlock(measure, copy.headline, ANTON, headPx, colW, 3, -0.012, true);
-  }
+  const fitHere = (start) => {
+    let px = Math.max(box.h * 0.05, start);
+    let blk = fitBlock(measure, copy.headline, ANTON, px, colW, 3, -0.012, true);
+    let guard = 0;
+    while (blk.h > room && px > box.h * 0.05 && guard++ < 60) {
+      px *= 0.94;
+      blk = fitBlock(measure, copy.headline, ANTON, px, colW, 3, -0.012, true);
+    }
+    return blk;
+  };
+  let head = fitHere(Math.min(box.h * 0.135 * density, Math.max(room, box.h * 0.05)));
+  if (headScale !== 1 && head.px) head = fitHere(head.px * headScale);
   const headH = head.h ? head.h + box.h * 0.022 : 0;
 
   // The block sits in the middle of the column it was given.
@@ -2428,16 +2441,16 @@ function solveContrast(spec, measure) {
 /** The drawings the contrast side can carry. The painter holds the geometry. */
 export const CONTRAST_MARKS = ['form', 'meter', 'sold', 'stairs', 'door', 'redacted'];
 
-/* --------------------------------------------------------------- the poster
+/* --------------------------------------------------------------- the lockup
  *
- * The guarantee itself, laid out the way the committee's own artwork lays it
- * out: the lockup, then the seven promises numbered down the page, then the
- * line that names what they are. Nobody's face on it.
+ * The Granite Guarantee as the committee publishes it, on its own: a rule to
+ * each side of the masthead, the two words stacked and each set to the full
+ * width, a divider with the state in it, and the four words in a bar across
+ * the foot. Nothing else on the panel.
  *
- * The committee's version is a portrait poster. A mail panel is landscape, so
- * the lockup takes the left and the promises take the right rather than the
- * whole thing being letterboxed into a strip with two feet of white either
- * side.
+ * It carried the seven promises down one side before this, and it was crowded.
+ * The seven are what the other seven rounds are for; this one is the brand and
+ * the four words, and it should have air.
  */
 function solveGuarantee(spec, measure) {
   const { w, h } = spec.canvas;
@@ -2449,8 +2462,11 @@ function solveGuarantee(spec, measure) {
   const textScale = clampScale(style.textScale);
   const headScale = clampScale(style.headScale);
 
-  const pad = w * 0.034 * density;
-  const inner = { x: pad, y: pad * 1.2, w: w - pad * 2, h: h - pad * 2.4 };
+  const pad = w * 0.026 * density;
+  const frame = { x: pad, y: pad, w: w - pad * 2, h: h - pad * 2,
+                  t: Math.max(2, s * 0.0075) };
+  const inner = { x: frame.x + s * 0.055, y: frame.y + s * 0.055,
+                  w: frame.w - s * 0.110, h: frame.h - s * 0.110 };
 
   /** The size that makes a line exactly this wide. */
   const fillWidth = (text, font, width, ls) => {
@@ -2458,91 +2474,85 @@ function solveGuarantee(spec, measure) {
     return at100 > 0 ? (width / at100) * 100 : 0;
   };
 
-  /* The bar at the foot, first: it is the line that names the thing and it
-   * never gives up its height. */
-  const barText = String(copy.footer || '').trim();
-  const barPx = Math.min(box.h * 0.070 * density * textScale,
-    fillWidth(barText, ANTON, inner.w * 0.86, 0.02));
+  /* The bar at the foot, first. It sits inside the frame and runs its full
+   * width, which is what the committee's own artwork does. */
+  const items = (Array.isArray(copy.list) ? copy.list : String(copy.footer || '').split('\u00b7'))
+    .map((t) => String(t || '').trim().toUpperCase()).filter(Boolean);
+  const dot = '  \u00b7  ';
+  const barText = items.join(dot);
+  const barPx = Math.min(box.h * 0.062 * density * textScale,
+    fillWidth(barText, ANTON, frame.w * 0.90, 0.02));
   const bar = barText
-    ? { h: barPx * 1.72, px: barPx, text: barText.toUpperCase() } : { h: 0, px: 0, text: '' };
-  const barTop = h - bar.h;
+    ? { x: frame.x, y: frame.y + frame.h - barPx * 2.1, w: frame.w, h: barPx * 2.1,
+        px: barPx, items, dot } : null;
+  const barTop = bar ? bar.y : frame.y + frame.h;
 
-  const gutter = inner.w * 0.045;
-  const leftW = inner.w * 0.38;
-  const rightX = inner.x + leftW + gutter;
-  const rightW = inner.x + inner.w - rightX;
+  /* ------------------------------------------------------------- the masthead */
 
-  /* -------------------------------------------------------------- the lockup */
+  const kickText = String(copy.kicker || '').trim().toUpperCase();
+  const kickPx = Math.min(box.h * 0.052 * density * textScale,
+    fillWidth(kickText, COND_BOLD, inner.w * 0.62, 0.22));
+  const kickW = widthAt(measure, kickText, COND_BOLD, kickPx, 0.22);
+  const kick = kickText ? { px: kickPx, ls: 0.22, text: kickText, w: kickW } : null;
 
-  const kickText = String(copy.kicker || '').trim();
-  const kickPx = Math.min(box.h * 0.034 * density * textScale,
-    fillWidth(kickText, COND_BOLD, leftW * 0.96, 0.20));
-  const kick = kickText
-    ? { px: kickPx, ls: 0.20, text: kickText.toUpperCase() } : null;
-
-  /* Two words, each set to the full width of the column, which is what makes
-   * them a lockup rather than two headlines that happen to be stacked. */
+  /* Two words, each set to the full width, which is what makes them a lockup
+   * rather than two headlines that happen to be stacked. */
   const words = String(copy.headline || '').split(/\n|\s+/).filter(Boolean).slice(0, 2);
   const title = words.map((t, i) => ({
     text: t.toUpperCase(),
-    px: Math.min(fillWidth(t, ANTON, leftW, -0.015), box.h * 0.30 * density * headScale),
+    px: fillWidth(t, ANTON, inner.w, -0.012),
     accent: i === 0,
   }));
-  const titleH = title.reduce((a, t) => a + t.px * 0.80, 0);
-  const kickH = kick ? kick.px * 2.2 : 0;
-  const lockH = kickH + titleH;
-  const lockTop = inner.y + Math.max(0, (barTop - inner.y - lockH) / 2);
 
-  /* ------------------------------------------------------------ the promises */
+  /* The divider: a rule either side of a small mark, under the lockup. */
+  const divH = s * 0.070;
+  const kickH = kick ? kick.px * 2.3 : 0;
+  const LINE = 0.82;
 
-  const items = (Array.isArray(copy.list) ? copy.list : [])
-    .map((t) => String(t || '').trim()).filter(Boolean).slice(0, 12);
-  const listTop = inner.y;
-  const listH = Math.max(1, barTop - inner.y - box.h * 0.02);
-  const rowH = items.length ? listH / items.length : 0;
-  const chip = rowH * 0.74;
-  const gap = chip * 0.42;
-  const tw = Math.max(1, rightW - chip - gap);
-  const rowPx = items.length
-    ? Math.min(box.h * 0.062 * density * textScale, rowH * 0.50,
-      Math.min(...items.map((t) => fillWidth(t, ANTON, tw, -0.005)))) : 0;
-  const numPx = chip * 0.62;
-  const rows = items.map((t, i) => ({
-    n: String(i + 1),
-    text: t.toUpperCase(),
-    y: listTop + i * rowH,
-    h: rowH,
-    chip: { x: rightX, y: listTop + i * rowH + (rowH - chip) / 2, w: chip, h: chip },
-    textX: rightX + chip + gap,
-  }));
+  /* Set to the width, then held to the height. A word set to the full width of
+   * a landscape panel is taller than the panel, and two of them stacked came
+   * out on top of each other and off both ends. The width gives the size; the
+   * height is what decides whether the lockup can have it. */
+  const room = Math.max(1, barTop - inner.y - kickH - divH);
+  const wanted = title.reduce((a, t) => a + t.px * LINE, 0);
+  const shrink = Math.min(1, wanted > 0 ? room / wanted : 1);
+  const cap = box.h * 0.40 * density * headScale;
+  for (const t of title) t.px = Math.min(t.px * shrink, cap);
+
+  const titleH = title.reduce((a, t) => a + t.px * LINE, 0);
+  const stackH = kickH + titleH + divH;
+  const top = inner.y + Math.max(0, (barTop - inner.y - stackH) / 2);
+
+  let y = top;
+  const kickAt = kick ? { ...kick, y } : null;
+  y += kickH;
+  const titleTop = y;
+  y += titleH;
+  const divider = { y: y + divH * 0.45, markW: s * 0.030,
+    gap: s * 0.022, w: inner.w * 0.62, cx: inner.x + inner.w / 2 };
 
   const dpi = spec.dpi || 0;
   return {
     canvas: { w, h },
     composition: 'guarantee',
     pad, gap: box.h * 0.02, s, scale: 1,
-    grid: { cols: 0, rows: items.length, tileW: 0, tileH: rowH },
+    grid: { cols: 0, rows: 0, tileW: 0, tileH: 0 },
     slateRect: null,
     tiles: [],
     deck: null,
     copy: null,
     mailPanel: null,
     qr: null,
-    guarantee: {
-      box, inner, left: { x: inner.x, w: leftW }, right: { x: rightX, w: rightW },
-      kick: kick ? { ...kick, y: lockTop } : null,
-      title, titleTop: lockTop + kickH,
-      rows, rowPx, numPx,
-      rule: { x: inner.x, w: inner.w },
-      bar: bar.h ? { ...bar, y: barTop, x: 0, w } : null,
-    },
+    guarantee: { box, frame, inner, kick: kickAt, title, titleTop, divider, bar,
+                 cx: inner.x + inner.w / 2 },
     disclaimer: null,
     warnings: [
-      ...(!items.length ? ['The guarantee has no promises on it.'] : []),
-      ...(items.length > 8
-        ? [`${items.length} promises on one panel leaves each line about `
-          + `${(rowPx / (dpi || 300)).toFixed(2)} inches tall.`] : []),
-      ...(!barText ? ['No line at the foot naming what these are.'] : []),
+      ...(!title.length ? ['The lockup has no words in it.'] : []),
+      ...(!items.length ? ['No line at the foot. The four words are the promise.'] : []),
+      ...(items.length > 5
+        ? [`${items.length} phrases across the foot is a sentence, not a bar.`] : []),
+      ...(dpi && title.length && title[0].px < box.h * 0.14
+        ? ['The lockup is small for the panel it is on.'] : []),
     ],
   };
 }

@@ -65,16 +65,7 @@ export const MAIL_PROGRAMS = [{
       guarantee: {
         kicker: 'New Hampshire House Republicans',
         headline: 'Granite Guarantee',
-        list: [
-          'Ban an income tax. Forever',
-          'Cap your property tax',
-          'Cut even more red tape',
-          'Lower energy bills',
-          'Lower health care costs',
-          'Parents decide',
-          'Support public safety',
-        ],
-        footer: 'Seven promises. In writing.',
+        list: ['Lower costs', 'No new taxes', 'Safer streets', 'More freedom'],
       },
       front: {
         headline: 'We Put It In Writing',
@@ -92,8 +83,8 @@ export const MAIL_PROGRAMS = [{
         ],
       },
       back: {
-        headline: 'Ask Them For Theirs',
-        subhead: 'They will not put a number on one of them, or a ceiling on your taxes.',
+        headline: 'Republicans Are Fighting For New Hampshire',
+        subhead: 'Lower costs. No new taxes. Safer streets. More freedom.',
       },
     },
     {

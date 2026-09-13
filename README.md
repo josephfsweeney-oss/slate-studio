@@ -557,7 +557,7 @@ things change through the drop now.
 
 | Round | Colourway | Trim | Message side |
 |---|---|---|---|
-| 1 The Contract | Granite Guarantee | 11 x 6 | the guarantee, numbered |
+| 1 The Contract | Granite Guarantee | 11 x 6 | the lockup, on its own |
 | 2 No Income Tax | Granite | 11 x 5.5 | contrast |
 | 3 Cap Your Property Tax | Classic red | 11 x 6 | contrast |
 | 4 Free Market Housing | Granite Guarantee | 11 x 5.5 | contrast |
@@ -657,16 +657,25 @@ side that attacks a record and does not cite it is a side you cannot defend.
 Where the record is not in the file the line prints empty and the app says so in
 the warnings, which is the point. Fill it before the drop.
 
-The round that opens the programme is the guarantee itself, laid out the way the
-committee publishes it: the lockup, the seven promises numbered down the page,
-and the line that names them across the foot. Nobody's face on that side. The
-committee's own version is a portrait poster, so the lockup takes the left and
-the promises take the right rather than the whole thing being letterboxed into a
-strip with two feet of white either side.
+The round that opens the programme is the Granite Guarantee lockup on its own:
+the frame, the masthead with a rule running out to each side of it, the two
+words stacked and each set to the full width, a divider with the state in it,
+and the four words in a bar across the foot. Nobody's face on that side, and
+nothing else on the panel.
 
-The seven are the committee's words in the committee's order. Six of them have a
-round of their own in the drop. **Support public safety** does not, and that is
-worth knowing before the schedule is signed off.
+It carried the seven promises down one side of it first, and it was crowded. The
+seven are what the other seven rounds are for. This one is the brand and the
+four words, and it should have air.
+
+The two words are set to the width and then held to the height. A word set to
+the full width of a landscape panel is taller than the panel, and two of them
+stacked came out on top of each other and off both ends. The width gives the
+size; the height decides whether the lockup can have it. A test holds that at
+every trim the app offers.
+
+The state in the divider is drawn here, not traced from the committee's file.
+It is a mark at the size it is used rather than a map. Send the outline and it
+is a one line change.
 
 `list` also works on a band as a ticked checklist, which is what the opener used
 before the real artwork arrived.
