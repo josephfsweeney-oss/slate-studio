@@ -72,10 +72,12 @@ export const MAIL_PROGRAMS = [{
       contrast: {
         mark: 'form',
         art: 'c-tax',
-        kicker: 'The income tax ban died in the House',
-        headline: 'They Would Not Close The Door',
-        number: '43',
-        subhead: 'Votes short of banning the income tax in the constitution for good.',
+        kicker: 'CACR 12 died forty-three votes short',
+        headline: 'One Vote From Closing It For Good',
+        versus: [
+          { dir: 'no', text: 'Democrats would not close the door on an income tax' },
+          { dir: 'yes', text: 'Republicans voted to write the ban into the constitution' },
+        ],
         source: 'CACR 12. 193 yes, 148 no. 236 needed.',
       },
       front: {
@@ -94,8 +96,10 @@ export const MAIL_PROGRAMS = [{
         art: 'c-house',
         kicker: 'Your school tax has no ceiling',
         headline: 'It Climbs Every Single Year',
-        number: '',
-        subhead: 'Republicans put a cap at inflation on your ballot. Nothing else stops it.',
+        versus: [
+          { dir: 'no', text: 'Democrats will let it keep climbing' },
+          { dir: 'yes', text: 'Republicans put a cap at inflation on your ballot' },
+        ],
         source: 'HB 1300.',
       },
       front: {
@@ -114,8 +118,10 @@ export const MAIL_PROGRAMS = [{
         art: 'c-build',
         kicker: 'Nothing got built',
         headline: 'Priced Out Of The Town They Grew Up In',
-        number: '15',
-        subhead: 'Housing bills Republicans passed in one session, with Governor Ayotte.',
+        versus: [
+          { dir: 'no', text: 'Democrats will keep saying no to new housing' },
+          { dir: 'yes', text: 'Republicans passed fifteen housing bills in one session' },
+        ],
         source: 'The 2025 housing package. Fifteen bills in one session.',
       },
       front: {
@@ -135,10 +141,9 @@ export const MAIL_PROGRAMS = [{
         kicker: 'What you pay for the same electricity',
         headline: 'Two Sides. Two Directions.',
         versus: [
-          { dir: 'down', text: 'Republicans are fighting to lower your bills' },
           { dir: 'up', text: 'Democrats are fighting to increase your bills' },
+          { dir: 'down', text: 'Republicans are fighting to lower your bills' },
         ],
-        subhead: 'New Hampshire pays about 27 percent over the country for the same electricity.',
         source: '',
       },
       front: {
@@ -157,8 +162,10 @@ export const MAIL_PROGRAMS = [{
         art: 'c-hospital',
         kicker: 'They kept the prices out of sight',
         headline: 'You Were Never Meant To See The Bill',
-        number: '',
-        subhead: 'House Republicans and Governor Ayotte opened the books. The system liked them closed.',
+        versus: [
+          { dir: 'no', text: 'Democrats will leave the prices hidden' },
+          { dir: 'yes', text: 'Republicans and Governor Ayotte put them in the open' },
+        ],
         source: 'HB 705, enacted 2026.',
       },
       front: {
@@ -176,9 +183,11 @@ export const MAIL_PROGRAMS = [{
         mark: 'door',
         art: 'c-classroom',
         kicker: 'HB 115, on Education Freedom Accounts',
-        headline: 'Not One Democrat Voted Yes',
-        number: '0',
-        subhead: 'Democrats voted to open Education Freedom Accounts to every family.',
+        headline: 'Who Decides Where Your Child Goes',
+        versus: [
+          { dir: 'no', text: 'Not one Democrat voted to let you choose' },
+          { dir: 'yes', text: 'Republicans opened the accounts to every family' },
+        ],
         source: 'HB 115. Passed 198 to 180.',
       },
       front: {

@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { ROOT } from '../server/config.js';
-import { solve, bestGrid, PHOTO_AR, PLATE_AR, COMPOSITIONS, CONTRAST_MARKS } from '../public/layout.js';
+import { solve, bestGrid, PHOTO_AR, PLATE_AR, COMPOSITIONS, CONTRAST_MARKS,
+  CONTRAST_DIRS } from '../public/layout.js';
 import { nameParts, slugify } from '../public/names.js';
 import { fillTokens, CANVASES, TEMPLATES, PALETTES } from '../public/presets.js';
 import { MAIL_PROGRAMS, SIDE_COMMON, sideStyle, sideCopyFor } from '../public/mailers.js';
@@ -998,7 +999,7 @@ test('the push token stays in the browser and never reaches this app', () => {
   assert.match(html, /Contents set to\s*\n?\s*read and write/);
 });
 
-test('a round can argue with arrows, and the copy survives the token filler', () => {
+test('every issue round names them first and answers second', () => {
   /* Copy is not all strings. A comparison is a list of lines with a direction on
    * each, and the filler used to turn it into an empty string, which took the
    * whole block off the artwork without saying so. */
@@ -1009,16 +1010,18 @@ test('a round can argue with arrows, and the copy survives the token filler', ()
   assert.equal(fillTokens('{{COUNTY}} {{DISTRICT}}', d), 'Rockingham 25');
 
   const c = CANVASES.find((x) => x.id === 'mail6');
-  const piece = MAIL_PROGRAMS[0].pieces.find((x) => x.contrast && x.contrast.versus);
-  assert.ok(piece, 'no round argues with arrows');
+  const rounds = MAIL_PROGRAMS[0].pieces.filter((x) => x.contrast && x.contrast.versus);
+  assert.equal(rounds.length, 6, 'every issue round should carry its own comparison');
+  const piece = rounds.find((x) => x.id === 'energy');
+  assert.ok(piece, 'the energy round lost its arrows');
   const copy = { ...SIDE_COMMON, ...sideCopyFor(piece, 'front', true) };
   const p = solve({ canvas: { w: c.w, h: c.h }, dpi: c.dpi, slate: slate(4), copy,
     style: sideStyle(piece, 'front', true) }, measure);
   const v = p.contrast.versus;
   assert.ok(v, 'the comparison did not reach the plan');
   assert.equal(v.rows.length, 2, 'a comparison takes two sides');
-  assert.deepEqual(v.rows.map((r) => r.dir), ['down', 'up'],
-    'ours goes down and theirs goes up, in that order');
+  assert.deepEqual(v.rows.map((r) => r.dir), ['up', 'down'],
+    'theirs is named first and ours answers it');
   for (const r of v.rows) assert.ok(r.block.lines.length, 'an arrow with no line beside it');
 
   // The rows stack without landing on each other, and the block stays in the column.
@@ -1026,8 +1029,23 @@ test('a round can argue with arrows, and the copy survives the token filler', ()
   assert.ok(v.y + v.h <= p.contrast.cta.y + 1, 'the comparison lands on the foot');
   assert.ok(v.arrowW + v.gap < p.contrast.col.w, 'the arrow leaves no room for the line');
 
-  // With a comparison on it, the big numeral stands down.
-  assert.equal(p.contrast.number, null, 'a numeral and a comparison is two headlines');
+  /* Every round names them first and answers second, and the mark says which is
+   * which before a word of it is read. */
+  const AGAINST = ['up', 'no'];
+  const FOR = ['down', 'yes'];
+  for (const round of rounds) {
+    const dirs = round.contrast.versus.map((r) => r.dir);
+    assert.equal(dirs.length, 2, `${round.id}: a comparison takes two sides`);
+    assert.ok(AGAINST.includes(dirs[0]), `${round.id}: does not name them first`);
+    assert.ok(FOR.includes(dirs[1]), `${round.id}: does not answer with ours`);
+    for (const r of round.contrast.versus) {
+      assert.ok(CONTRAST_DIRS.includes(r.dir), `${round.id}: no mark called ${r.dir}`);
+      assert.ok(String(r.text || '').trim().length > 10, `${round.id}: a mark with no line on it`);
+    }
+    // And no two rounds argue the same way.
+    const twin = rounds.filter((x) => x.contrast.versus[1].text === round.contrast.versus[1].text);
+    assert.equal(twin.length, 1, `${round.id}: two rounds say the same thing`);
+  }
 });
 
 test('nothing is set in a colour that cannot be read on the ground under it', async () => {

@@ -595,12 +595,19 @@ uses the palette's own light accent, and where a palette has none the accent is
 lifted toward white until it carries. Brand colour that cannot be read is not
 brand colour. A test holds every palette to 4.5 to 1.
 
-A round can argue with arrows instead of a number. The energy round does: one
-arrow down beside what Republicans are doing to your bill, one arrow up beside
-what Democrats are doing to it. Where a round has a comparison the big numeral
-stands down, because a numeral and a comparison in the same column are two
-headlines. `versus` in `public/mailers.js` is a list of `{ dir, text }`, and
-`dir` is `down` for ours and `up` for theirs.
+Every issue round argues the same shape and says something different in it: a
+line naming what they will do, then a line answering with what Republicans did.
+Theirs is always first and ours always answers, because the answer is the half
+you want read last.
+
+The mark says which is which before a word of it is read. A cost going up or
+down takes an arrow, so the energy round runs arrows. Everything else takes a
+cross or a tick, because an arrow pointing at a school choice means nothing.
+Against is red, for is the readable accent.
+
+`versus` in `public/mailers.js` is a list of `{ dir, text }`. `dir` is `up` or
+`no` for theirs and `down` or `yes` for ours. A test holds all six rounds to
+that order, to two lines each, and to saying six different things.
 
 Every contrast side ends on a source line: the bill, the roll call, the date. A
 side that attacks a record and does not cite it is a side you cannot defend.

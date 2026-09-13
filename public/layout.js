@@ -1718,6 +1718,10 @@ function solvePoster(spec, measure) {
  */
 /* The words for a count, so the piece can tell a voter how many to mark
  * without printing a numeral in a sentence. */
+/** What a line in a comparison can be marked with. The first two are against. */
+export const CONTRAST_DIRS = ['up', 'no', 'down', 'yes'];
+const DIRS = CONTRAST_DIRS;
+
 const COUNT_WORD = ['', 'ONE', 'TWO', 'THREE', 'FOUR', 'FIVE', 'SIX', 'SEVEN',
   'EIGHT', 'NINE', 'TEN', 'ELEVEN', 'TWELVE'];
 
@@ -2285,7 +2289,7 @@ function solveContrast(spec, measure) {
       const block = fitInside(measure, v.text, COND_BOLD,
         Math.min(box.h * 0.060, tw * 0.070) * density, tw, 2, 0.02, true);
       const rh = Math.max(block.h, arrowW * 1.20);
-      rows.push({ dir: v.dir === 'up' ? 'up' : 'down', block, dy: vy, h: rh });
+      rows.push({ dir: DIRS.includes(v.dir) ? v.dir : 'down', block, dy: vy, h: rh });
       vy += rh + pad;
     }
     versus = { arrowW, gap: vgap, rows, h: Math.max(0, vy - pad) };
@@ -2295,7 +2299,7 @@ function solveContrast(spec, measure) {
   /* The headline takes what the rest of the column leaves, and never less than
    * a line it can be read at. */
   const room = Math.max(box.h * 0.06,
-    footTop - inner.y - kickH - (versus ? 0 : numH) - versusH - capH - box.h * 0.02);
+    footTop - inner.y - kickH - numH - versusH - capH - box.h * 0.02);
   let headPx = Math.min(box.h * 0.135 * density, Math.max(room, box.h * 0.05));
   let head = fitBlock(measure, copy.headline, ANTON, headPx, colW, 3, -0.012, true);
   let guard = 0;
@@ -2306,7 +2310,7 @@ function solveContrast(spec, measure) {
   const headH = head.h ? head.h + box.h * 0.022 : 0;
 
   // The block sits in the middle of the column it was given.
-  const stackH = kickH + headH + (versus ? 0 : numH) + versusH + capH;
+  const stackH = kickH + headH + numH + versusH + capH;
   let y = inner.y + Math.max(0, (footTop - inner.y - stackH) / 2);
   const place = (blk, gapAfter) => {
     if (!blk.h) return null;
@@ -2336,7 +2340,7 @@ function solveContrast(spec, measure) {
       box, inner, col: { x: inner.x, w: colW },
       kicker: place(kick, box.h * 0.024),
       head: place(head, box.h * 0.022),
-      number: versus ? null : place(num, box.h * 0.016),
+      number: place(num, box.h * 0.016),
       versus: versus ? placeVersus() : null,
       caption: place(cap, box.h * 0.018),
       mark: mark.id || mark.art ? mark : null,

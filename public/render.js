@@ -1767,24 +1767,48 @@ function paintContrast(ctx, plan, style, theme, assets, bleed = 0) {
       const ax = c.col.x;
       const aw = v.arrowW;
       const ah = r.h;
-      const down = r.dir !== 'up';
+      /* Against is red, for is the readable accent, whichever mark it wears. A
+       * cost going up or down takes an arrow; anything else takes a cross or a
+       * tick, because an arrow pointing at a school choice means nothing. */
+      const against = r.dir === 'up' || r.dir === 'no';
       const sw = aw * 0.36;
-      ctx.fillStyle = down ? mark : bad;
-      if (down) {
-        ctx.fillRect(ax + (aw - sw) / 2, y + ah * 0.08, sw, ah * 0.52);
+      ctx.fillStyle = against ? bad : mark;
+      if (r.dir === 'down' || r.dir === 'up') {
+        const up = r.dir === 'up';
+        ctx.fillRect(ax + (aw - sw) / 2, y + ah * (up ? 0.40 : 0.08), sw, ah * 0.52);
         ctx.beginPath();
-        ctx.moveTo(ax, y + ah * 0.54);
-        ctx.lineTo(ax + aw, y + ah * 0.54);
-        ctx.lineTo(ax + aw / 2, y + ah * 0.96);
+        ctx.moveTo(ax, y + ah * (up ? 0.46 : 0.54));
+        ctx.lineTo(ax + aw, y + ah * (up ? 0.46 : 0.54));
+        ctx.lineTo(ax + aw / 2, y + ah * (up ? 0.04 : 0.96));
+        ctx.closePath();
+        ctx.fill();
+      } else if (r.dir === 'no') {
+        const t = aw * 0.20;
+        const cx0 = ax + aw / 2;
+        const cy0 = y + ah / 2;
+        const arm = aw * 0.40;
+        ctx.save();
+        ctx.translate(cx0, cy0);
+        ctx.rotate(Math.PI / 4);
+        ctx.fillRect(-arm, -t / 2, arm * 2, t);
+        ctx.fillRect(-t / 2, -arm, t, arm * 2);
+        ctx.restore();
       } else {
-        ctx.fillRect(ax + (aw - sw) / 2, y + ah * 0.40, sw, ah * 0.52);
+        const t = aw * 0.20;
+        const cx0 = ax + aw * 0.12;
+        const cy0 = y + ah * 0.56;
+        ctx.save();
         ctx.beginPath();
-        ctx.moveTo(ax, y + ah * 0.46);
-        ctx.lineTo(ax + aw, y + ah * 0.46);
-        ctx.lineTo(ax + aw / 2, y + ah * 0.04);
+        ctx.lineWidth = t;
+        ctx.lineCap = 'square';
+        ctx.lineJoin = 'miter';
+        ctx.strokeStyle = mark;
+        ctx.moveTo(cx0, cy0);
+        ctx.lineTo(cx0 + aw * 0.27, cy0 + ah * 0.22);
+        ctx.lineTo(cx0 + aw * 0.80, y + ah * 0.14);
+        ctx.stroke();
+        ctx.restore();
       }
-      ctx.closePath();
-      ctx.fill();
 
       const blk = r.block;
       ctx.fillStyle = ink;
