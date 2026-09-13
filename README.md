@@ -550,6 +550,46 @@ at the top where the words are and lightest across the middle where the faces
 stand. `public/art/CREDITS.md` says which photograph is which, who took it and
 where it came from. **Background photo** on the Design panel turns it off.
 
+### Eight drops, not one piece eight times
+
+Six of the eight rounds used to be the same piece with the words swapped. Three
+things change through the drop now.
+
+| Round | Colourway | Trim | Message side |
+|---|---|---|---|
+| 1 The Contract | Granite Guarantee | 11 x 6 | the guarantee, ticked |
+| 2 No Income Tax | Granite | 11 x 5.5 | contrast |
+| 3 Cap Your Property Tax | Classic red | 11 x 6 | contrast |
+| 4 Free Market Housing | Granite Guarantee | 11 x 5.5 | contrast |
+| 5 Lower Energy Bills | Navy | 11 x 6 | contrast |
+| 6 Lower Health Care Costs | Classic red | 11 x 5.5 | contrast |
+| 7 Parents Decide | Granite | 11 x 6 | contrast |
+| 8 The Close | Classic red on navy | 11 x 5.5 | the ballot, marked |
+
+Never the same colourway twice running and never the same trim twice running. A
+different size in the hand reads as a different piece before a word of it is.
+**Give each round its own colourway and trim** turns both off for anyone who
+wants to set them by hand.
+
+The address side stays the slate on all eight, and that is deliberate. That side
+is the identification, and the repetition there is the whole point: eight weeks
+of the same faces in the same order is how a voter matches eight names on a
+ballot.
+
+Colour alone will not carry eight weeks. The shape is what does, and there are
+three of them so far against six rounds of contrast. The rounds that should get
+their own shape next are the income tax (the roll call, type only, no
+photograph) and health care (an itemised bill with the prices blacked out).
+
+### Type size
+
+**Headline size** and **Body size** on the Design panel. Both are ceilings, not
+sizes: the engine fits everything to the space it has, and these move the height
+it is allowed to reach. A line still has to fit the width it is set in, so
+asking for bigger only gets bigger while there is room across. A bigger headline
+takes its room from the faces, and the floor the slate reserves moves with the
+dial, so the ask is honoured rather than swallowed by a reserve nobody can see.
+
 ### The contrast side
 
 A slate piece has two jobs and cannot do both well on one side. The six issue
