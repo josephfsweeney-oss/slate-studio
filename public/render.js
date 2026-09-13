@@ -1699,69 +1699,41 @@ const MARKS = {
 
 /* ---------------------------------------------------------------- the swoosh
  *
- * The arrow beside a comparison line. Not a shaft with a triangle on it: a
- * curved body that thickens into the head, with streaks trailing behind it, so
- * a bill going up looks like it is going up fast.
+ * The arrow beside a comparison line. Not a smooth curve and not a shaft with a
+ * triangle on it: a crooked diagonal, the shape a rate makes on a chart. It
+ * runs on the diagonal and kinks against itself on the way, with shorter
+ * crooked streaks trailing behind, so a bill going up looks like it is going up
+ * fast and not gliding there.
  *
  * Everything is worked in pixels rather than in a unit square, because a unit
- * square scaled to a wide box skews every normal in it and the body comes out
- * thicker on one side than the other.
+ * square scaled to a wide box skews every corner in it and one shoulder of the
+ * head comes out longer than the other.
  */
-const cubic = (p, t) => {
-  const u = 1 - t;
-  const a = u * u * u;
-  const b = 3 * u * u * t;
-  const c = 3 * u * t * t;
-  const d = t * t * t;
-  return [a * p[0][0] + b * p[1][0] + c * p[2][0] + d * p[3][0],
-          a * p[0][1] + b * p[1][1] + c * p[2][1] + d * p[3][1]];
-};
 
-const cubicTan = (p, t) => {
-  const u = 1 - t;
-  const a = 3 * u * u;
-  const b = 6 * u * t;
-  const c = 3 * t * t;
-  return [a * (p[1][0] - p[0][0]) + b * (p[2][0] - p[1][0]) + c * (p[3][0] - p[2][0]),
-          a * (p[1][1] - p[0][1]) + b * (p[2][1] - p[1][1]) + c * (p[3][1] - p[2][1])];
-};
-
-/** A tapered ribbon along a curve: thin at the tail, w1 across at the head. */
-function ribbon(ctx, p, w0, w1) {
-  const N = 26;
-  const left = [];
-  const right = [];
-  for (let i = 0; i <= N; i++) {
-    const t = i / N;
-    const [x, y] = cubic(p, t);
-    const [tx, ty] = cubicTan(p, t);
-    const len = Math.hypot(tx, ty) || 1;
-    const nx = -ty / len;
-    const ny = tx / len;
-    const w = (w0 + (w1 - w0) * (t * t)) / 2;
-    left.push([x + nx * w, y + ny * w]);
-    right.push([x - nx * w, y - ny * w]);
-  }
-  ctx.beginPath();
-  ctx.moveTo(left[0][0], left[0][1]);
-  for (const [x, y] of left.slice(1)) ctx.lineTo(x, y);
-  for (let i = right.length - 1; i >= 0; i--) ctx.lineTo(right[i][0], right[i][1]);
-  ctx.closePath();
-  ctx.fill();
-}
-
-/* The body, then three streaks behind it, in a unit box the caller scales. The
- * up arrow is the same drawing with the box turned over. */
+/* A diagonal that argues with itself: down and right, with two corrections on
+ * the way. The up arrow is the same drawing with the box turned over. */
 const SWOOSH = {
-  body: { p: [[0.00, 0.04], [0.34, 0.06], [0.42, 0.40], [0.62, 0.60]], w0: 0.03, w1: 0.20 },
-  head: { len: 0.34, half: 0.23, lap: 0.09 },
+  body: [[0.00, 0.04], [0.19, 0.21], [0.31, 0.12], [0.52, 0.39], [0.64, 0.30], [0.78, 0.56]],
+  weight: 0.115,
+  head: { half: 0.19, reach: 0.30 },
   streaks: [
-    { p: [[0.00, 0.20], [0.26, 0.23], [0.38, 0.46], [0.52, 0.58]], w0: 0.02, w1: 0.09 },
-    { p: [[0.03, 0.34], [0.24, 0.37], [0.34, 0.52], [0.44, 0.61]], w0: 0.02, w1: 0.07 },
-    { p: [[0.09, 0.47], [0.23, 0.49], [0.30, 0.57], [0.36, 0.63]], w0: 0.02, w1: 0.055 },
+    { p: [[0.00, 0.28], [0.16, 0.41], [0.27, 0.34], [0.45, 0.56]], w: 0.050 },
+    { p: [[0.05, 0.48], [0.17, 0.58], [0.26, 0.52], [0.38, 0.67]], w: 0.038 },
   ],
-  flecks: [[0.00, 0.44, 0.055], [0.04, 0.58, 0.042]],
+  flecks: [[0.00, 0.50, 0.09], [0.06, 0.70, 0.07]],
 };
+
+/** A crooked line with square corners. Stroked, so every corner stays sharp. */
+function crooked(ctx, pts, w) {
+  ctx.lineWidth = w;
+  ctx.lineJoin = 'miter';
+  ctx.lineCap = 'butt';
+  ctx.miterLimit = 9;
+  ctx.beginPath();
+  ctx.moveTo(pts[0][0], pts[0][1]);
+  for (const [x, y] of pts.slice(1)) ctx.lineTo(x, y);
+  ctx.stroke();
+}
 
 /** Draw the swoosh inside a box. up turns the whole drawing over. */
 function swoosh(ctx, r, up, colour) {
@@ -1770,40 +1742,46 @@ function swoosh(ctx, r, up, colour) {
   const px = (pts) => pts.map(([x, y]) => [X(x), Y(y)]);
   const S = Math.min(r.w, r.h);
 
+  ctx.save();
   ctx.fillStyle = colour;
-  for (const st of SWOOSH.streaks) ribbon(ctx, px(st.p), st.w0 * S, st.w1 * S);
-  for (const [fx, fy, fw] of SWOOSH.flecks) {
-    const w = fw * S;
-    ctx.beginPath();
-    ctx.ellipse(X(fx) + w, Y(fy), w, w * 0.22, up ? -0.5 : 0.5, 0, Math.PI * 2);
-    ctx.fill();
+  ctx.strokeStyle = colour;
+
+  for (const st of SWOOSH.streaks) crooked(ctx, px(st.p), st.w * S);
+  for (const [fx, fy, fl] of SWOOSH.flecks) {
+    const len = fl * S;
+    const x0 = X(fx);
+    const y0 = Y(fy);
+    crooked(ctx, [[x0, y0], [x0 + len, y0 + (up ? -len : len) * 0.55]], 0.030 * S);
   }
 
-  const body = px(SWOOSH.body.p);
-  ribbon(ctx, body, SWOOSH.body.w0 * S, SWOOSH.body.w1 * S);
+  const body = px(SWOOSH.body);
+  crooked(ctx, body, SWOOSH.weight * S);
 
-  // The head, squared off across the end of the body and pointing where it goes.
-  const [hx, hy] = body[3];
-  const [tx, ty] = cubicTan(body, 1);
-  const len = Math.hypot(tx, ty) || 1;
-  const ux = tx / len;
-  const uy = ty / len;
+  /* The head, squared across the end of the last segment and pointing the way
+   * that segment was already going. */
+  const a = body[body.length - 2];
+  const b = body[body.length - 1];
+  const dx = b[0] - a[0];
+  const dy = b[1] - a[1];
+  const len = Math.hypot(dx, dy) || 1;
+  const ux = dx / len;
+  const uy = dy / len;
   const nx = -uy;
   const ny = ux;
   const half = SWOOSH.head.half * S;
-  const reach = SWOOSH.head.len * S;
-  /* The base sits back along the curve so it overlaps the body it grows out of.
-   * Squared off exactly at the end, the head is wider than the body there and
-   * the join prints as a step on one shoulder. */
-  const back = SWOOSH.head.lap * S;
-  const bx = hx - ux * back;
-  const by = hy - uy * back;
+  const reach = SWOOSH.head.reach * S;
+  // Back along the segment, so the head grows out of the line rather than
+  // sitting on the end of it with a step where the two widths meet.
+  const lap = SWOOSH.weight * S * 0.9;
+  const bx = b[0] - ux * lap;
+  const by = b[1] - uy * lap;
   ctx.beginPath();
   ctx.moveTo(bx + nx * half, by + ny * half);
   ctx.lineTo(bx - nx * half, by - ny * half);
-  ctx.lineTo(bx + ux * (reach + back), by + uy * (reach + back));
+  ctx.lineTo(bx + ux * (reach + lap), by + uy * (reach + lap));
   ctx.closePath();
   ctx.fill();
+  ctx.restore();
 }
 
 /* The message side of an issue round, with nobody's face on it. Dark on
