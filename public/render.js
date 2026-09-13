@@ -1557,9 +1557,23 @@ function paintSlateBand(ctx, plan, style, theme, assets, bleed = 0) {
     ctx.textAlign = 'center';
     ctx.fillStyle = BRAND.white;
     for (const f of b.figures) {
-      setFont(ctx, { family: 'Barlow Condensed', weight: 700 }, f.name.px, 0.03);
-      ctx.fillText(f.name.text.toUpperCase(),
-        f.nameBox.x + f.nameBox.w / 2, f.nameBox.y + (f.nameBox.h + f.name.px * 0.72) / 2);
+      const cx = f.nameBox.x + f.nameBox.w / 2;
+      const COND = { family: 'Barlow Condensed', weight: 700 };
+      if (f.name.first) {
+        /* The first name small, the surname large under it. The surname is what
+         * a voter matches against a ballot, so it gets the size. */
+        const stack = f.name.firstPx * 1.20 + f.name.px;
+        const top = f.nameBox.y + (f.nameBox.h - stack) / 2;
+        setFont(ctx, COND, f.name.firstPx, 0.08);
+        ctx.fillText(f.name.first.toUpperCase(), cx, top + f.name.firstPx * 0.80);
+        setFont(ctx, COND, f.name.px, 0.03);
+        ctx.fillText(f.name.text.toUpperCase(), cx,
+          top + f.name.firstPx * 1.20 + f.name.px * 0.78);
+      } else {
+        setFont(ctx, COND, f.name.px, 0.03);
+        ctx.fillText(f.name.text.toUpperCase(), cx,
+          f.nameBox.y + (f.nameBox.h + f.name.px * 0.72) / 2);
+      }
     }
   }
 
@@ -1893,12 +1907,10 @@ function paintGuarantee(ctx, plan, style, theme, bleed = 0) {
   }
 
   // The lockup: the first word in the accent, the second in the plate colour.
-  let ty = g.titleTop;
   for (const t of g.title) {
     setFont(ctx, ANTON_F, t.px, -0.012);
     ctx.fillStyle = t.accent ? mark : ink;
-    ctx.fillText(t.text, g.cx, ty + t.px * 0.76);
-    ty += t.px * 0.82;
+    ctx.fillText(t.text, g.cx, t.y + t.px * 0.76);
   }
 
   // The divider: a rule either side of the state.

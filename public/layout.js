@@ -1889,12 +1889,18 @@ function solveSlateBand(spec, measure, side) {
   const solveRows = (zoneTop, zoneBottom, mode) => {
     const first = layoutRows(nominalBandH, zoneTop, zoneBottom, mode);
     const cellW = first.cellW || strip.w;
-    const wide = (t, px) => widthAt(measure, t, COND_BOLD, px, 0.03) <= cellW * 0.94;
+    const wide = (t, px) => widthAt(measure, t, COND_BOLD, px, 0.03) <= cellW * 0.96;
     const fullNames = slate.map((c) => `${firstLine(c, style)} ${c.last}`.trim());
     const shortNames = slate.map((c) => String(c.last || '').trim());
-    const startPx = Math.min(box.h * (n <= 2 ? 0.042 : 0.028) * textScale,
-      cellW * 0.155) * density;
-    const floorPx = startPx * 0.62;
+    /* The name is the only thing on this piece a voter has to find again on a
+     * ballot, so it is set as large as the cell will carry. */
+    const startPx = Math.min(box.h * (n <= 2 ? 0.054 : n <= 4 ? 0.042 : 0.036) * textScale,
+      cellW * 0.195) * density;
+    /* The floor holds where it was. Raising the start without holding the floor
+     * would drop first names on the long slates, and the first name is on the
+     * ballot too. */
+    const floorPx = Math.min(startPx * 0.90,
+      box.h * (n <= 2 ? 0.026 : 0.0174) * textScale * density);
     let bandPx = startPx;
     let texts = fullNames;
     let guard = 0;
@@ -1904,13 +1910,46 @@ function solveSlateBand(spec, measure, side) {
       bandPx *= 0.95;
     }
     const dropped = texts !== fullNames;
+
+    /* On a long slate the cell is narrow and the longest full name on it sets
+     * the size for everybody, so one Vandecasteele holds seven other names down
+     * to nothing. The surname is what a voter reads off a ballot, so where it
+     * buys a materially bigger surname the name is stacked: the first name
+     * small on its own line, the last name large under it. */
+    /* A gutter either side, which a single line does not need: two names set
+     * large on neighbouring cells run into one another long before either of
+     * them runs out of its own cell. */
+    const fitsStacked = (t, px) => widthAt(measure, t, COND_BOLD, px, 0.03) <= cellW * 0.90;
+    const shrinkTo = (arr, cap) => {
+      let px = cap; let g = 0;
+      while (px > 1 && !arr.every((t) => fitsStacked(t, px)) && g++ < 60) px *= 0.95;
+      return px;
+    };
+    const firsts = slate.map((c) => firstLine(c, style).trim());
+    const lastCap = Math.min(box.h * (n <= 2 ? 0.064 : n <= 4 ? 0.052 : 0.046) * textScale,
+      cellW * 0.30) * density;
+    const lastPx = shrinkTo(shortNames, lastCap);
+    const firstPx = shrinkTo(firsts, lastPx * 0.58);
+    const stackLine = firstPx * 1.20 + lastPx * 1.06;
+    const zoneH = Math.max(1, zoneBottom - zoneTop);
+    /* Only when the surname gains by a fifth, the first name is still readable
+     * rather than a smear, and the deeper band leaves the faces most of the
+     * room they had. */
+    const stacked = firsts.every(Boolean)
+      && lastPx >= bandPx * 1.22
+      && firstPx >= lastPx * 0.34
+      && stackLine * rowCount + lastPx <= zoneH * 0.42;
+
     /* One band under the whole group, deep enough to hold a line of names for
      * each row of faces. Two bands, one per row, cut a montage in half and read
      * as two slates. */
-    const lineH = bandPx * 1.30;
-    const bandH = n ? lineH * rowCount + bandPx : 0;
+    const lineH = stacked ? stackLine : bandPx * 1.30;
+    const bandH = n ? lineH * rowCount + (stacked ? lastPx * 0.6 : bandPx) : 0;
     return { laid: layoutRows(bandH, zoneTop, zoneBottom, mode),
-             bandH, bandPx, lineH, texts, dropped };
+             bandH, bandPx: stacked ? lastPx : bandPx, lineH,
+             texts: stacked ? shortNames : texts,
+             firsts: stacked ? firsts : null, firstPx: stacked ? firstPx : 0,
+             dropped: stacked ? false : dropped };
   };
 
   /* ------------------------------------------------------------- the shape
@@ -2019,7 +2058,7 @@ function solveSlateBand(spec, measure, side) {
      * programme is a written guarantee and the piece that opens it has to say
      * what is in it: a promise nobody can read is not a promise. Message side
      * only, where there is a full column to set it in. */
-    const listIn = !panel && Array.isArray(copy.list)
+    const listIn = Array.isArray(copy.list)
       ? copy.list.map((t) => String(t || '').trim()).filter(Boolean) : [];
     let list = null;
     let listH = 0;
@@ -2056,7 +2095,7 @@ function solveSlateBand(spec, measure, side) {
       const faceFloorRow = box.h * (list ? 0.24
         : rowCount > 1 ? 0.20 : (n <= 4 ? 0.36 : 0.26)) / Math.max(1, headScale);
       let room = panel
-        ? wordsBox.h - subHt - seatH - ctaH
+        ? wordsBox.h - subHt - listH - seatH - ctaH
         : Math.max(box.h * 0.10,
           inner.h - ctaH - seatH - subHt - listH - (faceFloorRow + nominalBandH) * rowCount);
       /* With no room left for a headline the line under it is the thing that
@@ -2065,7 +2104,7 @@ function solveSlateBand(spec, measure, side) {
       if (panel && room < box.h * 0.062 && subBlk.lines.length) {
         subBlk = EMPTY_SUB;
         subHt = 0;
-        room = wordsBox.h - seatH - ctaH;
+        room = wordsBox.h - listH - seatH - ctaH;
       }
       /* fitHead measures the type; the rule under it, the block padding and the
        * gap are chrome the block carries as well. Room has to come off for
@@ -2108,7 +2147,7 @@ function solveSlateBand(spec, measure, side) {
     checklist = pass.list; checklistH = pass.listH;
   }
 
-  const { laid, bandH, bandPx, lineH, texts, dropped } = rowsOut;
+  const { laid, bandH, bandPx, lineH, texts, dropped, firsts, firstPx } = rowsOut;
 
   /* ------------------------------------------------------- what is left over */
 
@@ -2119,6 +2158,9 @@ function solveSlateBand(spec, measure, side) {
   const footBleed = !panel && laid.rows.length;
   const lastRow = laid.rows.length ? laid.rows[laid.rows.length - 1] : null;
   const lastBandH = footBleed ? Math.max(bandH, h - laid.bandY) : bandH;
+  /* The lead over the stacked name is smaller than the one over a single line,
+   * because the pair is already deep. */
+  const lastPad = firsts ? firstPx * 0.5 : bandPx * 0.5;
 
   const asideX = laid.right + gutter;
   const asideW = strip.x + strip.w - asideX;
@@ -2193,9 +2235,10 @@ function solveSlateBand(spec, measure, side) {
          * whole: on Rockingham 25 one shoulder covered the man beside him. */
         maxW: Math.min(r.cellW * (r.spread && r.rn >= 7 ? 1.62 : 1.32), r.h * 0.92),
         clipH: r.clipH,
-        name: { text: texts[k], px: bandPx, dropped },
+        name: { text: texts[k], px: bandPx, dropped,
+                first: firsts ? firsts[k] : '', firstPx },
         nameBox: { x, w: r.cellW, h: lineH,
-          y: laid.bandY + bandPx * 0.5 + ri * lineH },
+          y: laid.bandY + (firsts ? lastPad : bandPx * 0.5) + ri * lineH },
       });
     }
     rows.push({ y: r.y, h: r.h,
@@ -2217,6 +2260,11 @@ function solveSlateBand(spec, measure, side) {
     ? listTop + checklistH : wordsBox.y + wordsBox.h - ctaH - seatH + box.h * 0.008;
   const ctaY = overFaces
     ? listTop + checklistH + seatH : wordsBox.y + wordsBox.h - ctaH;
+  /* In the carrier's corner the list has the room between the words and the
+   * call to action, and it is centred in what is left rather than jammed under
+   * the headline with a hole beneath it. */
+  const listY = overFaces ? listTop
+    : listTop + Math.max(0, (seatY - listTop - checklistH) / 2);
   const wordsCx = wordsBox.x + wordsBox.w / 2;
 
   const dpi = spec.dpi || 0;
@@ -2246,7 +2294,7 @@ function solveSlateBand(spec, measure, side) {
             ruleY: wordTop + head.h + blockPad * 2 + box.h * 0.014 }
         : null,
       sub: sub.lines.length ? { block: sub, y: subTop } : null,
-      list: checklist ? { ...checklist, x: wordsBox.x, y: listTop } : null,
+      list: checklist ? { ...checklist, x: wordsBox.x, y: listY } : null,
       figures,
       rows,
       aside,
@@ -2508,18 +2556,27 @@ function solveGuarantee(spec, measure) {
   const divH = s * 0.070;
   const kickH = kick ? kick.px * 2.3 : 0;
   const LINE = 0.82;
+  /* Two words in the same face, each set to the same width, read as one block,
+   * and at a line advance of 0.82 the feet of the first word sat on the caps of
+   * the second. GRANITE and GUARANTEE also start with the same letter and run to
+   * nearly the same length, so there was nothing to tell them apart. A gap
+   * between the words is what separates them. */
+  const WORD_GAP = 0.30;
+  const gapOf = (px) => (title.length > 1 ? px * WORD_GAP : 0);
 
   /* Set to the width, then held to the height. A word set to the full width of
    * a landscape panel is taller than the panel, and two of them stacked came
    * out on top of each other and off both ends. The width gives the size; the
    * height is what decides whether the lockup can have it. */
   const room = Math.max(1, barTop - inner.y - kickH - divH);
-  const wanted = title.reduce((a, t) => a + t.px * LINE, 0);
+  const small = title.length ? Math.min(...title.map((t) => t.px)) : 0;
+  const wanted = title.reduce((a, t) => a + t.px * LINE, 0) + gapOf(small);
   const shrink = Math.min(1, wanted > 0 ? room / wanted : 1);
   const cap = box.h * 0.40 * density * headScale;
   for (const t of title) t.px = Math.min(t.px * shrink, cap);
 
-  const titleH = title.reduce((a, t) => a + t.px * LINE, 0);
+  const gapH = gapOf(title.length ? Math.min(...title.map((t) => t.px)) : 0);
+  const titleH = title.reduce((a, t) => a + t.px * LINE, 0) + gapH;
   const stackH = kickH + titleH + divH;
   const top = inner.y + Math.max(0, (barTop - inner.y - stackH) / 2);
 
@@ -2527,6 +2584,13 @@ function solveGuarantee(spec, measure) {
   const kickAt = kick ? { ...kick, y } : null;
   y += kickH;
   const titleTop = y;
+  /* The painter reads the line off the word rather than counting its own
+   * advance, so the gap lives in one place. */
+  let wy = titleTop;
+  title.forEach((t, i) => {
+    t.y = wy;
+    wy += t.px * LINE + (i === 0 ? gapH : 0);
+  });
   y += titleH;
   const divider = { y: y + divH * 0.45, markW: s * 0.030,
     gap: s * 0.022, w: inner.w * 0.62, cx: inner.x + inner.w / 2 };

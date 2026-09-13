@@ -860,6 +860,48 @@ test('a dark palette turns the type white, on cards as well as on pages', async 
   assert.equal(cardStock({ ...dark, bgType: 'transparent' }), '#FFFFFF');
 });
 
+/* The name is the one thing on the piece a voter has to find again on a ballot,
+ * so the band is set as large as the cell will carry. The check is that it
+ * fills the cell it is in, not that it hits some number: a slate of eight has a
+ * narrower cell than a slate of two and a smaller name is the right answer
+ * there. What is wrong is a name sitting in the middle of a cell with room on
+ * both sides of it. */
+test('the names are set as large as their cell carries', () => {
+  const CONDW = 43 / 100;   // the stand-in measure, per px, for Barlow Condensed
+  const piece = MAIL_PROGRAMS[0].pieces.find((x) => x.id === 'close');
+  for (const id of ['mail6', 'mail11']) {
+    const c = CANVASES.find((x) => x.id === id);
+    for (const n of [1, 2, 3, 4, 6, 8]) {
+      const list = slate(n);
+      const copy = { ...SIDE_COMMON, ...piece.front };
+      const p = solve({ canvas: { w: c.w, h: c.h }, dpi: c.dpi, slate: list, copy,
+        style: sideStyle(piece, 'front') }, measure);
+      const b = p.band;
+      const where = `${id} n=${n}`;
+      assert.ok(b && b.figures.length === n, `${where} did not solve as a band`);
+
+      const cellW = p.grid.tileW;
+      const px = b.figures[0].name.px;
+      assert.ok(px > 0, `${where} sized the names to nothing`);
+      for (const f of b.figures) {
+        assert.equal(f.name.px, px, `${where} sets the names at two different sizes`);
+      }
+
+      /* Nothing runs out of its cell. */
+      const widest = Math.max(...b.figures.map((f) => f.name.text.length)) * CONDW * px;
+      assert.ok(widest <= cellW + 1,
+        `${where}: a name is ${(widest - cellW).toFixed(0)}px wider than its cell`);
+
+      /* And the band is not left small in a cell that had room. Either the name
+       * fills the cell, or it stopped at the height ceiling for the slate. */
+      const ceiling = c.h * (n <= 2 ? 0.054 : n <= 4 ? 0.042 : 0.036);
+      assert.ok(widest >= cellW * 0.78 || px >= ceiling * 0.98,
+        `${where}: the names fill ${(widest / cellW * 100).toFixed(0)}% of the cell `
+        + `at ${px.toFixed(0)}px, with a ${ceiling.toFixed(0)}px ceiling unused`);
+    }
+  }
+});
+
 /* ------------------------------------------------------------ the mail band */
 
 test('every mail side puts the slate, a headline and a call to action on the piece', () => {
@@ -892,7 +934,7 @@ test('every mail side puts the slate, a headline and a call to action on the pie
         assert.ok(b.head, `${where} has no headline`);
         assert.ok(b.cta, `${where} has no call to action`);
         assert.equal(p.disclaimer, null, `${where} printed a disclaimer the print shop sets`);
-        assert.match(b.cta.block.lines[0], /NOVEMBER 3/, `${where} does not say when to vote`);
+        assert.match(b.cta.block.lines[0], /NOV\.? ?3/, `${where} does not say when to vote`);
 
         // Nothing lands on anything else, on either shape.
         assert.ok(b.head.y >= 0, `${where} headline off the top`);
@@ -900,8 +942,11 @@ test('every mail side puts the slate, a headline and a call to action on the pie
           assert.ok(row.y + row.h <= b.bandRect.y + 1, `${where} faces run past the band`);
         }
         const wordsBottom = b.sub ? b.sub.y + b.sub.block.h : b.head.y + b.head.block.h;
-        assert.ok(wordsBottom <= b.seat.y + 1, `${where} the copy lands on the district line`);
-        assert.ok(b.cta.y >= b.seat.y, `${where} call to action above the district line`);
+        assert.ok(wordsBottom <= b.cta.y + 1, `${where} the copy lands on the call to action`);
+        if (b.seat) {
+          assert.ok(wordsBottom <= b.seat.y + 1, `${where} the copy lands on the district line`);
+          assert.ok(b.cta.y >= b.seat.y, `${where} call to action above the district line`);
+        }
         assert.ok(b.cta.y + b.cta.h <= c.h, `${where} call to action off the foot`);
 
         if (side === 'front' && b.shape === 'beside') {
@@ -923,8 +968,10 @@ test('every mail side puts the slate, a headline and a call to action on the pie
           // Nothing on this side is lower than the candidates.
           const bottom = b.bandRect.y + b.bandRect.h;
           assert.ok(b.cta.y + b.cta.h <= bottom + 1, `${where} the call to action is below the slate`);
-          assert.ok(b.seat.y + b.seat.block.h <= bottom + 1,
-            `${where} the district line is below the slate`);
+          if (b.seat) {
+            assert.ok(b.seat.y + b.seat.block.h <= bottom + 1,
+              `${where} the district line is below the slate`);
+          }
         }
         if (side === 'back') {
           // An L: the slate takes the width above the carrier's line and the
@@ -947,8 +994,10 @@ test('every mail side puts the slate, a headline and a call to action on the pie
           for (const f of b.figures) clear(f.slot, 'a face');
           clear(b.bandRect, 'the name band');
           clear({ x: b.cta.x, y: b.cta.y, w: b.cta.w, h: b.cta.h }, 'the call to action');
-          clear({ x: 0, y: b.seat.y, w: b.seat.block.w + b.cta.x * 2, h: b.seat.block.h },
-            'the district line');
+          if (b.seat) {
+            clear({ x: 0, y: b.seat.y, w: b.seat.block.w + b.cta.x * 2, h: b.seat.block.h },
+              'the district line');
+          }
           // The band and the faces earn the full width by staying above the line.
           assert.ok(b.bandRect.y + b.bandRect.h <= m.y + 1,
             `${where} the name band crosses the carrier line`);
@@ -1059,8 +1108,16 @@ test('the lockup is set to the width and held to the height', () => {
     assert.ok(g.title[0].accent && !g.title[1].accent,
       `${where}: the first word carries the accent and the second does not`);
 
+    /* The two words are told apart by the space between them. Set solid, with
+     * the same face at the same width, GRANITE and GUARANTEE ran together. */
+    assert.equal(g.title[0].y, g.titleTop, `${where}: the first word left the top`);
+    const gap = g.title[1].y - (g.title[0].y + g.title[0].px * 0.82);
+    assert.ok(gap >= Math.min(g.title[0].px, g.title[1].px) * 0.20,
+      `${where}: only ${gap.toFixed(0)}px between the two words of the lockup`);
+
     // It fits between the masthead and the bar, and inside the frame.
-    const bottom = g.titleTop + g.title.reduce((a, t) => a + t.px * 0.82, 0);
+    const last = g.title[g.title.length - 1];
+    const bottom = last.y + last.px * 0.82;
     const floor = g.bar ? g.bar.y : g.frame.y + g.frame.h;
     assert.ok(bottom <= floor + 1,
       `${where}: the lockup runs ${(bottom - floor).toFixed(0)}px past the bar`);
@@ -1081,7 +1138,9 @@ test('the size dials move the ceiling, and the width still wins', () => {
    * address side uses and drops the carrier's panel. */
   const piece = MAIL_PROGRAMS[0].pieces.find((x) => x.id === 'contract');
   const list = slate(4);
-  const copy = { ...SIDE_COMMON, ...piece.back };
+  /* With a district line on it, so there is a body block to watch as well as a
+   * headline. The programme itself does not carry one any more. */
+  const copy = { ...SIDE_COMMON, ...piece.back, list: null, footer: 'Belknap District 5' };
   const at = (style) => solve({ canvas: { w: c.w, h: c.h }, dpi: c.dpi, slate: list, copy,
     style: { composition: 'promise', mailPanel: 'none', ...style } }, measure);
 
@@ -1238,7 +1297,7 @@ test('the issue rounds argue on one side and carry the team on the other', () =>
       // It says something, it cites it, and it says when to vote.
       assert.ok(b.head, `${where} has no headline`);
       assert.ok(b.cta, `${where} has no call to action`);
-      assert.match(b.cta.block.lines[0], /NOVEMBER 3/, `${where} does not say when to vote`);
+      assert.match(b.cta.block.lines[0], /NOV\.? ?3/, `${where} does not say when to vote`);
       assert.equal(p.disclaimer, null, `${where} printed a disclaimer the print shop sets`);
 
       // The mark is one the painter can actually draw.
