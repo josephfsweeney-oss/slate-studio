@@ -256,7 +256,7 @@ function idealTile(n, s) {
 
 export const COMPOSITIONS = ['stack', 'banner', 'split', 'slateOnly', 'palmcard',
   'palmback', 'ballot', 'spotlight', 'versus', 'strip', 'stat', 'receipt', 'typeled',
-  'promise', 'proof', 'poster', 'contrast'];
+  'promise', 'proof', 'poster', 'contrast', 'guarantee'];
 
 /* The palm card is a designed template rather than a solved one: a fixed stack
  * of bands, in a fixed order, the way a rack card is read top to bottom. The
@@ -2428,6 +2428,125 @@ function solveContrast(spec, measure) {
 /** The drawings the contrast side can carry. The painter holds the geometry. */
 export const CONTRAST_MARKS = ['form', 'meter', 'sold', 'stairs', 'door', 'redacted'];
 
+/* --------------------------------------------------------------- the poster
+ *
+ * The guarantee itself, laid out the way the committee's own artwork lays it
+ * out: the lockup, then the seven promises numbered down the page, then the
+ * line that names what they are. Nobody's face on it.
+ *
+ * The committee's version is a portrait poster. A mail panel is landscape, so
+ * the lockup takes the left and the promises take the right rather than the
+ * whole thing being letterboxed into a strip with two feet of white either
+ * side.
+ */
+function solveGuarantee(spec, measure) {
+  const { w, h } = spec.canvas;
+  const style = spec.style || {};
+  const copy = spec.copy || {};
+  const density = style.density ?? 1;
+  const box = { x: 0, y: 0, w, h };
+  const s = Math.min(w, h);
+  const textScale = clampScale(style.textScale);
+  const headScale = clampScale(style.headScale);
+
+  const pad = w * 0.034 * density;
+  const inner = { x: pad, y: pad * 1.2, w: w - pad * 2, h: h - pad * 2.4 };
+
+  /** The size that makes a line exactly this wide. */
+  const fillWidth = (text, font, width, ls) => {
+    const at100 = widthAt(measure, String(text || '').toUpperCase(), font, 100, ls);
+    return at100 > 0 ? (width / at100) * 100 : 0;
+  };
+
+  /* The bar at the foot, first: it is the line that names the thing and it
+   * never gives up its height. */
+  const barText = String(copy.footer || '').trim();
+  const barPx = Math.min(box.h * 0.070 * density * textScale,
+    fillWidth(barText, ANTON, inner.w * 0.86, 0.02));
+  const bar = barText
+    ? { h: barPx * 1.72, px: barPx, text: barText.toUpperCase() } : { h: 0, px: 0, text: '' };
+  const barTop = h - bar.h;
+
+  const gutter = inner.w * 0.045;
+  const leftW = inner.w * 0.38;
+  const rightX = inner.x + leftW + gutter;
+  const rightW = inner.x + inner.w - rightX;
+
+  /* -------------------------------------------------------------- the lockup */
+
+  const kickText = String(copy.kicker || '').trim();
+  const kickPx = Math.min(box.h * 0.034 * density * textScale,
+    fillWidth(kickText, COND_BOLD, leftW * 0.96, 0.20));
+  const kick = kickText
+    ? { px: kickPx, ls: 0.20, text: kickText.toUpperCase() } : null;
+
+  /* Two words, each set to the full width of the column, which is what makes
+   * them a lockup rather than two headlines that happen to be stacked. */
+  const words = String(copy.headline || '').split(/\n|\s+/).filter(Boolean).slice(0, 2);
+  const title = words.map((t, i) => ({
+    text: t.toUpperCase(),
+    px: Math.min(fillWidth(t, ANTON, leftW, -0.015), box.h * 0.30 * density * headScale),
+    accent: i === 0,
+  }));
+  const titleH = title.reduce((a, t) => a + t.px * 0.80, 0);
+  const kickH = kick ? kick.px * 2.2 : 0;
+  const lockH = kickH + titleH;
+  const lockTop = inner.y + Math.max(0, (barTop - inner.y - lockH) / 2);
+
+  /* ------------------------------------------------------------ the promises */
+
+  const items = (Array.isArray(copy.list) ? copy.list : [])
+    .map((t) => String(t || '').trim()).filter(Boolean).slice(0, 12);
+  const listTop = inner.y;
+  const listH = Math.max(1, barTop - inner.y - box.h * 0.02);
+  const rowH = items.length ? listH / items.length : 0;
+  const chip = rowH * 0.74;
+  const gap = chip * 0.42;
+  const tw = Math.max(1, rightW - chip - gap);
+  const rowPx = items.length
+    ? Math.min(box.h * 0.062 * density * textScale, rowH * 0.50,
+      Math.min(...items.map((t) => fillWidth(t, ANTON, tw, -0.005)))) : 0;
+  const numPx = chip * 0.62;
+  const rows = items.map((t, i) => ({
+    n: String(i + 1),
+    text: t.toUpperCase(),
+    y: listTop + i * rowH,
+    h: rowH,
+    chip: { x: rightX, y: listTop + i * rowH + (rowH - chip) / 2, w: chip, h: chip },
+    textX: rightX + chip + gap,
+  }));
+
+  const dpi = spec.dpi || 0;
+  return {
+    canvas: { w, h },
+    composition: 'guarantee',
+    pad, gap: box.h * 0.02, s, scale: 1,
+    grid: { cols: 0, rows: items.length, tileW: 0, tileH: rowH },
+    slateRect: null,
+    tiles: [],
+    deck: null,
+    copy: null,
+    mailPanel: null,
+    qr: null,
+    guarantee: {
+      box, inner, left: { x: inner.x, w: leftW }, right: { x: rightX, w: rightW },
+      kick: kick ? { ...kick, y: lockTop } : null,
+      title, titleTop: lockTop + kickH,
+      rows, rowPx, numPx,
+      rule: { x: inner.x, w: inner.w },
+      bar: bar.h ? { ...bar, y: barTop, x: 0, w } : null,
+    },
+    disclaimer: null,
+    warnings: [
+      ...(!items.length ? ['The guarantee has no promises on it.'] : []),
+      ...(items.length > 8
+        ? [`${items.length} promises on one panel leaves each line about `
+          + `${(rowPx / (dpi || 300)).toFixed(2)} inches tall.`] : []),
+      ...(!barText ? ['No line at the foot naming what these are.'] : []),
+    ],
+  };
+}
+
 function solvePromise(spec, measure) { return solveSlateBand(spec, measure, 'front'); }
 function solveProof(spec, measure) { return solveSlateBand(spec, measure, 'back'); }
 
@@ -2654,6 +2773,7 @@ function solveAll(spec, measure) {
   if (comp === 'proof') return solveProof(spec, measure);
   if (comp === 'poster') return solvePoster(spec, measure);
   if (comp === 'contrast') return solveContrast(spec, measure);
+  if (comp === 'guarantee') return solveGuarantee(spec, measure);
   if (!hasCopy) comp = 'slateOnly';
 
   // Reserve the disclaimer strip first. It is required on a finished ad under

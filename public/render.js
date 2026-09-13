@@ -1818,6 +1818,83 @@ function swoosh(ctx, r, up, colour) {
   ctx.restore();
 }
 
+/* The guarantee itself: the lockup on the left, the promises numbered down the
+ * right, and the line that names them across the foot. */
+function paintGuarantee(ctx, plan, style, theme, bleed = 0) {
+  const g = plan.guarantee;
+  const { w, h } = plan.canvas;
+  const B = bleed;
+  const accent = style.accent || BRAND.green;
+  const plate = style.plateColor || BRAND.navy;
+  const ground = cardStock(style);
+  const onDark = luminance(ground) <= 0.45;
+  const ink = onDark ? BRAND.white : plate;
+  const lift = readableOn(accent, ground, style.plateAccent, 4.5);
+  const mark = onDark ? lift : accent;
+  const ANTON_F = { family: 'Anton', weight: 400 };
+  const COND_BOLD_F = { family: 'Barlow Condensed', weight: 700 };
+
+  ctx.fillStyle = ground;
+  ctx.fillRect(-B, -B, w + B * 2, h + B * 2);
+
+  ctx.textBaseline = 'alphabetic';
+
+  /* The kicker, with a rule either side of it, which is the committee's own
+   * treatment and the thing that makes it read as a masthead. */
+  if (g.kick) {
+    const k = g.kick;
+    setFont(ctx, COND_BOLD_F, k.px, k.ls);
+    ctx.textAlign = 'left';
+    ctx.fillStyle = ink;
+    const tx = g.left.x;
+    ctx.fillText(k.text, tx, k.y + k.px);
+    ctx.fillStyle = mark;
+    ctx.fillRect(tx, k.y + k.px * 1.62, g.left.w * 0.30, Math.max(2, k.px * 0.11));
+  }
+
+  // The lockup: the first word in the accent, the second in the plate colour.
+  let ty = g.titleTop;
+  for (const t of g.title) {
+    setFont(ctx, ANTON_F, t.px, -0.015);
+    ctx.textAlign = 'left';
+    ctx.fillStyle = t.accent ? mark : ink;
+    ctx.fillText(t.text, g.left.x, ty + t.px * 0.74);
+    ty += t.px * 0.80;
+  }
+
+  /* The promises. A number in a solid square, the promise beside it, and a
+   * hairline under each one so the eye can run down them. */
+  for (const r of g.rows) {
+    ctx.fillStyle = mark;
+    ctx.fillRect(r.chip.x, r.chip.y, r.chip.w, r.chip.h);
+    ctx.fillStyle = onDark ? plate : BRAND.white;
+    setFont(ctx, ANTON_F, g.numPx, 0);
+    ctx.textAlign = 'center';
+    ctx.fillText(r.n, r.chip.x + r.chip.w / 2, r.chip.y + (r.chip.h + g.numPx * 0.72) / 2);
+
+    ctx.fillStyle = ink;
+    setFont(ctx, ANTON_F, g.rowPx, -0.005);
+    ctx.textAlign = 'left';
+    ctx.fillText(r.text, r.textX, r.y + (r.h + g.rowPx * 0.72) / 2);
+
+    ctx.fillStyle = onDark ? 'rgba(255,255,255,.18)' : 'rgba(18,49,78,.14)';
+    ctx.fillRect(r.chip.x, r.y + r.h - Math.max(1, h * 0.0016), g.right.w, Math.max(1, h * 0.0016));
+  }
+
+  // The line that names them, in a solid bar off both edges of the paper.
+  if (g.bar) {
+    ctx.fillStyle = plate;
+    ctx.fillRect(-B, g.bar.y, w + B * 2, g.bar.h + B);
+    ctx.fillStyle = mark;
+    ctx.fillRect(-B, g.bar.y, w + B * 2, Math.max(3, h * 0.006));
+    ctx.fillStyle = BRAND.white;
+    setFont(ctx, ANTON_F, g.bar.px, 0.02);
+    ctx.textAlign = 'center';
+    ctx.fillText(g.bar.text, w / 2, g.bar.y + (g.bar.h + g.bar.px * 0.74) / 2);
+  }
+  if ('letterSpacing' in ctx) ctx.letterSpacing = '0px';
+}
+
 /* The message side of an issue round, with nobody's face on it. Dark on
  * purpose: it must not look like the side with the people on it. */
 function paintContrast(ctx, plan, style, theme, assets, bleed = 0) {
@@ -2048,6 +2125,8 @@ export function paint(ctx, plan, style, assets = {}, copy = {}, bleed = 0) {
   } else if (plan.typeled) {
     for (const tile of plan.tiles) paintTile(ctx, tile, plan, style, assets, theme);
     paintTypeLed(ctx, plan, style, theme);
+  } else if (plan.guarantee) {
+    paintGuarantee(ctx, plan, style, theme, bleed);
   } else if (plan.contrast) {
     paintContrast(ctx, plan, style, theme, assets, bleed);
   } else if (plan.band) {

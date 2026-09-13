@@ -57,8 +57,25 @@ export const MAIL_PROGRAMS = [{
   note: 'Eight two-sided 11 x 6 mailers. An issue on each side, the slate on both.',
   pieces: [
     {
-      id: 'contract', art: 'contract', n: 1, label: 'The Contract',
+      id: 'contract', shape: 'guarantee', art: 'contract', n: 1, label: 'The Contract',
       palette: 'guarantee', canvas: 'mail6',
+      /* The guarantee as the committee publishes it, in the committee's own
+       * words and its own order. Seven promises, numbered, nobody's face on it.
+       * The address side carries the slate. */
+      guarantee: {
+        kicker: 'New Hampshire House Republicans',
+        headline: 'Granite Guarantee',
+        list: [
+          'Ban an income tax. Forever',
+          'Cap your property tax',
+          'Cut even more red tape',
+          'Lower energy bills',
+          'Lower health care costs',
+          'Parents decide',
+          'Support public safety',
+        ],
+        footer: 'Seven promises. In writing.',
+      },
       front: {
         headline: 'We Put It In Writing',
         /* The piece that opens the programme has to say what is in it. A
@@ -333,7 +350,7 @@ export const SHARED_BACK_ART = '/art/portsmouth.webp';
  * is the version to run when the drop is worth the plates. */
 export const SHARED_BACK = {
   headline: 'Seven Promises. In Writing.',
-  subhead: 'No income tax. A cap on your property tax. More homes. Lower bills.',
+  subhead: 'Ban an income tax. Cap your property tax. Cut the red tape. Lower the bills.',
 };
 
 export const MAIL_VARS = [

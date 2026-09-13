@@ -557,7 +557,7 @@ things change through the drop now.
 
 | Round | Colourway | Trim | Message side |
 |---|---|---|---|
-| 1 The Contract | Granite Guarantee | 11 x 6 | the guarantee, ticked |
+| 1 The Contract | Granite Guarantee | 11 x 6 | the guarantee, numbered |
 | 2 No Income Tax | Granite | 11 x 5.5 | contrast |
 | 3 Cap Your Property Tax | Classic red | 11 x 6 | contrast |
 | 4 Free Market Housing | Granite Guarantee | 11 x 5.5 | contrast |
@@ -657,12 +657,19 @@ side that attacks a record and does not cite it is a side you cannot defend.
 Where the record is not in the file the line prints empty and the app says so in
 the warnings, which is the point. Fill it before the drop.
 
-The round that opens the programme carries the guarantee itself: seven promises
-in two ticked columns under the headline, because a guarantee nobody can read is
-not a guarantee, and each of the other seven rounds argues one of those lines.
-`list` in a side's copy is what puts it there. Message side only: it needs a
-full column to be set in, and the address side has a carrier standing in a
-quarter of it.
+The round that opens the programme is the guarantee itself, laid out the way the
+committee publishes it: the lockup, the seven promises numbered down the page,
+and the line that names them across the foot. Nobody's face on that side. The
+committee's own version is a portrait poster, so the lockup takes the left and
+the promises take the right rather than the whole thing being letterboxed into a
+strip with two feet of white either side.
+
+The seven are the committee's words in the committee's order. Six of them have a
+round of their own in the drop. **Support public safety** does not, and that is
+worth knowing before the schedule is signed off.
+
+`list` also works on a band as a ticked checklist, which is what the opener used
+before the real artwork arrived.
 
 The candidates are the lowest thing on the piece. The district line and the call
 to action sit above them, and the name band runs off the bottom of the paper, so

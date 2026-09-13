@@ -1038,12 +1038,14 @@ test('eight drops do not arrive as one piece eight times', () => {
 
 test('the size dials move the ceiling, and the width still wins', () => {
   const c = CANVASES.find((x) => x.id === 'mail6');
-  // A round whose message side is a band, so there is a headline to move.
+  /* A band, so there is a headline and a row of faces to move. Every round's
+   * message side has a shape of its own now, so this asks for the band the
+   * address side uses and drops the carrier's panel. */
   const piece = MAIL_PROGRAMS[0].pieces.find((x) => x.id === 'contract');
   const list = slate(4);
-  const copy = { ...SIDE_COMMON, ...piece.front };
+  const copy = { ...SIDE_COMMON, ...piece.back };
   const at = (style) => solve({ canvas: { w: c.w, h: c.h }, dpi: c.dpi, slate: list, copy,
-    style: { ...sideStyle(piece, 'front', true), ...style } }, measure);
+    style: { composition: 'promise', mailPanel: 'none', ...style } }, measure);
 
   const base = at({});
   const big = at({ headScale: 1.6 });
@@ -1187,6 +1189,7 @@ test('the issue rounds argue on one side and carry the team on the other', () =>
       }
       if (!piece.contrast) { seen.slate++; assert.ok(p.band, `${where} is not a slate side`); continue; }
 
+
       seen.contrast++;
       const b = p.contrast;
       assert.ok(b, `${where} did not solve as a contrast side`);
@@ -1229,8 +1232,8 @@ test('the issue rounds argue on one side and carry the team on the other', () =>
     }
   }
   assert.equal(seen.contrast, 6, 'six issue rounds should argue');
-  assert.equal(seen.slate, 1, 'the opening round keeps the slate on both sides');
-  assert.equal(seen.shaped, 1, 'the closing round shows the ballot');
+  assert.equal(seen.slate, 0, 'every round now gives its message side a shape');
+  assert.equal(seen.shaped, 2, 'the guarantee opens the drop and the ballot closes it');
 });
 
 test('the slate takes the width it needs and the words take what is left', () => {
