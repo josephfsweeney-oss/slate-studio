@@ -1957,10 +1957,12 @@ function paintMaidment(ctx, plan, style, theme, assets, bleed = 0) {
     ctx.fillText(b.text, b.x + b.h * 0.31, b.y + (b.h + b.px * 0.74) / 2);
   }
 
-  // The ballot line.
+  /* The ballot line, in the sage. Sampled off the artwork it is #C3D3C6, not
+   * white: the names are the only white type on the piece, which is what keeps
+   * them the thing you read first. */
   if (m.vote) {
     setFont(ctx, COND_F, m.vote.px, m.vote.ls);
-    ctx.fillStyle = BRAND.white;
+    ctx.fillStyle = sage;
     ctx.fillText(m.vote.text, m.col.x, m.vote.y + m.vote.px);
   }
 

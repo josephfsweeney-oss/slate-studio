@@ -2685,10 +2685,19 @@ function solveMaidment(spec, measure) {
    * allowed a second line rather than shrunk until it fits on one: illegible
    * legal text is a liability, not a design. */
   const disc = String(copy.disclaimer || '').trim();
-  const discBlk = disc
+  /* One line first. fitBlock stops as soon as the text fits the lines it was
+   * allowed, so asking for two got two at the size it started from, and the
+   * committee's own piece carries this line across the foot in one. A second
+   * line is the fallback for a trim too narrow to hold it at a size anybody
+   * can read, not the default. */
+  const discOne = disc
+    ? fitBlock(measure, disc, COND_BOLD, s * 0.030 * textScale * density,
+      w * 0.94, 1, 0.01, false)
+    : { lines: [], px: 0, lh: 0, h: 0 };
+  const discBlk = disc && (discOne.truncated || discOne.px < s * 0.019)
     ? fitBlock(measure, disc, COND_BOLD, s * 0.030 * textScale * density,
       w * 0.94, 2, 0.01, false)
-    : { lines: [], px: 0, lh: 0, h: 0 };
+    : discOne;
   const discPx = discBlk.px;
   const discH = disc ? discBlk.h + discPx * 0.85 : 0;
 
@@ -2861,15 +2870,28 @@ function layMaidmentFaces(slate, rect, wide, n) {
   /* They stand as tall as the band and are cropped at the sides rather than
    * scaled down, so every head is the same size. A slate of eight overlaps
    * more than a slate of two, which is what keeps them one group. */
-  const lap = n <= 2 ? 0.06 : n <= 4 ? 0.10 : 0.16;
+  /* Four or fewer stand apart, the way the committee's own pieces do: three
+   * faces across a square each get their own third of it and the green shows
+   * between them. Overlap is what a long slate needs to stay one group, not a
+   * look the design wants. */
+  const lap = n <= 4 ? 0 : n <= 6 ? 0.09 : 0.17;
   const cellW = rect.w / (n - (n - 1) * lap);
   const step = cellW * (1 - lap);
-  /* Held to the cell as well as to the band. A portrait scaled to the height
-   * of a tall band and then clipped to a narrow cell is a vertical strip of
-   * somebody's cheek, which is what eight of them on a link card came out as.
-   * Standing on the foot of the band is what keeps them a row of people. */
-  const figH = Math.min(rect.h, cellW * 2.4);
-  const top = rect.y + rect.h - figH;
+  /* Taller than the band, and cropped by the trim.
+   *
+   * Scaled to fit the band, a portrait framed at the waist puts a small head in
+   * the middle of the piece; the committee's own artwork crops the shoulders at
+   * the foot and the heads are half again the size. So the figure is set taller
+   * than the band it stands in and the bottom of it runs off the paper, which
+   * is what the reference does and what these portraits need: they are not all
+   * cropped the same way, and the ones framed loosest gain the most.
+   *
+   * Still held to the cell. A portrait scaled to a tall band and then clipped
+   * to a narrow cell is a vertical strip of somebody's cheek, which is what
+   * eight of them on a link card came out as. */
+  const OVERFLOW = 1.34;
+  const figH = Math.min(rect.h * OVERFLOW, cellW * 2.4);
+  const top = rect.y + Math.max(0, rect.h - figH);
   const list = slate.map((c, i) => ({
     candidate: c,
     slot: { x: rect.x + i * step, y: top, w: cellW, h: figH },

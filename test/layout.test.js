@@ -1169,7 +1169,19 @@ test('MaidmentGPT holds every line inside its column, at any slate size', () => 
 
       // The slate stands on the foot of the piece and inside its sides.
       for (const f of m.figures) {
-        assert.ok(f.slot.y + f.slot.h <= c.h + 1, `${where}: a face hangs past the foot`);
+        /* The slate is cropped by the trim, not fitted above it: the committee's
+         * own artwork cuts the shoulders at the foot, which is what makes the
+         * heads the size they are. So a figure may run past the bottom. What it
+         * may not do is start above the piece or leave the head off it. */
+        assert.ok(f.slot.y >= -1, `${where}: a face starts off the top`);
+        assert.ok(f.slot.y + f.slot.h >= c.h - 1,
+          `${where}: a face stops ${(c.h - f.slot.y - f.slot.h).toFixed(0)}px short of the foot`);
+        /* And enough of the piece is slate to read as one. Eight on a story
+         * is the tightest this gets: the cell is narrow, so the figures are
+         * short, and they still hold a sixth of the piece. */
+        assert.ok(c.h - f.slot.y >= c.h * 0.16,
+          `${where}: the slate holds ${((c.h - f.slot.y) / c.h * 100).toFixed(0)}% of the`
+          + ' piece, which is a sliver, not a row of people');
         assert.ok(f.slot.x >= -1 && f.slot.x + f.slot.w <= c.w + 1,
           `${where}: a face is off the side`);
         assert.ok(f.slot.h <= f.slot.w * 2.45,
@@ -1182,6 +1194,19 @@ test('MaidmentGPT holds every line inside its column, at any slate size', () => 
       assert.ok(m.disclaimer, `${where}: no disclaimer on a finished ad`);
       assert.ok(m.disclaimer.lines.length >= 1 && m.disclaimer.lines.length <= 2,
         `${where}: the disclaimer runs to ${m.disclaimer.lines.length} lines`);
+      /* One line unless the trim genuinely cannot hold it at a readable size.
+       * Asking fitBlock for two got two, because it stops as soon as the text
+       * fits the lines it was allowed, and the committee's own piece carries
+       * this across the foot in one. The rule is what is asserted, not the
+       * count: the stand-in measure here is a fifth wider than real Barlow
+       * Condensed, so which trims fit on one line differs from the browser. */
+      if (m.disclaimer.lines.length > 1) {
+        const onePx = (c.w * 0.94) / (measure(m.disclaimer.text, COND) / 100
+          + 0.01 * (m.disclaimer.text.length - 1));
+        assert.ok(onePx < Math.min(c.w, c.h) * 0.019,
+          `${where}: it took two lines when one would have set at `
+          + `${onePx.toFixed(1)}px, which is readable`);
+      }
       assert.equal(m.disclaimer.lines.join(' '), m.disclaimer.text,
         `${where}: wrapping changed the disclaimer's words`);
       const dw = Math.max(...m.disclaimer.lines.map(
