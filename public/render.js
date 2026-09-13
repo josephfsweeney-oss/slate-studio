@@ -1430,6 +1430,40 @@ function paintSlateBand(ctx, plan, style, theme, assets, bleed = 0) {
     blk.lines.forEach((l, i) => ctx.fillText(l, anchor, b.sub.y + blk.lh * (i + 0.86)));
   }
 
+  /* The checklist: what is actually in the guarantee, ticked, in two columns.
+   * The tick is the accent on a light ground and white on a dark one, and it is
+   * drawn rather than set, because a tick in a typeface is whatever that
+   * typeface felt like doing that day. */
+  if (b.list) {
+    const L = b.list;
+    const tickInk = dark ? BRAND.white : accent;
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'alphabetic';
+    L.items.forEach((blk, i) => {
+      const col = Math.floor(i / L.rws);
+      const row = i % L.rws;
+      const x = L.x + col * (L.cw + L.colGap);
+      const y = L.y + row * L.rowH;
+      const t = L.tick;
+
+      ctx.save();
+      ctx.strokeStyle = tickInk;
+      ctx.lineWidth = Math.max(2, t * 0.30);
+      ctx.lineCap = 'square';
+      ctx.lineJoin = 'miter';
+      ctx.beginPath();
+      ctx.moveTo(x, y + L.rowH * 0.52);
+      ctx.lineTo(x + t * 0.42, y + L.rowH * 0.74);
+      ctx.lineTo(x + t * 1.15, y + L.rowH * 0.20);
+      ctx.stroke();
+      ctx.restore();
+
+      ctx.fillStyle = dark ? BRAND.white : plate;
+      setFont(ctx, blk.font, blk.px, blk.ls);
+      ctx.fillText(blk.lines[0] || '', x + t * 2.0, y + L.rowH * 0.72);
+    });
+  }
+
   /* The figures. Contained by height and centred on the slot, so a tall
    * portrait and a short one stand on the same floor, and drawn left to right
    * so each overlaps the one before: a row of people, not a row of stamps. */

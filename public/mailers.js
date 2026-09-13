@@ -60,11 +60,22 @@ export const MAIL_PROGRAMS = [{
       id: 'contract', art: 'contract', n: 1, label: 'The Contract',
       front: {
         headline: 'We Put It In Writing',
-        subhead: 'Seven promises. Our names on every one.',
+        /* The piece that opens the programme has to say what is in it. A
+         * guarantee nobody can read is not a guarantee, and the other seven
+         * rounds each argue one of these lines. */
+        list: [
+          'No income tax',
+          'No sales tax',
+          'A cap on your property tax',
+          'More homes, less red tape',
+          'Lower electric bills',
+          'Prices posted before you pay',
+          'Parents choose the school',
+        ],
       },
       back: {
         headline: 'Ask Them For Theirs',
-        subhead: 'They will not put a number on it, or a ceiling on your taxes.',
+        subhead: 'They will not put a number on one of them, or a ceiling on your taxes.',
       },
     },
     {

@@ -1925,6 +1925,8 @@ function solveSlateBand(spec, measure, side) {
   let headH; let subH; let ctaBlk; let ctaH; let seatBlk; let seatH; let align;
   let asideSub = null;
   let wordShift = 0;
+  let checklist = null;
+  let checklistH = 0;
 
   const fitHead = (width, room, maxLines) => {
     let px = Math.min(box.h * 0.150 * density, Math.max(room, box.h * 0.035));
@@ -1990,16 +1992,46 @@ function solveSlateBand(spec, measure, side) {
      * leaves; if that is enough to set the supporting line beside the faces,
      * the second pass takes it out of the stack, and the height it was using
      * goes to the headline and the faces. */
+    /* A checklist under the headline, in two columns, each line ticked. The
+     * programme is a written guarantee and the piece that opens it has to say
+     * what is in it: a promise nobody can read is not a promise. Message side
+     * only, where there is a full column to set it in. */
+    const listIn = !panel && Array.isArray(copy.list)
+      ? copy.list.map((t) => String(t || '').trim()).filter(Boolean) : [];
+    let list = null;
+    let listH = 0;
+    if (listIn.length) {
+      const cols = listIn.length > 4 ? 2 : 1;
+      const rws = Math.ceil(listIn.length / cols);
+      const colGap = wordsBox.w * 0.045;
+      const cw = (wordsBox.w - colGap * (cols - 1)) / cols;
+      const tick = cw * 0.058;
+      const tw = Math.max(1, cw - tick * 2.0);
+      const start = Math.min(box.h * 0.032, tw * 0.055) * density;
+      /* One size for every line. Fitted one at a time, a short promise sat next
+       * to a long one at twice the size and the list read as a ransom note. */
+      const px = Math.min(...listIn.map(
+        (t) => fitInside(measure, t, COND_BOLD, start, tw, 1, 0.02, true).px));
+      const items = listIn.map((t) => fitInside(measure, t, COND_BOLD, px, tw, 1, 0.02, true));
+      const rowH = px * 1.48;
+      list = { cols, rws, colGap, cw, tick, tw, px, rowH, items };
+      listH = rws * rowH + box.h * 0.024;
+    }
+
     const stackedPass = (dropSub) => {
       let subBlk = dropSub ? EMPTY_SUB : fitBlock(measure, copy.subhead, COND_BOLD,
         box.h * (panel ? 0.036 : 0.050) * density, wordsBox.w * 0.98, panel ? 1 : 2, 0.045, true);
       let subHt = subBlk.h ? subBlk.h + box.h * (panel ? 0.016 : 0.024) : 0;
 
-      const faceFloorRow = box.h * (rowCount > 1 ? 0.20 : (n <= 4 ? 0.36 : 0.26));
+      /* A short slate gets a taller floor, because four big faces are the
+       * design. A piece carrying a checklist gives some of that back: the list
+       * is why the piece went out. */
+      const faceFloorRow = box.h * (list ? 0.24
+        : rowCount > 1 ? 0.20 : (n <= 4 ? 0.36 : 0.26));
       let room = panel
         ? wordsBox.h - subHt - seatH - ctaH
         : Math.max(box.h * 0.10,
-          inner.h - ctaH - seatH - subHt - (faceFloorRow + nominalBandH) * rowCount);
+          inner.h - ctaH - seatH - subHt - listH - (faceFloorRow + nominalBandH) * rowCount);
       /* With no room left for a headline the line under it is the thing that
        * goes. A subhead over a headline set at the floor is two small lines
        * where there should be one that carries. */
@@ -2024,7 +2056,7 @@ function solveSlateBand(spec, measure, side) {
        * them instead, and the slate stands on the foot of the paper. */
       const zone = panel
         ? { top: inner.y, bottom: panel.y - box.h * 0.022 }
-        : { top: inner.y + hh + subHt + seatH + ctaH, bottom: foot };
+        : { top: inner.y + hh + subHt + listH + seatH + ctaH, bottom: foot };
       /* Left first, to find out what the slate leaves. If it leaves too little
        * to put anything in, the row goes back to centred: a row of eight with
        * half an inch of air on the right reads as a slip, not as a margin. */
@@ -2033,7 +2065,7 @@ function solveSlateBand(spec, measure, side) {
       let out = solveRows(zone.top, zone.bottom, 'left');
       const spare = strip.x + strip.w - out.laid.right - gutter;
       if (spare < minAside) out = solveRows(zone.top, zone.bottom, 'fill');
-      return { subBlk, subHt, headBlk, bp, rh, hh, zone, out, spare };
+      return { subBlk, subHt, headBlk, bp, rh, hh, zone, out, spare, list, listH };
     };
 
     let pass = stackedPass(false);
@@ -2046,6 +2078,7 @@ function solveSlateBand(spec, measure, side) {
     sub = pass.subBlk; subH = pass.subHt;
     head = pass.headBlk; blockPad = pass.bp; ruleH = pass.rh; headH = pass.hh;
     slateZone = pass.zone; rowsOut = pass.out;
+    checklist = pass.list; checklistH = pass.listH;
   }
 
   const { laid, bandH, bandPx, lineH, texts, dropped } = rowsOut;
@@ -2152,8 +2185,11 @@ function solveSlateBand(spec, measure, side) {
    * to action, both above the slate. Beside them, and in the carrier's corner,
    * the words are their own column and the two sit at its foot. */
   const overFaces = !panel && !sideBySide;
-  const seatY = overFaces ? subTop + subH : wordsBox.y + wordsBox.h - ctaH - seatH + box.h * 0.008;
-  const ctaY = overFaces ? subTop + subH + seatH : wordsBox.y + wordsBox.h - ctaH;
+  const listTop = subTop + subH;
+  const seatY = overFaces
+    ? listTop + checklistH : wordsBox.y + wordsBox.h - ctaH - seatH + box.h * 0.008;
+  const ctaY = overFaces
+    ? listTop + checklistH + seatH : wordsBox.y + wordsBox.h - ctaH;
   const wordsCx = wordsBox.x + wordsBox.w / 2;
 
   const dpi = spec.dpi || 0;
@@ -2183,6 +2219,7 @@ function solveSlateBand(spec, measure, side) {
             ruleY: wordTop + head.h + blockPad * 2 + box.h * 0.014 }
         : null,
       sub: sub.lines.length ? { block: sub, y: subTop } : null,
+      list: checklist ? { ...checklist, x: wordsBox.x, y: listTop } : null,
       figures,
       rows,
       aside,

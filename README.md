@@ -617,6 +617,13 @@ side that attacks a record and does not cite it is a side you cannot defend.
 Where the record is not in the file the line prints empty and the app says so in
 the warnings, which is the point. Fill it before the drop.
 
+The round that opens the programme carries the guarantee itself: seven promises
+in two ticked columns under the headline, because a guarantee nobody can read is
+not a guarantee, and each of the other seven rounds argues one of those lines.
+`list` in a side's copy is what puts it there. Message side only: it needs a
+full column to be set in, and the address side has a carrier standing in a
+quarter of it.
+
 The candidates are the lowest thing on the piece. The district line and the call
 to action sit above them, and the name band runs off the bottom of the paper, so
 the slate stands on the floor of the piece rather than a quarter inch above it.
