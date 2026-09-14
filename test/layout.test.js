@@ -961,10 +961,19 @@ test('the election information grows with the block it stands in', () => {
       `${id}: the block lost its date`);
     assert.ok(two.rect.w > four.rect.w,
       `${id}: two on the ballot did not leave a wider block than four`);
-    assert.ok(two.date.block.px > four.date.block.px * 1.2,
+    assert.ok(two.date.block.px > four.date.block.px * 1.1,
       `${id}: two on the ballot sets the date at ${two.date.block.px.toFixed(0)}px `
       + `in a ${two.rect.w.toFixed(0)}px block, four at ${four.date.block.px.toFixed(0)}px `
       + `in a ${four.rect.w.toFixed(0)}px block`);
+
+    /* And the block has a ceiling, which it never had. Taking whatever the
+     * slate did not want, it took 54 per cent of an 11 x 5.5 from a slate of
+     * four: half the paper of navy with a date in it, and the candidates
+     * squeezed into the rest. The slate is the point of this side. */
+    for (const [n, a] of [[3, at(3)], [4, four]]) {
+      assert.ok(a.rect.w <= c.w * 0.42,
+        `${id} n=${n}: the block takes ${(a.rect.w / c.w * 100).toFixed(0)}% of the piece`);
+    }
     // The width still has the last word: nothing runs out of the block.
     for (const [n, a] of [[2, two], [4, four]]) {
       for (const part of [a.kicker, a.date, a.note]) {

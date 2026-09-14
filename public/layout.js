@@ -1874,7 +1874,9 @@ function solveSlateBand(spec, measure, side) {
    *   left  the slate keeps the width it needs and a block takes the rest
    *   fill  nothing is taking the rest, so the slate takes all of it
    * A row centred with half an inch of air either side reads as a slip. */
-  const layoutRows = (bandH, zoneTop, zoneBottom, mode) => {
+  /* `runW` is the width the faces are laid into. It is the whole strip unless
+   * something beside them has been given a width of its own first. */
+  const layoutRows = (bandH, zoneTop, zoneBottom, mode, runW = strip.w) => {
     const figZone = Math.max(1, zoneBottom - zoneTop - bandH);
     const stackH = 1 + (rowCount - 1) * rowPitch;
     const figH = Math.min(figCap, Math.max(1, figZone / stackH));
@@ -1884,30 +1886,37 @@ function solveSlateBand(spec, measure, side) {
     const tight = natural * 0.94;              // a little overlap at the shoulder
     const out = [];
     let seen = 0;
+    /* The step of the row behind, which is what the row in front is offset
+     * against. Offset by its own step instead, a front row of three standing
+     * in front of a back row of four lands between nobody: the rows carry
+     * different numbers of people, so in fill mode they carry different steps
+     * as well. Equal rows hid it. */
+    let behind = 0;
     for (let r = 0; r < rowsOf.length; r++) {
       const rn = rowsOf[r].length;
       /* Only share the width out when there are more faces than fit. */
-      const spread = natural + (rn - 1) * tight > strip.w;
-      const cellW = spread ? strip.w / rn : natural;
+      const spread = natural + (rn - 1) * tight > runW;
+      const cellW = spread ? runW / rn : natural;
       /* Filling means the first face starts at the left margin and the last one
        * ends at the right, whatever is between them. Shoulder to shoulder if
        * that is wide enough, a little apart if it is not. */
-      const span = rn > 1 ? (strip.w - cellW) / (rn - 1) : 0;
-      const step = spread ? strip.w / rn
+      const span = rn > 1 ? (runW - cellW) / (rn - 1) : 0;
+      const step = spread ? runW / rn
         : mode === 'fill' ? Math.max(tight, span) : tight;
       const groupW = (rn - 1) * step + cellW;
       /* A second row is offset half a face, so its people stand in the gaps of
        * the row in front instead of in a grid behind it. A row that already
        * has to share the width out has no gaps to stand in. */
-      const stagger = r % 2 === 1 && !spread ? step / 2 : 0;
+      const stagger = r % 2 === 1 && !spread ? behind / 2 : 0;
       const x0 = stagger + strip.x + (spread || mode !== 'centre'
-        ? 0 : (strip.w - groupW) / 2);
+        ? 0 : (runW - groupW) / 2);
       out.push({ members: rowsOf[r], first: seen, rn, spread, step, cellW, x0,
                  y: groupTop + r * figH * rowPitch, h: figH, bandY, bandH,
                  /* A row with another one in front of it is cut at the line
                   * that row starts on, so nothing of it hangs in the gaps. */
                  clipH: r < rowsOf.length - 1 ? figH * rowPitch : figH,
                  right: x0 + (rn - 1) * step + cellW });
+      behind = step;
       seen += rn;
     }
     const left = out.length ? Math.min(...out.map((r) => r.x0)) : strip.x;
@@ -1926,8 +1935,8 @@ function solveSlateBand(spec, measure, side) {
    * divided by the slate, which on a centred group of four was three times too
    * wide, and the band came out as one another's names printed on top of each
    * other. */
-  const solveRows = (zoneTop, zoneBottom, mode) => {
-    const first = layoutRows(nominalBandH, zoneTop, zoneBottom, mode);
+  const solveRows = (zoneTop, zoneBottom, mode, runW = strip.w) => {
+    const first = layoutRows(nominalBandH, zoneTop, zoneBottom, mode, runW);
     const cellW = first.cellW || strip.w;
     const wide = (t, px) => widthAt(measure, t, COND_BOLD, px, 0.03) <= cellW * 0.96;
     const fullNames = slate.map((c) => `${firstLine(c, style)} ${c.last}`.trim());
@@ -1985,7 +1994,7 @@ function solveSlateBand(spec, measure, side) {
      * as two slates. */
     const lineH = stacked ? stackLine : bandPx * 1.30;
     const bandH = n ? lineH * rowCount + (stacked ? lastPx * 0.6 : bandPx) : 0;
-    return { laid: layoutRows(bandH, zoneTop, zoneBottom, mode),
+    return { laid: layoutRows(bandH, zoneTop, zoneBottom, mode, runW),
              bandH, bandPx: stacked ? lastPx : bandPx, lineH,
              texts: stacked ? shortNames : texts,
              firsts: stacked ? firsts : null, firstPx: stacked ? firstPx : 0,
@@ -2015,6 +2024,22 @@ function solveSlateBand(spec, measure, side) {
    * business keeping. */
   const minAside = Math.max(box.h * 0.30, (inner.w) * 0.17)
     * (1 + Math.max(0, n - 4) * 0.22);
+  /* And a ceiling on it, which it never had.
+   *
+   * The block took whatever the slate did not want, so a short slate on a
+   * piece that had already given height to the pledges handed it 54 per cent
+   * of an 11 x 5.5: half the paper of navy with a date in it, and four
+   * candidates squeezed into the rest. The slate is the point of this side.
+   *
+   * On a side with a carrier's corner the ceiling is the address panel's own
+   * width, so the block and the panel are one column down the right instead of
+   * two rectangles that nearly line up. Anything wider than that goes back to
+   * the faces, which spread into it. */
+  const maxAside = (panel ? panel.w : strip.w * 0.38)
+    /* One or two on the ballot do not need the width, so the block may have
+     * it: that is where the election information gets to be big. Three or more
+     * do need it, and that is where the block was taking half the paper. */
+    * (n <= 2 ? 1.45 : 1);
   const freeFull = strip.w - groupWidthAt(zoneFull.top, zoneFull.bottom, nominalBandH) - gutter;
   /* Beside the faces is a message side idea. The address side has the carrier's
    * corner in the bottom right, so its words stay in the lower left. */
@@ -2195,8 +2220,22 @@ function solveSlateBand(spec, measure, side) {
       /* Left first, to find out what the slate leaves. If what it leaves is
        * not worth a block, the slate takes that width too. */
       let out = solveRows(zone.top, zone.bottom, 'left');
-      const spare = strip.x + strip.w - out.laid.right - gutter;
-      if (spare < minAside) out = solveRows(zone.top, zone.bottom, 'fill');
+      let spare = strip.x + strip.w - out.laid.right - gutter;
+      if (spare < minAside) {
+        out = solveRows(zone.top, zone.bottom, 'fill');
+      } else if (spare > maxAside) {
+        /* More left over than a block is worth. The faces take the difference,
+         * laid across everything up to where the block starts.
+         *
+         * Measured off the trim rather than off the padded strip, because the
+         * block bleeds to the edge and the strip does not: run to the strip's
+         * own right margin and the block came out 132px wider than the address
+         * panel under it, which is the misalignment this cap was meant to
+         * close. With a carrier's corner the two now share a left edge. */
+        out = solveRows(zone.top, zone.bottom, 'fill',
+          Math.max(1, (w - maxAside) - gutter - strip.x));
+        spare = strip.x + strip.w - out.laid.right - gutter;
+      }
       return { subBlk, subHt, headBlk, bp, rh, hh, zone, out, spare, list, listH };
     };
 
