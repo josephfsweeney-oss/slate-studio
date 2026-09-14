@@ -1539,12 +1539,39 @@ function paintSlateBand(ctx, plan, style, theme, assets, bleed = 0) {
     }
     const tx = a.tier === 'plate' ? r.x + r.w / 2 : r.x + barW + (r.w - barW) / 2;
     ctx.textAlign = 'center';
-    for (const part of [a.kicker, a.date, a.note]) {
+    for (const part of [a.kicker, a.date, a.note, a.head]) {
       if (!part) continue;
       const blk = part.block;
       ctx.fillStyle = a.tier === 'plate' ? BRAND.white : (dark ? BRAND.white : plate);
       setFont(ctx, blk.font, blk.px, blk.ls);
       blk.lines.forEach((l, i) => ctx.fillText(l, tx, part.y + blk.lh * (i + 0.84)));
+    }
+
+    /* The pledges, one to a line under the heading, each on its own tick. The
+     * tick is in the accent and the words are white, the way the four words on
+     * the lockup's plate are set. */
+    if (a.list) {
+      const q = a.list;
+      ctx.textAlign = 'left';
+      q.items.forEach((blk, i) => {
+        const y = q.y + i * q.rowH;
+        const t = q.tick;
+        ctx.save();
+        ctx.strokeStyle = accent;
+        ctx.lineWidth = Math.max(2, t * 0.30);
+        ctx.lineCap = 'square';
+        ctx.lineJoin = 'miter';
+        ctx.beginPath();
+        ctx.moveTo(q.x, y + q.rowH * 0.50);
+        ctx.lineTo(q.x + t * 0.42, y + q.rowH * 0.70);
+        ctx.lineTo(q.x + t * 1.15, y + q.rowH * 0.18);
+        ctx.stroke();
+        ctx.restore();
+        ctx.fillStyle = BRAND.white;
+        setFont(ctx, blk.font, blk.px, blk.ls);
+        ctx.fillText(blk.lines[0] || '', q.x + t * 1.9, y + q.rowH * 0.70);
+      });
+      ctx.textAlign = 'center';
     }
   }
 

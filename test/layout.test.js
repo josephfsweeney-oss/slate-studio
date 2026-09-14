@@ -956,7 +956,18 @@ test('the election information stands in the column above the carrier', () => {
       const a = p.band.aside;
       const m = p.mailPanel;
       const where = `${id} n=${n}`;
-      assert.ok(a && a.rect && a.date, `${where}: the block lost its date`);
+      assert.ok(a && a.rect, `${where}: the block is gone`);
+      /* A block carrying the promise carries no date: four inches by three and
+       * a quarter will not hold an election day, a date, a count, a heading and
+       * seven pledges at a size anybody reads, and the call to action already
+       * says NOV. 3RD in type an inch high. A block with no promise in it keeps
+       * the date, because then it is what the block is for. */
+      if (a.owns) {
+        assert.ok(a.list && a.head, `${where}: the block owns the promise and has none`);
+        assert.equal(a.date, null, `${where}: the promise block repeats the date`);
+      } else {
+        assert.ok(a.date, `${where}: the block lost its date`);
+      }
 
       /* With the slate standing on the foot, the block is the column above the
        * carrier's corner: the panel's own width, off the top and the right of
@@ -973,12 +984,24 @@ test('the election information stands in the column above the carrier', () => {
         `${where}: the block's foot is not the panel's top line`);
 
       // The type is set to the block and stays inside it.
-      for (const part of [a.kicker, a.date, a.note]) {
+      for (const part of [a.kicker, a.date, a.note, a.head]) {
         if (!part) continue;
         assert.ok(part.block.w <= a.rect.w - a.inset * 2 + 1,
           `${where}: "${part.block.lines[0]}" runs out of the block`);
         assert.ok(part.y >= a.rect.y - 1 && part.y + part.block.h <= a.rect.y + a.rect.h + 1,
           `${where}: "${part.block.lines[0]}" is outside the block`);
+      }
+      if (a.list) {
+        const q = a.list;
+        assert.ok(q.y + q.items.length * q.rowH <= a.rect.y + a.rect.h + 1,
+          `${where}: the pledges run out of the foot of the block`);
+        assert.ok(q.x + q.tick * 1.9 + q.items[0].w <= a.rect.x + a.rect.w - a.inset + 1,
+          `${where}: a pledge runs out of the side of the block`);
+        /* The heading leads its own list. Scaled with what was left over it
+         * came out at ten point over eleven point pledges. */
+        assert.ok(a.head.block.px >= q.px * 1.2,
+          `${where}: the heading is ${a.head.block.px.toFixed(0)}px over `
+          + `${q.px.toFixed(0)}px pledges`);
       }
     }
   }
@@ -1108,9 +1131,11 @@ test('the block beside the slate is a corner block', () => {
 });
 
 /* The pledges are the argument on the address side, not a caption under it.
- * Sized off a twentieth of their column they came out near ten point on an
- * 11 x 5.5, which nobody reads off a mailer at arm's length. */
-test('the pledges are readable, and the headline still leads them', () => {
+ * They live in the block above the carrier's corner: the column beside the
+ * slate was carrying a headline, seven pledges, a call to action, the names
+ * and the faces on an 11 x 5.5, and it held about three of those at a size
+ * anybody reads off a mailbox. */
+test('the pledges are readable, in the block, under a heading that leads them', () => {
   const piece = MAIL_PROGRAMS[0].pieces.find((x) => x.id === 'contract');
   assert.ok(Array.isArray(piece.back.list) && piece.back.list.length === 7,
     'the opening round lost the seven pledges off its address side');
@@ -1122,34 +1147,29 @@ test('the pledges are readable, and the headline still leads them', () => {
       const p = solve({ canvas: { w: c.w, h: c.h }, dpi: c.dpi, slate: slate(n), copy,
         style: sideStyle(piece, 'back') }, measure);
       const b = p.band;
+      const a = b.aside;
       const where = `${id} n=${n}`;
-      assert.ok(b.list, `${where}: the pledges are not on the piece`);
-      assert.equal(b.list.items.length, 7, `${where}: ${b.list.items.length} pledges, not seven`);
 
-      /* Twelve point at three hundred dots is fifty pixels.
-       *
-       * With the slate standing on the foot of the piece, the words have the
-       * band above it rather than the bottom half, and that band is carrying a
-       * headline, seven pledges, a call to action and four names. It does not
-       * always hold all of them at a size anybody reads off a mailbox. Where it
-       * cannot, the piece has to say so: a checklist set at nine point that
-       * nothing warns about is a piece that goes to print unreadable. */
-      const pt = b.list.px / c.dpi * 72;
-      if (pt < 11) {
-        assert.ok(p.warnings.some((x) => /checklist is set at/.test(x)),
-          `${where}: the pledges are ${pt.toFixed(1)}pt and nothing says so`);
-      }
+      // Not in the column beside the slate any more.
+      assert.equal(b.list, null, `${where}: the pledges are still beside the slate`);
+      assert.ok(a && a.list, `${where}: the pledges are not in the block`);
+      assert.equal(a.list.items.length, 7,
+        `${where}: ${a.list.items.length} pledges, not seven`);
 
-      /* And the heading over them is bigger than they are. A side with a
-       * heading smaller than its own bullets has them the wrong way round. */
-      assert.ok(b.head.block.px >= b.list.px * 1.2,
-        `${where}: the headline is ${b.head.block.px.toFixed(0)}px over `
-        + `${b.list.px.toFixed(0)}px pledges`);
+      // Eleven point at three hundred dots is forty-six pixels.
+      const pt = a.list.px / c.dpi * 72;
+      assert.ok(pt >= 11, `${where}: the pledges are ${pt.toFixed(1)}pt`);
 
-      // Nothing in the list crosses into the carrier's corner.
-      const right = b.list.x !== undefined ? b.list.x + b.top.w : b.top.x + b.top.w;
-      assert.ok(right <= p.mailPanel.x + 1,
-        `${where}: the pledges run into the carrier's corner`);
+      /* And the heading is with them, leading them, rather than left behind in
+       * the other column with nothing under it. */
+      assert.ok(a.head, `${where}: the heading did not follow its list`);
+      assert.ok(!b.head || b.head.block.lines.length === 0,
+        `${where}: the heading is in both columns`);
+      assert.ok(a.head.block.px >= a.list.px * 1.2,
+        `${where}: the heading is ${a.head.block.px.toFixed(0)}px over `
+        + `${a.list.px.toFixed(0)}px pledges`);
+      assert.ok(a.head.y + a.head.block.h <= a.list.y + 1,
+        `${where}: the heading is not above its list`);
     }
   }
 });
@@ -1353,13 +1373,15 @@ test('every mail side puts the slate, a headline and a call to action on the pie
 
         // The three things every side must carry. No disclaimer: the print shop
         // sets it with the carrier's corner, which is theirs.
-        assert.ok(b.head, `${where} has no headline`);
+        /* On the piece, in one column or the other: a side whose block carries
+         * the checklist carries the line that heads it there too. */
+        assert.ok(b.head || (b.aside && b.aside.head), `${where} has no headline`);
         assert.ok(b.cta, `${where} has no call to action`);
         assert.equal(p.disclaimer, null, `${where} printed a disclaimer the print shop sets`);
         assert.match(b.cta.block.lines[0], /NOV\.? ?3/, `${where} does not say when to vote`);
 
         // Nothing lands on anything else, on either shape.
-        assert.ok(b.head.y >= 0, `${where} headline off the top`);
+        if (b.head) assert.ok(b.head.y >= 0, `${where} headline off the top`);
         /* A foot slate has no band under it, and its faces are cropped by the
          * trim on purpose, so there is nothing here to run past. */
         if (b.bandRect) {
@@ -1367,7 +1389,8 @@ test('every mail side puts the slate, a headline and a call to action on the pie
             assert.ok(row.y + row.h <= b.bandRect.y + 1, `${where} faces run past the band`);
           }
         }
-        const wordsBottom = b.sub ? b.sub.y + b.sub.block.h : b.head.y + b.head.block.h;
+        const wordsBottom = b.sub ? b.sub.y + b.sub.block.h
+          : (b.head ? b.head.y + b.head.block.h : b.cta.y);
         assert.ok(wordsBottom <= b.cta.y + 1, `${where} the copy lands on the call to action`);
         if (b.nameStack) {
           assert.ok(b.cta.y + b.cta.h <= b.nameStack.rows[0].y + 1,
@@ -1390,7 +1413,9 @@ test('every mail side puts the slate, a headline and a call to action on the pie
         } else if (side === 'front') {
           /* A column: headline, supporting line, district line, call to action,
            * and the slate standing on the foot of the paper under all of it. */
-          assert.ok(b.figures[0].slot.y > b.head.y, `${where} faces above the headline`);
+          if (b.head) {
+            assert.ok(b.figures[0].slot.y > b.head.y, `${where} faces above the headline`);
+          }
           assert.ok(b.rows[0].y >= b.cta.y + b.cta.h - 1,
             `${where} the faces start above the call to action`);
         }
@@ -1425,7 +1450,7 @@ test('every mail side puts the slate, a headline and a call to action on the pie
            * rectangle in the lower right, not a band across the piece, so a
            * left hand column is free to start above it. A side carrying the
            * pledges does exactly that, because the slate gives height back. */
-          const clearBelow = b.head.y >= p.mailPanel.y - 1;
+          const clearBelow = !b.head || b.head.y >= p.mailPanel.y - 1;
           const clearLeft = b.top.x + b.top.w <= p.mailPanel.x + 1;
           assert.ok(clearBelow || clearLeft,
             `${where} the words are in the carrier's corner`);

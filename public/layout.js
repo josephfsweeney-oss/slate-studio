@@ -1821,6 +1821,8 @@ function solveSlateBand(spec, measure, side) {
    * taken here came straight off the portraits and their names. The reserve
    * comes in as the slate fills the piece. */
   const listReserve = 0;
+  /* The names get the full share again: the pledges have left this column. */
+  const wordsCarryList = false;
   const gutter = box.w * 0.028;
 
   /* ------------------------------------------------- the address side's shape
@@ -1839,6 +1841,10 @@ function solveSlateBand(spec, measure, side) {
    * under the group, which is the whole point of it, and a foot slate has no
    * band. Asking for two rows is asking for that piece. */
   const footSlate = !!panel && !(n >= 6 && style.twoRows === true);
+  /* The checklist and the line that heads it belong to the block above the
+   * carrier's corner on a foot slate, not to the column beside the slate. */
+  const promiseList = footSlate && Array.isArray(copy.list)
+    ? copy.list.map((t) => String(t || '').trim()).filter(Boolean) : [];
   const faceH = footSlate ? h * 0.46 : 0;
   const faceTop = footSlate ? h - faceH : 0;
   const stackTop = panel ? (footSlate ? inner.y : panel.y - listReserve) : 0;
@@ -1852,7 +1858,7 @@ function solveSlateBand(spec, measure, side) {
        * of it left the seven pledges four rows of thirty pixels, which is type
        * nobody reads off a mailbox. The names are a label for the row under
        * them; the pledges are the argument. */
-      Math.max(1, faceTop - inner.y - box.h * 0.018) * (hasList ? 0.30 : 0.42),
+      Math.max(1, faceTop - inner.y - box.h * 0.018) * (wordsCarryList ? 0.30 : 0.42),
       Math.ceil(n / NAME_COLS(n))
         * box.h * 0.085 * clampScale(style.textScale) * clampScale(style.headScale) * 0.916
         + box.h * 0.012)
@@ -2187,8 +2193,9 @@ function solveSlateBand(spec, measure, side) {
      * programme is a written guarantee and the piece that opens it has to say
      * what is in it: a promise nobody can read is not a promise. Message side
      * only, where there is a full column to set it in. */
-    const listIn = Array.isArray(copy.list)
-      ? copy.list.map((t) => String(t || '').trim()).filter(Boolean) : [];
+    /* Empty on a foot slate: the block above the carrier's corner has it. */
+    const listIn = promiseList.length || !Array.isArray(copy.list)
+      ? [] : copy.list.map((t) => String(t || '').trim()).filter(Boolean);
     /* Built at a scale rather than once, because how big the list may be
      * depends on what it leaves the headline, and what it leaves the headline
      * depends on how big it is. The pass settles it. */
@@ -2262,7 +2269,11 @@ function solveSlateBand(spec, measure, side) {
        * them, or the headline fits by its own measure and the line under it
        * lands on the district line by three pixels. */
       room = Math.max(box.h * 0.035, room - box.h * 0.034);
-      const headBlk = fitHead(panel ? wordsBox.w : inner.w, room, 3);
+      /* And no headline here either when the block has taken the list it heads:
+       * a heading with nothing under it is a line looking for its paragraph. */
+      const headBlk = promiseList.length
+        ? { lines: [], h: 0, px: 0, font: COND_BOLD, ls: 0 }
+        : fitHead(panel ? wordsBox.w : inner.w, room, 3);
       const bp = onDark && headBlk.lines.length ? headBlk.px * 0.30 : 0;
       const rh = !onDark && headBlk.lines.length ? Math.max(3, box.h * 0.0085) : 0;
       const hh = headBlk.h
@@ -2404,41 +2415,114 @@ function solveSlateBand(spec, measure, side) {
      * height the block actually has. */
     const noteText = n >= 2 && n < COUNT_WORD.length ? `VOTE FOR ALL ${COUNT_WORD[n]}` : '';
     const gap = box.h * 0.020;
-    const fitParts = (k) => {
-      const kick2 = asideSub
-        ? fitInside(measure, copy.subhead, COND_BOLD, tw * 0.088 * k * density, tw, 4, 0.03, true)
-        : fitInside(measure, 'ELECTION DAY', COND_BOLD,
-          tw * 0.105 * k * density, tw, 1, 0.14, true);
+
+    /* The promise column.
+     *
+     * A side that carries a checklist puts it here, with the line that heads
+     * it, rather than in the column beside the slate. On an 11 x 5.5 that
+     * column was carrying a headline, seven pledges, a call to action, the
+     * names and the faces, and the band above the slate holds about three of
+     * those at a size anybody reads off a mailbox: the pledges came out at
+     * nine point. This block is twelve hundred by nine hundred and was holding
+     * three short lines. */
+    const owns = footSlate && promiseList.length > 0;
+    /* `holdList` scales what is left over without touching the pledges or the
+     * line that heads them: those two are the argument, and the count of how
+     * many to mark is what gives way. Scaling the heading with the rest put it
+     * at ten point over eleven point pledges, which is a heading under its own
+     * list. */
+    const fitParts = (k, holdList = false) => {
+      /* A block carrying the promise does not carry the date as well. Four
+       * inches by three and a quarter will not hold an election day, a date, a
+       * count, a heading and seven pledges at a size anybody reads off a
+       * mailbox: sized together they all came out at nine point, and sizing
+       * the pledges first shrank the date to nothing. The call to action on the
+       * other side of the piece already says NOV. 3RD in type an inch high, so
+       * the date here was the same fact twice. What the call to action does not
+       * say is how many to mark, and that stays. */
+      const kick2 = owns
+        ? { lines: [], h: 0, px: 0, font: COND_BOLD, ls: 0 }
+        : asideSub
+          ? fitInside(measure, copy.subhead, COND_BOLD, tw * 0.088 * k * density, tw, 4, 0.03, true)
+          : fitInside(measure, 'ELECTION DAY', COND_BOLD,
+            tw * 0.105 * k * density, tw, 1, 0.14, true);
       /* One line for the date. At two the month took the width and left the day
        * sitting on its own underneath, which reads as a mistake, not a date. */
-      const date2 = fitInside(measure, dateText, ANTON,
-        tw * 0.225 * k * density, tw, 1, -0.005, true);
+      const date2 = owns
+        ? { lines: [], h: 0, px: 0, font: ANTON, ls: 0 }
+        : fitInside(measure, dateText, ANTON,
+          tw * 0.225 * k * density, tw, 1, -0.005, true);
       const note2 = fitInside(measure, noteText, COND_BOLD,
-        tw * 0.125 * k * density, tw, 2, 0.06, true);
-      const h2 = (kick2.h ? kick2.h + gap : 0) + date2.h + (note2.h ? note2.h + gap : 0);
-      return { kick2, date2, note2, h2 };
+        tw * (owns ? 0.150 : 0.125) * k * density, tw, 2, 0.06, true);
+      /* The heading and the pledges under it, one to a line, each set to the
+       * column and all of them at the size the longest can carry. */
+      const head2 = owns
+        ? fitBlock(measure, copy.headline, COND_BOLD,
+          tw * 0.072 * (holdList ? 1 : k) * density, tw, 3, 0.03, true)
+        : { lines: [], h: 0, px: 0 };
+      let items2 = null;
+      let listH2 = 0;
+      if (owns) {
+        const tick2 = tw * 0.075;
+        const lw = Math.max(1, tw - tick2 * 1.7);
+        const lk = holdList ? 1 : k;
+        /* Held under what the heading and the count need above them. Sized
+         * to the block alone the pledges took nine tenths of it and left the
+         * line that heads them at eight point. */
+        const ceil2 = Math.min(tw * 0.070, box.h * 0.029) * lk * density;
+        const px2 = Math.min(ceil2,
+          ...promiseList.map((t) => fitInside(measure, t, COND_BOLD, ceil2, lw, 1, 0.02, true).px));
+        items2 = {
+          tick: tick2, tw: lw, px: px2, rowH: px2 * 1.62,
+          items: promiseList.map((t) => fitInside(measure, t, COND_BOLD, px2, lw, 1, 0.02, true)),
+        };
+        listH2 = promiseList.length * items2.rowH;
+      }
+      const h2 = (kick2.h ? kick2.h + gap : 0) + date2.h + (note2.h ? note2.h + gap : 0)
+        + (head2.h ? head2.h + gap * 1.4 : 0) + (listH2 ? listH2 + gap * 0.4 : 0);
+      return { kick2, date2, note2, head2, items2, listH2, h2 };
     };
     let parts = fitParts(1);
     /* The stack stands in the block rather than filling it to the walls, so
      * there is air above the first line and under the last. */
-    const fill = rect.h * 0.82;
-    if (parts.h2 > fill) parts = fitParts(Math.max(0.25, fill / parts.h2));
+    const fill = rect.h * (owns ? 0.90 : 0.82);
+    if (owns) {
+      /* The pledges are the argument this side went out to make, so they are
+       * sized first and the election information takes what is left. Scaling
+       * the whole stack together, the date and the heading held their share
+       * and the seven pledges came out at eleven point whatever the ceilings
+       * were set to: everything shrank by the same factor, so nothing gave
+       * way. */
+      const held = parts.listH2 + gap * 0.4
+        + (parts.head2.h ? parts.head2.h + gap * 1.4 : 0);
+      const room = Math.max(1, fill - held);
+      const rest = parts.h2 - held;
+      if (rest > room) parts = fitParts(Math.max(0.25, room / rest), true);
+    } else if (parts.h2 > fill) {
+      parts = fitParts(Math.max(0.25, fill / parts.h2));
+    }
     const kicker = parts.kick2;
     const date = parts.date2;
     const note = parts.note2;
     const stackH = parts.h2;
     const top = rect.y + Math.max(0, (rect.h - stackH) / 2);
     let cur = top;
-    const place = (blk) => {
+    const place = (blk, after = gap) => {
       if (!blk.h) return null;
       const at = { block: blk, y: cur };
-      cur += blk.h + gap;
+      cur += blk.h + after;
       return at;
     };
     const k = place(kicker);
     const d = place(date);
     const nt = place(note);
-    if (d || nt) aside = { tier, rect, inset, bleedFoot: !!footBleed, kicker: k, date: d, note: nt };
+    const hd = parts.head2.h ? place(parts.head2, gap * 1.4) : null;
+    const lst = parts.listH2
+      ? { ...parts.items2, x: rect.x + inset, y: cur, w: tw } : null;
+    if (d || nt || hd || lst) {
+      aside = { tier, rect, inset, bleedFoot: !!footBleed, kicker: k, date: d, note: nt,
+                head: hd, list: lst, owns };
+    }
   }
 
   /* ------------------------------------------------------------ the figures */
