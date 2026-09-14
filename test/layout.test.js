@@ -945,91 +945,142 @@ test('the address panel is only on a trim that can carry a real one', () => {
 /* Fewer on the ballot means a wider block, and the election information in it
  * used to be sized off the height alone, so a district with two set its date
  * at the same size as a district with four and stood half empty. */
-test('the election information grows with the block it stands in', () => {
+test('the election information stands in the column above the carrier', () => {
   const piece = MAIL_PROGRAMS[0].pieces[0];
   for (const id of ['mail6', 'mail11']) {
     const c = CANVASES.find((x) => x.id === id);
-    const at = (n) => {
+    for (const n of [1, 2, 3, 4, 6, 8]) {
       const copy = { ...SIDE_COMMON, ...piece.back };
       const p = solve({ canvas: { w: c.w, h: c.h }, dpi: c.dpi, slate: slate(n), copy,
         style: sideStyle(piece, 'back') }, measure);
-      return p.band.aside;
-    };
-    const two = at(2);
-    const four = at(4);
-    assert.ok(two && two.date && four && four.date,
-      `${id}: the block lost its date`);
-    assert.ok(two.rect.w > four.rect.w,
-      `${id}: two on the ballot did not leave a wider block than four`);
-    assert.ok(two.date.block.px > four.date.block.px * 1.1,
-      `${id}: two on the ballot sets the date at ${two.date.block.px.toFixed(0)}px `
-      + `in a ${two.rect.w.toFixed(0)}px block, four at ${four.date.block.px.toFixed(0)}px `
-      + `in a ${four.rect.w.toFixed(0)}px block`);
+      const a = p.band.aside;
+      const m = p.mailPanel;
+      const where = `${id} n=${n}`;
+      assert.ok(a && a.rect && a.date, `${where}: the block lost its date`);
 
-    /* And the block has a ceiling, which it never had. Taking whatever the
-     * slate did not want, it took 54 per cent of an 11 x 5.5 from a slate of
-     * four: half the paper of navy with a date in it, and the candidates
-     * squeezed into the rest. The slate is the point of this side. */
-    for (const [n, a] of [[3, at(3)], [4, four]]) {
-      assert.ok(a.rect.w <= c.w * 0.42,
-        `${id} n=${n}: the block takes ${(a.rect.w / c.w * 100).toFixed(0)}% of the piece`);
-    }
-    // The width still has the last word: nothing runs out of the block.
-    for (const [n, a] of [[2, two], [4, four]]) {
+      /* With the slate standing on the foot, the block is the column above the
+       * carrier's corner: the panel's own width, off the top and the right of
+       * the trim, foot on the panel's top line. The right hand side of the
+       * piece is one column from edge to edge rather than two rectangles that
+       * nearly agree. It used to take whatever the slate did not want, which
+       * on a short slate was over half the paper. */
+      assert.equal(Math.round(a.rect.x), Math.round(m.x),
+        `${where}: the block and the panel start on different lines`);
+      assert.equal(Math.round(a.rect.x + a.rect.w), c.w,
+        `${where}: the block stops short of the right hand trim`);
+      assert.equal(Math.round(a.rect.y), 0, `${where}: the block has a margin above it`);
+      assert.equal(Math.round(a.rect.y + a.rect.h), Math.round(m.y),
+        `${where}: the block's foot is not the panel's top line`);
+
+      // The type is set to the block and stays inside it.
       for (const part of [a.kicker, a.date, a.note]) {
         if (!part) continue;
         assert.ok(part.block.w <= a.rect.w - a.inset * 2 + 1,
-          `${id} n=${n}: "${part.block.lines[0]}" runs out of the block`);
+          `${where}: "${part.block.lines[0]}" runs out of the block`);
+        assert.ok(part.y >= a.rect.y - 1 && part.y + part.block.h <= a.rect.y + a.rect.h + 1,
+          `${where}: "${part.block.lines[0]}" is outside the block`);
       }
     }
   }
 });
 
 /* Four edges with four different treatments is what made this block look like
- * it had been dropped on the piece: a margin above it that nothing else on the
- * side had, a floating left edge, a flush right edge, and a gap below it. */
-test('the block beside the slate is a corner block', () => {
+ * it had been dropped on the piece: a margin above it, a floating left edge, a
+ * flush right edge, and a gap below it. It is a corner block: off the top and
+ * the right of the trim, standing on the address panel's own top line, sharing
+ * the panel's left edge. The two are one column. */
+/* The address side stands its slate on the foot of the piece with the names
+ * stacked above it, which is the shape of the committee's own slate graphic.
+ * The faces get the bottom half of the paper instead of a third of it, so they
+ * can overlap and still be recognised. */
+test('the address side stands its slate on the foot, names above', () => {
   const piece = MAIL_PROGRAMS[0].pieces[0];
+  const ANTON_F = { family: 'Anton', weight: 400 };
   for (const id of ['mail6', 'mail11']) {
     const c = CANVASES.find((x) => x.id === id);
-    for (const n of [1, 2, 3, 4]) {
+    for (const n of [1, 2, 3, 4, 5, 8]) {
+      const list = slate(n);
       const copy = { ...SIDE_COMMON, ...piece.back };
-      const p = solve({ canvas: { w: c.w, h: c.h }, dpi: c.dpi, slate: slate(n), copy,
+      const p = solve({ canvas: { w: c.w, h: c.h }, dpi: c.dpi, slate: list, copy,
         style: sideStyle(piece, 'back') }, measure);
-      const a = p.band.aside;
+      const b = p.band;
+      const m = p.mailPanel;
       const where = `${id} n=${n}`;
-      if (!a || a.tier === 'words' || !a.rect) continue;
-      // Off the top of the trim, off the right of it.
-      assert.equal(Math.round(a.rect.y), 0, `${where}: the block has a margin above it`);
-      assert.equal(Math.round(a.rect.x + a.rect.w), c.w,
-        `${where}: the block stops short of the right hand trim`);
-      // And its foot lands on the name band's line, not somewhere of its own.
-      assert.ok(Math.abs((a.rect.y + a.rect.h) - (p.band.bandRect.y + p.band.bandRect.h)) <= 1,
-        `${where}: the block's foot is ${Math.round(a.rect.y + a.rect.h)}, `
-        + `the band's is ${Math.round(p.band.bandRect.y + p.band.bandRect.h)}`);
+      assert.ok(b.footSlate, `${where}: the address side did not stand its slate on the foot`);
+
+      /* Cropped by the trim, not fitted above it, and clear of the corner.
+       * Fitted inside its band, a portrait framed at the waist puts a small
+       * head in a big space; the committee's artwork crops the shoulders at the
+       * foot, so the figure is set taller than the band it stands in. */
+      for (const f of b.figures) {
+        assert.ok(f.slot.y + f.slot.h >= c.h - 1,
+          `${where}: a face stops ${(c.h - f.slot.y - f.slot.h).toFixed(0)}px short of the foot`);
+        assert.ok(f.slot.h >= (c.h - f.slot.y) * 1.2,
+          `${where}: a face is ${(f.slot.h / (c.h - f.slot.y)).toFixed(2)} of the band it `
+          + 'stands in, so it is fitted above the foot rather than cropped by it');
+        assert.ok(f.slot.x + f.slot.w <= m.x + 1,
+          `${where}: a face runs into the carrier's corner`);
+      }
+
+      /* Half the paper, near enough. They used to stand in the top third with
+       * a caption band under them. */
+      const top = Math.min(...b.figures.map((f) => f.slot.y));
+      assert.ok(c.h - top >= c.h * 0.40,
+        `${where}: the slate holds ${((c.h - top) / c.h * 100).toFixed(0)}% of the piece`);
+
+      // No caption band: the names are above the row instead.
+      assert.equal(b.bandRect, null, `${where}: a foot slate still drew a name band`);
+      for (const f of b.figures) {
+        assert.equal(f.name, null, `${where}: a face still carries a caption`);
+      }
+
+      const ns = b.nameStack;
+      assert.ok(ns, `${where}: the names are not on the piece`);
+      assert.equal(ns.rows.length, n, `${where}: ${ns.rows.length} names for ${n} candidates`);
+      // Above the faces, and never printing through one another.
+      const lowest = Math.max(...ns.rows.map((r) => r.y));
+      assert.ok(lowest + ns.px <= top + 1, `${where}: the names run into the faces`);
+      /* Past four they are set two abreast, so a run down the list is not a run
+       * down the page: the advance is checked inside each column. */
+      assert.equal(ns.cols, n > 4 ? 2 : 1, `${where}: ${ns.cols} columns for ${n} names`);
+      for (let i = 1; i < n; i++) {
+        if (ns.rows[i].x !== ns.rows[i - 1].x) continue;      // a new column
+        const step = ns.rows[i].y - ns.rows[i - 1].y;
+        assert.ok(step >= ns.px * 0.87,
+          `${where}: the names advance ${(step / ns.px).toFixed(3)} of their size`);
+      }
+      // And each stays inside the column it is set in.
+      for (const r of ns.rows) {
+        const wide = measure(r.text, ANTON_F) / 100 * ns.px - 0.01 * ns.px * (r.text.length - 1);
+        assert.ok(wide <= ns.colW + 1,
+          `${where}: "${r.text}" runs ${(wide - ns.colW).toFixed(0)}px past its column`);
+        assert.ok(r.x + ns.colW <= ns.x + ns.w + 1,
+          `${where}: a name column runs past the words column`);
+      }
     }
   }
 });
 
-test('the block beside the slate runs to the same edge as the address panel', () => {
+test('the block beside the slate is a corner block', () => {
   const piece = MAIL_PROGRAMS[0].pieces[0];
   for (const id of ['mail6', 'mail11']) {
     const c = CANVASES.find((x) => x.id === id);
-    for (const n of [1, 2, 3, 4]) {
+    for (const n of [1, 2, 3, 4, 8]) {
       const copy = { ...SIDE_COMMON, ...piece.back };
       const p = solve({ canvas: { w: c.w, h: c.h }, dpi: c.dpi, slate: slate(n), copy,
         style: sideStyle(piece, 'back') }, measure);
       const a = p.band.aside;
+      const m = p.mailPanel;
       const where = `${id} n=${n}`;
       if (!a || a.tier === 'words' || !a.rect) continue;
+      assert.equal(Math.round(a.rect.y), 0, `${where}: the block has a margin above it`);
       assert.equal(Math.round(a.rect.x + a.rect.w), c.w,
-        `${where}: the block stops ${Math.round(c.w - a.rect.x - a.rect.w)}px short of the trim`);
-      assert.equal(Math.round(a.rect.x + a.rect.w),
-        Math.round(p.mailPanel.x + p.mailPanel.w),
-        `${where}: the block and the address panel end on different lines`);
-      // And it still clears the carrier's corner.
-      assert.ok(a.rect.y + a.rect.h <= p.mailPanel.y + 1,
-        `${where}: the block is in the carrier's corner`);
+        `${where}: the block stops short of the right hand trim`);
+      assert.equal(Math.round(a.rect.y + a.rect.h), Math.round(m.y),
+        `${where}: the block's foot is ${Math.round(a.rect.y + a.rect.h)}, `
+        + `the panel's top is ${Math.round(m.y)}`);
+      assert.equal(Math.round(a.rect.x), Math.round(m.x),
+        `${where}: the block and the panel do not share a left edge`);
     }
   }
 });
@@ -1053,12 +1104,18 @@ test('the pledges are readable, and the headline still leads them', () => {
       assert.ok(b.list, `${where}: the pledges are not on the piece`);
       assert.equal(b.list.items.length, 7, `${where}: ${b.list.items.length} pledges, not seven`);
 
-      /* Twelve point at three hundred dots is fifty pixels. From three on the
-       * ballot up: with one or two the faces are the design and the slate keeps
-       * the height rather than giving it to the list. */
-      if (n >= 3) {
-        assert.ok(b.list.px >= 50,
-          `${where}: the pledges are ${(b.list.px / c.dpi * 72).toFixed(1)}pt`);
+      /* Twelve point at three hundred dots is fifty pixels.
+       *
+       * With the slate standing on the foot of the piece, the words have the
+       * band above it rather than the bottom half, and that band is carrying a
+       * headline, seven pledges, a call to action and four names. It does not
+       * always hold all of them at a size anybody reads off a mailbox. Where it
+       * cannot, the piece has to say so: a checklist set at nine point that
+       * nothing warns about is a piece that goes to print unreadable. */
+      const pt = b.list.px / c.dpi * 72;
+      if (pt < 11) {
+        assert.ok(p.warnings.some((x) => /checklist is set at/.test(x)),
+          `${where}: the pledges are ${pt.toFixed(1)}pt and nothing says so`);
       }
 
       /* And the heading over them is bigger than they are. A side with a
@@ -1281,11 +1338,19 @@ test('every mail side puts the slate, a headline and a call to action on the pie
 
         // Nothing lands on anything else, on either shape.
         assert.ok(b.head.y >= 0, `${where} headline off the top`);
-        for (const row of b.rows) {
-          assert.ok(row.y + row.h <= b.bandRect.y + 1, `${where} faces run past the band`);
+        /* A foot slate has no band under it, and its faces are cropped by the
+         * trim on purpose, so there is nothing here to run past. */
+        if (b.bandRect) {
+          for (const row of b.rows) {
+            assert.ok(row.y + row.h <= b.bandRect.y + 1, `${where} faces run past the band`);
+          }
         }
         const wordsBottom = b.sub ? b.sub.y + b.sub.block.h : b.head.y + b.head.block.h;
         assert.ok(wordsBottom <= b.cta.y + 1, `${where} the copy lands on the call to action`);
+        if (b.nameStack) {
+          assert.ok(b.cta.y + b.cta.h <= b.nameStack.rows[0].y + 1,
+            `${where} the call to action lands on the names`);
+        }
         if (b.seat) {
           assert.ok(wordsBottom <= b.seat.y + 1, `${where} the copy lands on the district line`);
           assert.ok(b.cta.y >= b.seat.y, `${where} call to action above the district line`);
@@ -1317,10 +1382,22 @@ test('every mail side puts the slate, a headline and a call to action on the pie
           }
         }
         if (side === 'back') {
-          // An L: the slate takes the width above the carrier's line and the
-          // words take the corner the carrier is not standing in.
-          assert.ok(b.bandRect.y + b.bandRect.h <= p.mailPanel.y + 1,
-            `${where} the slate crosses the carrier line`);
+          /* An L, the other way up from the one this side used to be. The slate
+           * stands on the foot of the piece and stops at the carrier's corner;
+           * the words take the band above it. Either way nothing may enter the
+           * rectangle the carrier is standing in. */
+          const m = p.mailPanel;
+          for (const f of b.figures) {
+            assert.ok(f.slot.x + f.slot.w <= m.x + 1 || f.slot.y + f.slot.h <= m.y + 1,
+              `${where} a face is in the carrier's corner`);
+          }
+          if (b.nameStack) {
+            for (const r of b.nameStack.rows) {
+              assert.ok(b.nameStack.x + b.nameStack.w <= m.x + 1 || r.y >= m.y - 1
+                || r.y + b.nameStack.px <= m.y + 1,
+                `${where} a name is in the carrier's corner`);
+            }
+          }
           /* The words stay out of the carrier's corner. That means below the
            * panel's top line, or clear of its left edge: the panel is a
            * rectangle in the lower right, not a band across the piece, so a
@@ -1343,15 +1420,24 @@ test('every mail side puts the slate, a headline and a call to action on the pie
           const clear = (r, what) => assert.ok(
             r.x + r.w <= m.x + 1 || r.y + r.h <= m.y + 1, `${where} ${what} in the carrier corner`);
           for (const f of b.figures) clear(f.slot, 'a face');
-          clear(b.bandRect, 'the name band');
+          if (b.bandRect) clear(b.bandRect, 'the name band');
+          if (b.nameStack) {
+            clear({ x: b.nameStack.x, y: b.nameStack.rows[0].y, w: b.nameStack.w,
+              h: b.nameStack.rows.length * b.nameStack.px * b.nameStack.line },
+            'the names');
+          }
           clear({ x: b.cta.x, y: b.cta.y, w: b.cta.w, h: b.cta.h }, 'the call to action');
           if (b.seat) {
             clear({ x: 0, y: b.seat.y, w: b.seat.block.w + b.cta.x * 2, h: b.seat.block.h },
               'the district line');
           }
-          // The band and the faces earn the full width by staying above the line.
-          assert.ok(b.bandRect.y + b.bandRect.h <= m.y + 1,
-            `${where} the name band crosses the carrier line`);
+          /* A foot slate stands on the paper and stops at the carrier's corner;
+           * the montage keeps the old shape and earns the full width by staying
+           * above the line. Either way `clear` above is the rule that matters. */
+          if (!b.footSlate) {
+            assert.ok(b.bandRect.y + b.bandRect.h <= m.y + 1,
+              `${where} the name band crosses the carrier line`);
+          }
           assert.ok(b.cta.x + b.cta.w <= m.x + 1, `${where} the call to action is not on the left`);
         } else {
           assert.equal(p.mailPanel, null, `${where} put a mail panel on the message side`);
@@ -1797,19 +1883,26 @@ test('the slate takes the width it needs and the words take what is left', () =>
       }
     }
   }
-  /* One candidate frees most of the piece and something stands in it. A full
-   * slate of eight frees nothing and nothing does. */
+  /* The flex rule is the message side's now. One candidate frees most of it and
+   * something stands in the leftover; a full slate of eight frees nothing and
+   * nothing does.
+   *
+   * The address side no longer flexes, because the slate stands on the foot of
+   * the piece and the block is the column above the carrier's corner, which the
+   * faces never wanted. Eight on the ballot carry a block there and should. */
   assert.equal(seen.front[0], 'words', 'one candidate does not free the column');
-  assert.equal(seen.back[0], 'plate', 'one candidate does not free a block on the address side');
   assert.equal(seen.front[7], 'none', 'eight candidates still left a block on the message side');
-  assert.equal(seen.back[7], 'none', 'eight candidates still left a block on the address side');
-  // And once the slate has taken the width, it keeps it.
-  for (const side of ['front', 'back']) {
-    const firstNone = seen[side].indexOf('none');
-    assert.ok(firstNone > 0, `${side} never ran out of room`);
-    assert.ok(seen[side].slice(firstNone).every((t) => t === 'none'),
-      `${side} got a block back after losing it: ${seen[side].join(',')}`);
+  for (const [i, tier] of seen.back.entries()) {
+    assert.equal(tier, 'plate',
+      `n=${i + 1}: the address side's block is a column, and it is ${tier}`);
   }
+  /* And once the slate has taken the width, it keeps it. The message side only:
+   * the address side never gives its column up, so there is no 'none' in it to
+   * be monotonic about. */
+  const firstNone = seen.front.indexOf('none');
+  assert.ok(firstNone > 0, 'the message side never ran out of room');
+  assert.ok(seen.front.slice(firstNone).every((t) => t === 'none'),
+    `the message side got a block back after losing it: ${seen.front.join(',')}`);
 });
 
 test('two rows are a montage under one band, not two slates', () => {

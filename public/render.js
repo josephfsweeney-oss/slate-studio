@@ -1548,14 +1548,15 @@ function paintSlateBand(ctx, plan, style, theme, assets, bleed = 0) {
     }
   }
 
-  /* A band of names under each row of faces. */
-  for (const row of b.rows || []) {
+  /* A band of names under each row of faces. A foot slate has none: its names
+   * are stacked above the row. */
+  for (const row of (b.footSlate ? [] : b.rows || [])) {
     if (!row.band) continue;            // a montage has one band, under the group
     ctx.fillStyle = dark ? accent : plate;
     ctx.fillRect(row.band.x - B, row.band.y, row.band.w + B * 2,
       row.band.h + (row.bleedFoot ? B : 0));
   }
-  if (b.rows && b.rows.length) {
+  if (b.rows && b.rows.length && !b.footSlate) {
     ctx.textAlign = 'center';
     ctx.fillStyle = BRAND.white;
     for (const f of b.figures) {
@@ -1577,6 +1578,15 @@ function paintSlateBand(ctx, plan, style, theme, assets, bleed = 0) {
           f.nameBox.y + (f.nameBox.h + f.name.px * 0.72) / 2);
       }
     }
+  }
+
+  /* The names, stacked above the row they name, in the display face. */
+  if (b.nameStack) {
+    const ns = b.nameStack;
+    setFont(ctx, { family: 'Anton', weight: 400 }, ns.px, -0.01);
+    ctx.fillStyle = dark ? BRAND.white : plate;
+    ctx.textAlign = 'left';
+    for (const r of ns.rows) ctx.fillText(r.text, r.x ?? ns.x, r.y + ns.px * 0.80);
   }
 
   // The town and the district, under the band.

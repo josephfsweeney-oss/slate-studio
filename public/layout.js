@@ -1815,10 +1815,49 @@ function solveSlateBand(spec, measure, side) {
    * design and the block beside them already takes the width, so the height
    * taken here came straight off the portraits and their names. The reserve
    * comes in as the slate fills the piece. */
-  const listReserve = panel && hasList ? h * 0.10 * Math.min(1, Math.max(0, n - 2) / 2) : 0;
-  const stackTop = panel ? panel.y - listReserve : 0;
+  const listReserve = 0;
+  const gutter = box.w * 0.028;
+
+  /* ------------------------------------------------- the address side's shape
+   *
+   * The slate stands on the foot of the piece, not across the top of it, and
+   * the names go above the faces as a stack rather than on a band under them.
+   * That is the shape of the committee's own slate graphic, and it is a better
+   * piece: the faces get the bottom half of the paper instead of a third of
+   * it, so they can overlap and still be recognised, and the names are read
+   * before the faces rather than after them.
+   *
+   * Everything the words carry moves into the top left, beside the block, and
+   * the carrier's corner keeps the bottom right it always had. The faces stop
+   * at the panel's left edge and are cropped by the trim. */
+  /* The two row montage keeps the old shape: it puts the names on one band
+   * under the group, which is the whole point of it, and a foot slate has no
+   * band. Asking for two rows is asking for that piece. */
+  const footSlate = !!panel && !(n >= 6 && style.twoRows === true);
+  const faceH = footSlate ? h * 0.46 : 0;
+  const faceTop = footSlate ? h - faceH : 0;
+  const stackTop = panel ? (footSlate ? inner.y : panel.y - listReserve) : 0;
+  /* The names take their band out of the column before anything else is laid
+   * in it. Left to take what was over, there was nothing over: the call to
+   * action already stood on the foot of the column, and the stack came out at
+   * a pixel a line. */
+  const nameBandH = footSlate && n
+    ? Math.min(
+      /* Less of the column on a side that also carries a checklist. Two fifths
+       * of it left the seven pledges four rows of thirty pixels, which is type
+       * nobody reads off a mailbox. The names are a label for the row under
+       * them; the pledges are the argument. */
+      Math.max(1, faceTop - inner.y - box.h * 0.018) * (hasList ? 0.30 : 0.42),
+      Math.ceil(n / (n > 4 ? 2 : 1))
+        * box.h * 0.085 * clampScale(style.textScale) * clampScale(style.headScale) * 0.916
+        + box.h * 0.012)
+    : 0;
   const stackBox = panel
-    ? { x: pad, y: stackTop, w: panel.x - pad * 2, h: h - stackTop - pad * 0.5 }
+    ? (footSlate
+      ? { x: pad, y: inner.y,
+          w: Math.max(1, panel.x - pad - gutter),
+          h: Math.max(1, faceTop - inner.y - box.h * 0.018 - nameBandH) }
+      : { x: pad, y: stackTop, w: panel.x - pad * 2, h: h - stackTop - pad * 0.5 })
     : { x: inner.x, y: inner.y, w: inner.w, h: foot - inner.y };
 
   const onDark = luminance(style.bgType === 'transparent' ? '#FFFFFF'
@@ -1837,14 +1876,17 @@ function solveSlateBand(spec, measure, side) {
   const widest = rowsOf.length ? Math.max(...rowsOf.map((r) => r.length)) : 1;
 
   const nominalBandPx = box.h * 0.026 * density;
-  const nominalBandH = n ? nominalBandPx * 2.30 : 0;
-  const gutter = box.w * 0.028;
+  const nominalBandH = n ? (footSlate ? 0 : nominalBandPx * 2.30) : 0;
 
   /* The strip the faces stand in: the whole width, on both sides. The address
    * side earns it by staying above the carrier's line, and the row starts at
    * the left margin, so it never drifts over the corner the carrier is
    * standing in the way a centred row did. */
   const strip = { x: inner.x, w: inner.w };
+  /* What the foot slate is laid into: the left margin to the carrier's corner.
+   * The faces are cropped by the trim below and stop at the panel beside. */
+  const slateRun = footSlate
+    ? Math.max(1, panel.x - gutter - strip.x) : strip.w;
 
   /* A cutout is about four fifths as wide as it is tall, so a row is as wide as
    * its faces actually are. This says how wide, before anything is placed. */
@@ -1879,7 +1921,12 @@ function solveSlateBand(spec, measure, side) {
   const layoutRows = (bandH, zoneTop, zoneBottom, mode, runW = strip.w) => {
     const figZone = Math.max(1, zoneBottom - zoneTop - bandH);
     const stackH = 1 + (rowCount - 1) * rowPitch;
-    const figH = Math.min(figCap, Math.max(1, figZone / stackH));
+    /* On the foot slate the figure is set taller than the band it stands in and
+     * the bottom of it runs off the paper, the way the committee's own artwork
+     * crops the shoulders at the trim. Fitted inside the band instead, a
+     * portrait framed at the waist puts a small head in a big space. */
+    const figH = Math.min(figCap,
+      Math.max(1, figZone / stackH) * (footSlate ? 1.30 : 1));
     const groupTop = zoneTop + Math.max(0, figZone - figH * stackH);
     const bandY = groupTop + figH * stackH;
     const natural = figH / PHOTO_AR;
@@ -1993,7 +2040,10 @@ function solveSlateBand(spec, measure, side) {
      * each row of faces. Two bands, one per row, cut a montage in half and read
      * as two slates. */
     const lineH = stacked ? stackLine : bandPx * 1.30;
-    const bandH = n ? lineH * rowCount + (stacked ? lastPx * 0.6 : bandPx) : 0;
+    /* No band on the foot slate. The names are stacked above the faces, which
+     * is where the committee's artwork puts them, so a plate under them would
+     * be the same names twice. */
+    const bandH = footSlate ? 0 : (n ? lineH * rowCount + (stacked ? lastPx * 0.6 : bandPx) : 0);
     return { laid: layoutRows(bandH, zoneTop, zoneBottom, mode, runW),
              bandH, bandPx: stacked ? lastPx : bandPx, lineH,
              texts: stacked ? shortNames : texts,
@@ -2155,11 +2205,16 @@ function solveSlateBand(spec, measure, side) {
        * to a long one at twice the size and the list read as a ransom note. */
       let px = Math.min(...listIn.map(
         (t) => fitInside(measure, t, COND_BOLD, start, tw, 1, 0.02, true).px));
-      /* And held to a share of the piece. The list is an argument, not the
-       * whole side: left to grow it took height off the slate zone, the faces
-       * came in narrower, and a slate of eight stopped filling the width. */
+      /* And held to the column it is in, not to a share of the piece. An
+       * absolute cap was fine while the words had the bottom half of the
+       * address side; with the slate standing on the foot they have a band at
+       * the top instead, and a list sized against the paper ran straight
+       * through the call to action under it. What is left after the call to
+       * action and a headline worth the name is what the list may have. */
       const LEAD = 1.48;
-      const roomForList = box.h * 0.30 - box.h * 0.024;
+      const roomForList = Math.max(box.h * 0.05,
+        Math.min(box.h * 0.30 - box.h * 0.024,
+          wordsBox.h - ctaH - seatH - box.h * 0.085));
       const deep = rws * px * LEAD;
       if (deep > roomForList) px *= roomForList / deep;
       const items = listIn.map((t) => fitInside(measure, t, COND_BOLD, px, tw, 1, 0.02, true));
@@ -2211,16 +2266,23 @@ function solveSlateBand(spec, measure, side) {
       /* The candidates are the lowest thing on the piece. Anything that used to
        * sit under them, the district line and the call to action, goes above
        * them instead, and the slate stands on the foot of the paper. */
-      const zone = panel
-        ? { top: inner.y, bottom: stackTop - box.h * 0.022 }
-        : { top: inner.y + hh + subHt + listH + seatH + ctaH, bottom: foot };
+      const zone = footSlate
+        ? { top: faceTop, bottom: h }
+        : panel
+          ? { top: inner.y, bottom: stackTop - box.h * 0.022 }
+          : { top: inner.y + hh + subHt + listH + seatH + ctaH, bottom: foot };
       /* Left first, to find out what the slate leaves. If it leaves too little
        * to put anything in, the row goes back to centred: a row of eight with
        * half an inch of air on the right reads as a slip, not as a margin. */
       /* Left first, to find out what the slate leaves. If what it leaves is
        * not worth a block, the slate takes that width too. */
-      let out = solveRows(zone.top, zone.bottom, 'left');
+      /* On the foot slate the run is fixed: everything from the left margin to
+       * the carrier's corner. There is nothing to leave over, because the block
+       * has the column above the corner already. */
+      let out = solveRows(zone.top, zone.bottom, footSlate ? 'fill' : 'left', slateRun);
       let spare = strip.x + strip.w - out.laid.right - gutter;
+      if (footSlate) return { subBlk, subHt, headBlk, bp, rh, hh, zone, out,
+                              spare: 0, list, listH };
       if (spare < minAside) {
         out = solveRows(zone.top, zone.bottom, 'fill');
       } else if (spare > maxAside) {
@@ -2291,10 +2353,12 @@ function solveSlateBand(spec, measure, side) {
    * less room, until the block goes. Once it exists it occupies out to the
    * trim. Deciding on the bled width let an eight candidate slate keep a block
    * it has no room for. */
-  const asideRoom = strip.x + strip.w - asideX;
-  const asideW = w - asideX;
+  const asideRoom = footSlate ? panel.w : strip.x + strip.w - asideX;
+  const asideW = footSlate ? w - panel.x : w - asideX;
   const frac = asideRoom / strip.w;
-  const tier = sideBySide ? 'words' : (!n || asideRoom < minAside) ? 'none' : 'plate';
+  const tier = sideBySide ? 'words'
+    : footSlate ? 'plate'
+      : (!n || asideRoom < minAside) ? 'none' : 'plate';
 
   let aside = null;
   if (tier === 'words') {
@@ -2310,7 +2374,12 @@ function solveSlateBand(spec, measure, side) {
      * once the slate gave height back to the pledges its foot stopped a fifth
      * of an inch above the address panel with nothing in the gap. Four edges,
      * four different treatments, which is what made it look wrong. */
-    const rect = { x: asideX, y: box.y, w: asideW, h: laid.bandY + lastBandH - box.y };
+    /* On the foot slate the block is the column above the carrier's corner:
+     * off the top and the right of the trim, foot on the panel's own top line,
+     * so the right hand side of the piece is one column from edge to edge. */
+    const rect = footSlate
+      ? { x: panel.x, y: box.y, w: w - panel.x, h: panel.y - box.y }
+      : { x: asideX, y: box.y, w: asideW, h: laid.bandY + lastBandH - box.y };
     const dateText = String(copy.voteDate || '').trim();
     const inset = rect.w * 0.10;
     const tw = Math.max(1, rect.w - inset * 2);
@@ -2399,15 +2468,19 @@ function solveSlateBand(spec, measure, side) {
          * whole: on Rockingham 25 one shoulder covered the man beside him. */
         maxW: Math.min(r.cellW * (r.spread && r.rn >= 7 ? 1.62 : 1.32), r.h * 0.92),
         clipH: r.clipH,
-        name: { text: texts[k], px: bandPx, dropped,
+        /* A foot slate carries no caption under the face: the names are
+         * stacked above the row, so a plate under it would be the same name
+         * twice. */
+        name: footSlate ? null : { text: texts[k], px: bandPx, dropped,
                 first: firsts ? firsts[k] : '', firstPx },
-        nameBox: { x, w: r.cellW, h: lineH,
+        nameBox: footSlate ? null : { x, w: r.cellW, h: lineH,
           y: laid.bandY + (firsts ? lastPad : bandPx * 0.5) + ri * lineH },
       });
     }
     rows.push({ y: r.y, h: r.h,
       bleedFoot: !!(footBleed && r === lastRow),
-      band: r === lastRow
+      /* No plate under a foot slate: the names are stacked above the row. */
+      band: !footSlate && r === lastRow
         ? { x: box.x, y: laid.bandY, w: bandRight, h: lastBandH } : null });
   }
 
@@ -2431,6 +2504,62 @@ function solveSlateBand(spec, measure, side) {
     : listTop + Math.max(0, (seatY - listTop - checklistH) / 2);
   const wordsCx = wordsBox.x + wordsBox.w / 2;
 
+  /* ------------------------------------------------- the names, above the row
+   *
+   * The committee's own slate graphic sets them one to a line, in the display
+   * face, at the size the longest one can carry across its column. So does
+   * this: the slate is read before the faces are looked at, and a row of
+   * overlapping portraits cannot be captioned one by one anyway.
+   *
+   * They stand on the faces, which is what holds them to the row they name,
+   * and take what the words above them have not used. */
+  let nameStack = null;
+  if (footSlate && n) {
+    const NLINE = 0.916;                 // Anton's caps are 0.860 of its size
+    const lines = slate.map((c) => `${firstLine(c, style)} ${c.last}`.trim().toUpperCase());
+    const surnames = slate.map((c) => String(c.last || '').trim().toUpperCase());
+    const fillTo = (arr, width) => Math.min(...arr.map((t) => {
+      const at100 = widthAt(measure, t, ANTON, 100, -0.01);
+      return at100 > 0 ? (width / at100) * 100 : 0;
+    }));
+    /* Two columns past four. Eight names one to a line in the band above the
+     * slate came out at thirty pixels each, which is a caption, not a name.
+     * Set two abreast they are twice the size in the same band, and the column
+     * is wide enough to hold the longest of them twice over. */
+    const cols = n > 4 ? 2 : 1;
+    const rws = Math.ceil(n / cols);
+    const colGap = wordsBox.w * 0.04;
+    const colW = (wordsBox.w - colGap * (cols - 1)) / cols;
+    /* The band taken out of the column for them, from the foot of the words to
+     * the top of the faces. */
+    const roomForNames = Math.max(1, faceTop - box.h * 0.024
+      - (wordsBox.y + wordsBox.h) - box.h * 0.008);
+    const sizeFor = (arr) => {
+      let q = Math.min(fillTo(arr, colW), box.h * 0.085 * textScale) * headScale;
+      if (rws * q * NLINE > roomForNames) q = roomForNames / (rws * NLINE);
+      return q;
+    };
+    let use = lines;
+    let px = sizeFor(use);
+    /* Under the floor a voter reads from a mailbox, surnames alone carry the
+     * row: that is what a ballot matches on. */
+    if (px < box.h * 0.030 && surnames.some((t, i) => t !== use[i])) {
+      use = surnames;
+      px = sizeFor(use);
+    }
+    const stackH = rws * px * NLINE;
+    const top = faceTop - box.h * 0.024 - stackH;
+    nameStack = {
+      x: wordsBox.x, w: wordsBox.w, colW, colGap, cols, rws,
+      px, line: NLINE, dropped: use !== lines,
+      rows: use.map((t, i) => ({
+        text: t,
+        x: wordsBox.x + Math.floor(i / rws) * (colW + colGap),
+        y: top + (i % rws) * px * NLINE,
+      })),
+    };
+  }
+
   const dpi = spec.dpi || 0;
   const shortest = laid.figH;
   const cramped = shortest < box.h * 0.16;
@@ -2448,7 +2577,7 @@ function solveSlateBand(spec, measure, side) {
     mailPanel: panel,
     qr: null,
     band: {
-      side, box, inner, pad, cx,
+      side, box, inner, pad, cx, footSlate, nameStack,
       onDark, align, shape: sideBySide ? 'beside' : 'over',
       top: { x: wordsBox.x, w: wordsBox.w },
       topCx: wordsCx,
@@ -2474,6 +2603,11 @@ function solveSlateBand(spec, measure, side) {
     disclaimer: null,
     warnings: [
       ...(!n ? ['Nobody on the piece. A slate mailer with no slate is a background.'] : []),
+      ...(dpi && checklist && checklist.px / dpi * 72 < 11
+        ? [`The checklist is set at ${(checklist.px / dpi * 72).toFixed(0)} point. This side `
+          + 'is carrying a headline, a checklist, a call to action, the names and the faces, '
+          + 'and the band above the slate holds about three of them at a size anybody reads '
+          + 'off a mailbox. Drop one, or put this side on a taller trim.'] : []),
       ...(!String(copy.headline || '').trim()
         ? [`The ${side === 'back' ? 'address' : 'message'} side has no headline.`] : []),
       ...(!ctaText
