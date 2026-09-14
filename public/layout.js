@@ -2173,14 +2173,23 @@ function solveSlateBand(spec, measure, side) {
      * seven inches by two and a quarter at the sizes the message side uses, so
      * the supporting lines give way and the headline does not: it is the only
      * one of them anybody reads at arm's length. */
-    align = 'center';
+    /* One left edge down the whole column. Centred, the claim sat over
+     * left-aligned names and a left-aligned list, which is three alignments on
+     * one piece and no edge for the eye to run down. Centre by choice: the
+     * shape that has the words over the faces still centres, because there the
+     * column is the whole piece. */
+    align = footSlate ? 'left' : 'center';
     wordsBox = stackBox;
     /* The call to action is the last thing anybody reads and the only thing on
      * the piece that tells them what to do, so it takes all the size the column
      * will give it and stops at the width. */
-    ctaBlk = fitInside(measure, ctaText, ANTON, box.h * (panel ? 0.072 : 0.092) * density * textScale,
-      wordsBox.w * 0.94, 1, 0.005, true);
-    ctaH = ctaBlk.h ? ctaBlk.px * 1.58 : 0;
+    /* A band across the foot carries bigger type than a block inside a column,
+     * and it is the one line on the piece that tells anybody what to do. */
+    const ctaRun = footSlate ? panel.x - pad * 2 : wordsBox.w * 0.94;
+    ctaBlk = fitInside(measure, ctaText, ANTON,
+      box.h * (footSlate ? 0.088 : panel ? 0.072 : 0.092) * density * textScale,
+      ctaRun, 1, 0.005, true);
+    ctaH = ctaBlk.h ? ctaBlk.px * (footSlate ? 1.72 : 1.58) : 0;
     seatBlk = fitBlock(measure, seatLine, ANTON,
       box.h * (panel ? 0.042 : 0.058) * density * textScale, wordsBox.w, 1, 0.01, true);
     seatH = seatBlk.h ? seatBlk.h + box.h * 0.014 : 0;
@@ -2239,7 +2248,8 @@ function solveSlateBand(spec, measure, side) {
 
     const stackedPass = (dropSub, listScale = 1) => {
       const { list, listH } = buildList(listScale);
-      let subBlk = dropSub ? EMPTY_SUB : fitBlock(measure, copy.subhead, COND_BOLD,
+      let subBlk = (dropSub || promiseList.length) ? EMPTY_SUB
+        : fitBlock(measure, copy.subhead, COND_BOLD,
         box.h * (panel ? 0.036 : 0.050) * density * textScale,
         wordsBox.w * 0.98, panel ? 1 : 2, 0.045, true);
       let subHt = subBlk.h ? subBlk.h + box.h * (panel ? 0.016 : 0.024) : 0;
@@ -2253,7 +2263,7 @@ function solveSlateBand(spec, measure, side) {
       const faceFloorRow = box.h * (list ? 0.24
         : rowCount > 1 ? 0.20 : (n <= 4 ? 0.36 : 0.26)) / Math.max(1, headScale);
       let room = panel
-        ? wordsBox.h - subHt - listH - seatH - ctaH
+        ? wordsBox.h - subHt - listH - seatH - (footSlate ? 0 : ctaH)
         : Math.max(box.h * 0.10,
           inner.h - ctaH - seatH - subHt - listH - (faceFloorRow + nominalBandH) * rowCount);
       /* With no room left for a headline the line under it is the thing that
@@ -2262,18 +2272,14 @@ function solveSlateBand(spec, measure, side) {
       if (panel && room < box.h * 0.062 && subBlk.lines.length) {
         subBlk = EMPTY_SUB;
         subHt = 0;
-        room = wordsBox.h - listH - seatH - ctaH;
+        room = wordsBox.h - listH - seatH - (footSlate ? 0 : ctaH);
       }
       /* fitHead measures the type; the rule under it, the block padding and the
        * gap are chrome the block carries as well. Room has to come off for
        * them, or the headline fits by its own measure and the line under it
        * lands on the district line by three pixels. */
       room = Math.max(box.h * 0.035, room - box.h * 0.034);
-      /* And no headline here either when the block has taken the list it heads:
-       * a heading with nothing under it is a line looking for its paragraph. */
-      const headBlk = promiseList.length
-        ? { lines: [], h: 0, px: 0, font: COND_BOLD, ls: 0 }
-        : fitHead(panel ? wordsBox.w : inner.w, room, 3);
+      const headBlk = fitHead(panel ? wordsBox.w : inner.w, room, 3);
       const bp = onDark && headBlk.lines.length ? headBlk.px * 0.30 : 0;
       const rh = !onDark && headBlk.lines.length ? Math.max(3, box.h * 0.0085) : 0;
       const hh = headBlk.h
@@ -2431,7 +2437,13 @@ function solveSlateBand(spec, measure, side) {
      * many to mark is what gives way. Scaling the heading with the rest put it
      * at ten point over eleven point pledges, which is a heading under its own
      * list. */
-    const fitParts = (k, holdList = false) => {
+    /* The block's three parts are sized in the order they matter and none of
+     * them is left to absorb the rest. The heading and the count are short
+     * fixed lines, so they take their ceilings; the pledges are seven rows and
+     * take the height left once those two have theirs, held to a ceiling of
+     * their own. `listRoom` is that height, and it is nothing on the first pass
+     * because the fixed lines have not been measured yet. */
+    const fitParts = (k, holdList = false, listRoom = 0) => {
       /* A block carrying the promise does not carry the date as well. Four
        * inches by three and a quarter will not hold an election day, a date, a
        * count, a heading and seven pledges at a size anybody reads off a
@@ -2453,11 +2465,16 @@ function solveSlateBand(spec, measure, side) {
         : fitInside(measure, dateText, ANTON,
           tw * 0.225 * k * density, tw, 1, -0.005, true);
       const note2 = fitInside(measure, noteText, COND_BOLD,
-        tw * (owns ? 0.150 : 0.125) * k * density, tw, 2, 0.06, true);
+        tw * (owns ? 0.090 : 0.125) * (owns && holdList ? 1 : k) * density, tw, 2, 0.06, true);
       /* The heading and the pledges under it, one to a line, each set to the
        * column and all of them at the size the longest can carry. */
+      /* The block heads its own list, off the supporting line rather than the
+       * headline: the headline is the claim the piece makes and it belongs in
+       * the column beside the slate, where the eye lands first. Taking the
+       * headline here left that column with an instruction and no argument. */
+      const headText = String(copy.subhead || copy.headline || '').trim();
       const head2 = owns
-        ? fitBlock(measure, copy.headline, COND_BOLD,
+        ? fitBlock(measure, headText, COND_BOLD,
           tw * 0.072 * (holdList ? 1 : k) * density, tw, 3, 0.03, true)
         : { lines: [], h: 0, px: 0 };
       let items2 = null;
@@ -2465,13 +2482,15 @@ function solveSlateBand(spec, measure, side) {
       if (owns) {
         const tick2 = tw * 0.075;
         const lw = Math.max(1, tw - tick2 * 1.7);
-        const lk = holdList ? 1 : k;
-        /* Held under what the heading and the count need above them. Sized
-         * to the block alone the pledges took nine tenths of it and left the
-         * line that heads them at eight point. */
-        const ceil2 = Math.min(tw * 0.070, box.h * 0.029) * lk * density;
-        const px2 = Math.min(ceil2,
+        /* A ceiling of their own, and then the height the heading and the
+         * count have left them. Sized against the block alone the pledges took
+         * nine tenths of it and left the line that heads them at eight point;
+         * sized by one shared factor nothing gave way at all. */
+        const ceil2 = Math.min(tw * 0.078, box.h * 0.036) * (holdList ? 1 : k) * density;
+        const fits = Math.min(ceil2,
           ...promiseList.map((t) => fitInside(measure, t, COND_BOLD, ceil2, lw, 1, 0.02, true).px));
+        const px2 = listRoom > 0
+          ? Math.min(fits, listRoom / (promiseList.length * 1.62)) : fits;
         items2 = {
           tick: tick2, tw: lw, px: px2, rowH: px2 * 1.62,
           items: promiseList.map((t) => fitInside(measure, t, COND_BOLD, px2, lw, 1, 0.02, true)),
@@ -2479,7 +2498,7 @@ function solveSlateBand(spec, measure, side) {
         listH2 = promiseList.length * items2.rowH;
       }
       const h2 = (kick2.h ? kick2.h + gap : 0) + date2.h + (note2.h ? note2.h + gap : 0)
-        + (head2.h ? head2.h + gap * 1.4 : 0) + (listH2 ? listH2 + gap * 0.4 : 0);
+        + (head2.h ? head2.h + gap * 1.4 : 0) + (listH2 ? listH2 + gap * 1.4 : 0);
       return { kick2, date2, note2, head2, items2, listH2, h2 };
     };
     let parts = fitParts(1);
@@ -2493,11 +2512,11 @@ function solveSlateBand(spec, measure, side) {
        * and the seven pledges came out at eleven point whatever the ceilings
        * were set to: everything shrank by the same factor, so nothing gave
        * way. */
-      const held = parts.listH2 + gap * 0.4
-        + (parts.head2.h ? parts.head2.h + gap * 1.4 : 0);
-      const room = Math.max(1, fill - held);
-      const rest = parts.h2 - held;
-      if (rest > room) parts = fitParts(Math.max(0.25, room / rest), true);
+      const fixed = (parts.head2.h ? parts.head2.h + gap * 1.4 : 0)
+        + (parts.note2.h ? parts.note2.h + gap : 0) + gap * 1.4;
+      parts = fitParts(1, true, Math.max(1, fill - fixed));
+      /* And if the fixed lines alone will not fit, everything comes down. */
+      if (parts.h2 > fill) parts = fitParts(Math.max(0.25, fill / parts.h2));
     } else if (parts.h2 > fill) {
       parts = fitParts(Math.max(0.25, fill / parts.h2));
     }
@@ -2515,10 +2534,16 @@ function solveSlateBand(spec, measure, side) {
     };
     const k = place(kicker);
     const d = place(date);
-    const nt = place(note);
+    /* On a promise column the order is the argument first and the instruction
+     * last: the heading names the thing, the pledges are the thing, and how
+     * many to mark closes it. Set above the heading, the count was an order
+     * given before the reason for it. */
+    const nt0 = owns ? null : place(note);
     const hd = parts.head2.h ? place(parts.head2, gap * 1.4) : null;
     const lst = parts.listH2
       ? { ...parts.items2, x: rect.x + inset, y: cur, w: tw } : null;
+    if (lst) cur += parts.listH2 + gap;
+    const nt = owns ? place(note) : nt0;
     if (d || nt || hd || lst) {
       aside = { tier, rect, inset, bleedFoot: !!footBleed, kicker: k, date: d, note: nt,
                 head: hd, list: lst, owns };
@@ -2582,10 +2607,19 @@ function solveSlateBand(spec, measure, side) {
    * the words are their own column and the two sit at its foot. */
   const overFaces = !panel && !sideBySide;
   const listTop = subTop + subH;
+  /* On a foot slate the call to action is a band across the bottom of the
+   * piece, bled to the trim on the left and the foot, running to the carrier's
+   * corner. It was standing at the top of the column, which made it the first
+   * thing anybody read: an instruction with no argument attached to it yet.
+   * The last thing you read is what to do. */
+  const ctaFoot = footSlate && ctaH > 0;
   const seatY = overFaces
-    ? listTop + checklistH : wordsBox.y + wordsBox.h - ctaH - seatH + box.h * 0.008;
+    ? listTop + checklistH
+    : ctaFoot ? wordsBox.y + wordsBox.h - seatH
+      : wordsBox.y + wordsBox.h - ctaH - seatH + box.h * 0.008;
   const ctaY = overFaces
-    ? listTop + checklistH + seatH : wordsBox.y + wordsBox.h - ctaH;
+    ? listTop + checklistH + seatH
+    : ctaFoot ? h - ctaH : wordsBox.y + wordsBox.h - ctaH;
   /* In the carrier's corner the list has the room between the words and the
    * call to action, and it is centred in what is left rather than jammed under
    * the headline with a hole beneath it. */
@@ -2691,7 +2725,9 @@ function solveSlateBand(spec, measure, side) {
       bandRect: rows.length ? rows[rows.length - 1].band : null,
       seat: seatBlk.lines.length ? { block: seatBlk, y: seatY } : null,
       cta: ctaBlk.lines.length
-        ? { block: ctaBlk, y: ctaY, h: ctaH, x: wordsBox.x, w: wordsBox.w } : null,
+        ? (ctaFoot
+          ? { block: ctaBlk, y: ctaY, h: ctaH, x: box.x, w: panel.x, bleed: true }
+          : { block: ctaBlk, y: ctaY, h: ctaH, x: wordsBox.x, w: wordsBox.w }) : null,
     },
     disclaimer: null,
     warnings: [
@@ -3300,7 +3336,7 @@ function solveGuarantee(spec, measure) {
   y += titleH;
   /* The mark is New Hampshire, which is half as wide as it is tall, so it
    * needs the width a rounder mark did not. */
-  const divider = { y: y + divH * 0.45, markW: s * 0.040,
+  const divider = { y: y + divH * 0.45, markW: s * 0.058,
     gap: s * 0.022, w: markCol.w * 0.62, cx };
 
   /* The four words down the right, in a solid plate, on a split.

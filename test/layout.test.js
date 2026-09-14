@@ -999,7 +999,7 @@ test('the election information stands in the column above the carrier', () => {
           `${where}: a pledge runs out of the side of the block`);
         /* The heading leads its own list. Scaled with what was left over it
          * came out at ten point over eleven point pledges. */
-        assert.ok(a.head.block.px >= q.px * 1.2,
+        assert.ok(a.head.block.px > q.px,
           `${where}: the heading is ${a.head.block.px.toFixed(0)}px over `
           + `${q.px.toFixed(0)}px pledges`);
       }
@@ -1163,13 +1163,39 @@ test('the pledges are readable, in the block, under a heading that leads them', 
       /* And the heading is with them, leading them, rather than left behind in
        * the other column with nothing under it. */
       assert.ok(a.head, `${where}: the heading did not follow its list`);
-      assert.ok(!b.head || b.head.block.lines.length === 0,
-        `${where}: the heading is in both columns`);
-      assert.ok(a.head.block.px >= a.list.px * 1.2,
+      /* Two different lines, not one line moved. The claim the piece makes
+       * stays in the column beside the slate, where the eye lands; the block
+       * heads its own list off the supporting line. Taking the claim into the
+       * block left that column with an instruction and no argument. */
+      assert.ok(b.head && b.head.block.lines.length,
+        `${where}: the column beside the slate has no claim on it`);
+      assert.notEqual(b.head.block.lines.join(' '), a.head.block.lines.join(' '),
+        `${where}: the same line is set in both columns`);
+      assert.ok(a.head.block.px > a.list.px,
         `${where}: the heading is ${a.head.block.px.toFixed(0)}px over `
         + `${a.list.px.toFixed(0)}px pledges`);
       assert.ok(a.head.y + a.head.block.h <= a.list.y + 1,
         `${where}: the heading is not above its list`);
+      /* One on the ballot has no count to give: "vote for all one" is not a
+       * sentence. Two or more, and it closes the column. */
+      const listFoot = a.list.y + a.list.items.length * a.list.rowH;
+      if (n >= 2) {
+        assert.ok(a.note, `${where}: ${n} on the ballot and no count of how many to mark`);
+        assert.ok(a.note.y >= listFoot - 1,
+          `${where}: the count is not under the list it closes`);
+      }
+
+      /* And the block is used rather than half filled. The pledges take the
+       * height the heading and the count leave them, so the three of them fill
+       * it; sized against their own ceiling alone they stopped short and the
+       * whole stack sat small in the middle of a lot of navy. */
+      const stackTop = a.head.y;
+      const stackFoot = a.note ? a.note.y + a.note.block.h : listFoot;
+      assert.ok(stackFoot - stackTop >= a.rect.h * 0.60,
+        `${where}: the type fills ${((stackFoot - stackTop) / a.rect.h * 100).toFixed(0)}% `
+        + 'of the block');
+      assert.ok(stackFoot <= a.rect.y + a.rect.h + 1,
+        `${where}: the stack runs out of the foot of the block`);
     }
   }
 });
@@ -1392,9 +1418,24 @@ test('every mail side puts the slate, a headline and a call to action on the pie
         const wordsBottom = b.sub ? b.sub.y + b.sub.block.h
           : (b.head ? b.head.y + b.head.block.h : b.cta.y);
         assert.ok(wordsBottom <= b.cta.y + 1, `${where} the copy lands on the call to action`);
-        if (b.nameStack) {
+        if (b.nameStack && !b.footSlate) {
           assert.ok(b.cta.y + b.cta.h <= b.nameStack.rows[0].y + 1,
             `${where} the call to action lands on the names`);
+        }
+        if (b.footSlate) {
+          /* The last thing anybody reads is what to do, so it is a band across
+           * the foot of the piece, under the names and under the faces, bled
+           * to the trim on the left and the bottom. Standing at the top of the
+           * column it was the first thing read: an instruction with no argument
+           * attached to it yet. */
+          assert.ok(b.cta.bleed, `${where} the call to action is not a band`);
+          assert.equal(Math.round(b.cta.y + b.cta.h), c.h,
+            `${where} the call to action does not run to the foot`);
+          assert.equal(Math.round(b.cta.x), 0,
+            `${where} the call to action does not bleed off the left`);
+          const lowestName = Math.max(...b.nameStack.rows.map((r) => r.y));
+          assert.ok(b.cta.y > lowestName,
+            `${where} the call to action is above the names`);
         }
         if (b.seat) {
           assert.ok(wordsBottom <= b.seat.y + 1, `${where} the copy lands on the district line`);

@@ -86,7 +86,23 @@ export const MAIL_PROGRAMS = [{
         ],
       },
       back: {
-        headline: 'Republicans Are Fighting For New Hampshire',
+        /* The claim, beside the slate, where the eye lands.
+         *
+         * "Republicans Are Fighting For New Hampshire" asserts effort, which is
+         * what every mailer in every race says. This says what the piece is:
+         * a count, the mechanism, and the timing. The number is the argument,
+         * which is why seven pledges under it is a list and not a wall, and
+         * "before you vote" is the whole point of a guarantee: anybody can
+         * promise after the fact. */
+        /* Broken by hand. Left to the wrapper it came out "SEVEN PROMISES. IN
+         * / WRITING. BEFORE YOU VOTE.", which breaks a phrase after a
+         * preposition. Three lines, one clause each, and each line stands on
+         * its own if it is all anybody reads. */
+        headline: 'Seven Promises.\nIn Writing.\nBefore You Vote.',
+        /* And the line that heads them names the thing, so the two sides of
+         * the piece are one idea: the lockup on the reverse is the Granite
+         * Guarantee, and this is what the Granite Guarantee actually says. */
+        subhead: 'The Granite Guarantee',
         /* The seven, in the corner the carrier is not standing in. The front of
          * this round is the lockup and the four words; this is where the
          * promises themselves are actually read. */

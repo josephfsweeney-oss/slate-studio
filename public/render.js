@@ -1632,7 +1632,9 @@ function paintSlateBand(ctx, plan, style, theme, assets, bleed = 0) {
     const blk = b.cta.block;
     const x = b.cta.x;
     ctx.fillStyle = dark ? accent : (theme.ctaBg || accent);
-    ctx.fillRect(x, b.cta.y, b.cta.w, b.cta.h);
+    /* A band at the foot bleeds off the left and the bottom of the trim. */
+    if (b.cta.bleed) ctx.fillRect(x - B, b.cta.y, b.cta.w + B, b.cta.h + B);
+    else ctx.fillRect(x, b.cta.y, b.cta.w, b.cta.h);
     ctx.fillStyle = BRAND.white;
     setFont(ctx, blk.font, blk.px, blk.ls);
     ctx.textAlign = 'center';
