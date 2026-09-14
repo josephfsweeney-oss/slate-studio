@@ -3076,11 +3076,23 @@ function solveGuarantee(spec, measure) {
   const divider = { y: y + divH * 0.45, markW: s * 0.040,
     gap: s * 0.022, w: markCol.w * 0.62, cx };
 
-  /* The four words down the right, in a solid plate, on a split. */
+  /* The four words down the right, in a solid plate, on a split.
+   *
+   * Squared up to the mark beside it, top and bottom. Run from under the
+   * masthead to the foot of the frame instead, the plate started below the cap
+   * of GRANITE and finished below the baseline of GUARANTEE, so the two halves
+   * of the piece sat at different heights and the block read as dropped in.
+   *
+   * The bounds are the ink, not the line boxes: Anton's caps are 0.860 of its
+   * size and the painter sets each word at 0.76 of it above its own y, so the
+   * cap of the first word is a tenth of a size above where its box starts and
+   * the baseline of the last is 0.76 of a size below where its box does. */
   let promise = null;
-  if (promiseW) {
-    const bodyTop = inner.y + kickH;
-    const bodyH = Math.max(1, floor - bodyTop);
+  if (promiseW && title.length) {
+    const firstW = title[0];
+    const lastW = title[title.length - 1];
+    const bodyTop = firstW.y + firstW.px * (0.76 - 0.86);
+    const bodyH = Math.max(1, (lastW.y + lastW.px * 0.76) - bodyTop);
     const inset = promiseW * 0.11;
     const tw = Math.max(1, promiseW - inset * 2);
     const LEAD = 1.85;

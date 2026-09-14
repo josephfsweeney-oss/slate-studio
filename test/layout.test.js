@@ -1519,6 +1519,22 @@ test('the lockup fills a landscape trim instead of floating in it', () => {
       measure);
     const g = p.guarantee;
     assert.equal(g.layout, 'split', `${id} is landscape and did not split`);
+
+    /* The plate squares up to the mark beside it, top and bottom. Run from
+     * under the masthead to the foot of the frame it started below the cap of
+     * the first word and finished below the baseline of the last, so the two
+     * halves of the piece sat at different heights. The bounds are the ink:
+     * Anton's caps are 0.860 of its size and the painter sets each word at
+     * 0.76 of it above its own y. */
+    const first = g.title[0];
+    const last = g.title[g.title.length - 1];
+    const capTop = first.y + first.px * (0.76 - 0.86);
+    const baseline = last.y + last.px * 0.76;
+    assert.ok(Math.abs(g.promise.panel.y - capTop) <= 1,
+      `${id}: the plate starts ${(g.promise.panel.y - capTop).toFixed(0)}px off the cap`);
+    assert.ok(Math.abs((g.promise.panel.y + g.promise.panel.h) - baseline) <= 1,
+      `${id}: the plate ends `
+      + `${(g.promise.panel.y + g.promise.panel.h - baseline).toFixed(0)}px off the baseline`);
     const widest = Math.max(...g.title.map((t) => widthOf(t.text, t.px)));
     assert.ok(widest >= g.markCol.w * 0.92,
       `${id}: the mark fills ${(widest / g.markCol.w * 100).toFixed(0)}% of its column`);
