@@ -1091,6 +1091,46 @@ test('the address side stands its slate on the foot, names above', () => {
         assert.equal(ns.rows[i].x, ns.rows[i % ns.cols].x,
           `${where}: name ${i + 1} is not in column ${(i % ns.cols) + 1}`);
       }
+
+      /* The two columns hang off a rule down the gutter: the first flush right
+       * against it, the second flush left off it. Set both left, the gutter was
+       * whatever the shorter names happened to leave, which is a different
+       * width in every district. */
+      if (ns.cols > 1 && n > 1) {
+        assert.ok(ns.rule, `${where}: two columns and no rule between them`);
+        const left = ns.rule.x - ns.rule.w / 2;
+        const right = ns.rule.x + ns.rule.w / 2;
+        assert.ok(left > ns.x + ns.colW,
+          `${where}: the rule is inside the first column`);
+        assert.ok(right < ns.x + ns.colW + ns.colGap,
+          `${where}: the rule is inside the second column`);
+
+        for (const [i, r] of ns.rows.entries()) {
+          const wide = measure(r.text, ANTON_F) / 100 * ns.px
+            - 0.01 * ns.px * (r.text.length - 1);
+          if (i % ns.cols === 0) {
+            assert.equal(r.align, 'right', `${where}: "${r.text}" is not flush right`);
+            assert.equal(Math.round(r.anchor), Math.round(r.x + ns.colW),
+              `${where}: "${r.text}" is not hung off the rule`);
+            assert.ok(r.anchor <= left + 1, `${where}: "${r.text}" crosses the rule`);
+            assert.ok(r.anchor - wide >= ns.x - 1,
+              `${where}: "${r.text}" runs off the left of the column`);
+          } else {
+            assert.equal(r.align, 'left', `${where}: "${r.text}" is not flush left`);
+            assert.ok(r.x >= right - 1, `${where}: "${r.text}" crosses the rule`);
+          }
+        }
+        /* And the rule is the height of the ink, so it does not hang above the
+         * first name or below the last. */
+        const inkTop = ns.rows[0].y + ns.px * (0.80 - 0.86);
+        const inkFoot = Math.max(...ns.rows.map((r) => r.y)) + ns.px * 0.80;
+        assert.ok(Math.abs(ns.rule.y - inkTop) <= 1,
+          `${where}: the rule starts above the first name`);
+        assert.ok(Math.abs((ns.rule.y + ns.rule.h) - inkFoot) <= 1,
+          `${where}: the rule runs past the last name`);
+      } else {
+        assert.equal(ns.rule, null, `${where}: one column and a rule beside it`);
+      }
       /* A run down the list is not a run down the page, so the advance is
        * checked between a name and the one above it in its own column. */
       for (let i = ns.cols; i < n; i++) {

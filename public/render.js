@@ -1610,10 +1610,20 @@ function paintSlateBand(ctx, plan, style, theme, assets, bleed = 0) {
   /* The names, stacked above the row they name, in the display face. */
   if (b.nameStack) {
     const ns = b.nameStack;
+    /* The rule down the gutter first, so the names sit on it rather than it on
+     * them. In the accent, because the names are the plate colour and a rule in
+     * the same ink would read as part of the type. */
+    if (ns.rule) {
+      ctx.fillStyle = dark ? accent : (theme.ruleInk || accent);
+      ctx.fillRect(ns.rule.x - ns.rule.w / 2, ns.rule.y, ns.rule.w, ns.rule.h);
+    }
     setFont(ctx, { family: 'Anton', weight: 400 }, ns.px, -0.01);
     ctx.fillStyle = dark ? BRAND.white : plate;
+    for (const r of ns.rows) {
+      ctx.textAlign = r.align || 'left';
+      ctx.fillText(r.text, r.anchor ?? r.x ?? ns.x, r.y + ns.px * 0.80);
+    }
     ctx.textAlign = 'left';
-    for (const r of ns.rows) ctx.fillText(r.text, r.x ?? ns.x, r.y + ns.px * 0.80);
   }
 
   // The town and the district, under the band.

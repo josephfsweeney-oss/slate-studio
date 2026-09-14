@@ -2660,7 +2660,8 @@ function solveSlateBand(spec, measure, side) {
      * the column is wide enough to hold the longest of them twice over. */
     const cols = NAME_COLS(n);
     const rws = Math.ceil(n / cols);
-    const colGap = wordsBox.w * 0.04;
+    /* Wide enough that the names are not touching the rule they hang off. */
+    const colGap = wordsBox.w * 0.062;
     const colW = (wordsBox.w - colGap * (cols - 1)) / cols;
     /* The band taken out of the column for them, from the foot of the words to
      * the top of the faces. */
@@ -2684,14 +2685,33 @@ function solveSlateBand(spec, measure, side) {
     }
     const stackH = rws * px * NLINE;
     const top = faceTop - box.h * 0.006 - stackH;
+    /* Two columns hung off a rule down the gutter: the first column is flush
+     * right against it and the second flush left off it. Both set left, the
+     * gutter was whatever the shorter names in the first column happened to
+     * leave, which is a different width on every district. A rule makes it one
+     * axis, and the block reads as a list rather than two lists. */
+    const rows = use.map((t, i) => {
+      const col = i % cols;
+      const left = wordsBox.x + col * (colW + colGap);
+      return {
+        text: t, x: left,
+        align: cols > 1 && col === 0 ? 'right' : 'left',
+        anchor: cols > 1 && col === 0 ? left + colW : left,
+        y: top + Math.floor(i / cols) * px * NLINE,
+      };
+    });
+    /* The rule runs the height of the ink, not of the line boxes: Anton's caps
+     * are 0.860 of its size and the painter sets each name at 0.80 of it below
+     * its own y, so the box above the first name and below the last is empty. */
+    const inkTop = rows[0].y + px * (0.80 - 0.86);
+    const inkFoot = Math.max(...rows.map((r) => r.y)) + px * 0.80;
     nameStack = {
       x: wordsBox.x, w: wordsBox.w, colW, colGap, cols, rws,
-      px, line: NLINE, dropped: use !== lines,
-      rows: use.map((t, i) => ({
-        text: t,
-        x: wordsBox.x + (i % cols) * (colW + colGap),
-        y: top + Math.floor(i / cols) * px * NLINE,
-      })),
+      px, line: NLINE, dropped: use !== lines, rows,
+      rule: cols > 1 && n > 1
+        ? { x: wordsBox.x + colW + colGap / 2, y: inkTop,
+            w: Math.max(2, px * 0.055), h: inkFoot - inkTop }
+        : null,
     };
   }
 
