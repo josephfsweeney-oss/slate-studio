@@ -998,7 +998,7 @@ test('the address side stands its slate on the foot, names above', () => {
   const ANTON_F = { family: 'Anton', weight: 400 };
   for (const id of ['mail6', 'mail11']) {
     const c = CANVASES.find((x) => x.id === id);
-    for (const n of [1, 2, 3, 4, 5, 8]) {
+    for (const n of [1, 2, 3, 4, 5, 6, 7, 8]) {
       const list = slate(n);
       const copy = { ...SIDE_COMMON, ...piece.back };
       const p = solve({ canvas: { w: c.w, h: c.h }, dpi: c.dpi, slate: list, copy,
@@ -1040,14 +1040,36 @@ test('the address side stands its slate on the foot, names above', () => {
       // Above the faces, and never printing through one another.
       const lowest = Math.max(...ns.rows.map((r) => r.y));
       assert.ok(lowest + ns.px <= top + 1, `${where}: the names run into the faces`);
-      /* Past four they are set two abreast, so a run down the list is not a run
-       * down the page: the advance is checked inside each column. */
-      assert.equal(ns.cols, n > 4 ? 2 : 1, `${where}: ${ns.cols} columns for ${n} names`);
-      for (let i = 1; i < n; i++) {
-        if (ns.rows[i].x !== ns.rows[i - 1].x) continue;      // a new column
-        const step = ns.rows[i].y - ns.rows[i - 1].y;
+      /* The grid: two columns for everything but a single name, filled across
+       * and then down. One and two share a line, three sits under one, four
+       * under two, and so on to eight in two columns of four. */
+      /* The table as it was given, written out rather than asked of the code:
+       * a test that derives the rule from the rule agrees with itself whatever
+       * the rule says, and this one did. */
+      const [wantCols, wantRows] = {
+        1: [1, 1], 2: [2, 1], 3: [2, 2], 4: [2, 2],
+        5: [2, 3], 6: [2, 3], 7: [2, 4], 8: [2, 4],
+      }[n];
+      assert.equal(ns.cols, wantCols, `${where}: ${ns.cols} columns, asked for ${wantCols}`);
+      assert.equal(ns.rws, wantRows, `${where}: ${ns.rws} rows, asked for ${wantRows}`);
+      for (let i = 0; i < n; i++) {
+        assert.equal(ns.rows[i].x, ns.rows[i % ns.cols].x,
+          `${where}: name ${i + 1} is not in column ${(i % ns.cols) + 1}`);
+      }
+      /* A run down the list is not a run down the page, so the advance is
+       * checked between a name and the one above it in its own column. */
+      for (let i = ns.cols; i < n; i++) {
+        const step = ns.rows[i].y - ns.rows[i - ns.cols].y;
         assert.ok(step >= ns.px * 0.87,
           `${where}: the names advance ${(step / ns.px).toFixed(3)} of their size`);
+      }
+      // Two on a line do not run into one another.
+      for (let i = 1; i < n; i++) {
+        if (ns.rows[i].y !== ns.rows[i - 1].y) continue;
+        const left = measure(ns.rows[i - 1].text, ANTON_F) / 100 * ns.px
+          - 0.01 * ns.px * (ns.rows[i - 1].text.length - 1);
+        assert.ok(ns.rows[i - 1].x + left <= ns.rows[i].x + 1,
+          `${where}: "${ns.rows[i - 1].text}" runs into "${ns.rows[i].text}"`);
       }
       // And each stays inside the column it is set in.
       for (const r of ns.rows) {

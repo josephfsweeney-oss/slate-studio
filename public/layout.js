@@ -1773,6 +1773,11 @@ function fitInside(measure, text, font, px, maxW, maxLines, ls, upper) {
 /** A fitted block with nothing in it, for a line that has been taken out. */
 const EMPTY_SUB = { lines: [], h: 0, px: 0, lh: 0, font: COND_BOLD, ls: 0.045, w: 0, widths: [] };
 
+/** How the names above a foot slate are set: two columns for everything but a
+ *  single name, filled across and then down. One alone has nothing to sit
+ *  beside; two share a line; three puts the third under the first. */
+export const NAME_COLS = (n) => (n <= 1 ? 1 : 2);
+
 function solveSlateBand(spec, measure, side) {
   const { w, h } = spec.canvas;
   const slate = spec.slate || [];
@@ -1848,7 +1853,7 @@ function solveSlateBand(spec, measure, side) {
        * nobody reads off a mailbox. The names are a label for the row under
        * them; the pledges are the argument. */
       Math.max(1, faceTop - inner.y - box.h * 0.018) * (hasList ? 0.30 : 0.42),
-      Math.ceil(n / (n > 4 ? 2 : 1))
+      Math.ceil(n / NAME_COLS(n))
         * box.h * 0.085 * clampScale(style.textScale) * clampScale(style.headScale) * 0.916
         + box.h * 0.012)
     : 0;
@@ -2522,11 +2527,15 @@ function solveSlateBand(spec, measure, side) {
       const at100 = widthAt(measure, t, ANTON, 100, -0.01);
       return at100 > 0 ? (width / at100) * 100 : 0;
     }));
-    /* Two columns past four. Eight names one to a line in the band above the
-     * slate came out at thirty pixels each, which is a caption, not a name.
-     * Set two abreast they are twice the size in the same band, and the column
-     * is wide enough to hold the longest of them twice over. */
-    const cols = n > 4 ? 2 : 1;
+    /* Two columns for everything but a single name, filled across and then
+     * down, so the names read the way a list reads: one and two side by side,
+     * three under one, four under two.
+     *
+     * One to a line, eight names came out at thirty pixels each in the band
+     * above the slate, which is a caption rather than a name. Two abreast
+     * halves the rows, so the same band carries them at twice the size, and
+     * the column is wide enough to hold the longest of them twice over. */
+    const cols = NAME_COLS(n);
     const rws = Math.ceil(n / cols);
     const colGap = wordsBox.w * 0.04;
     const colW = (wordsBox.w - colGap * (cols - 1)) / cols;
@@ -2554,8 +2563,8 @@ function solveSlateBand(spec, measure, side) {
       px, line: NLINE, dropped: use !== lines,
       rows: use.map((t, i) => ({
         text: t,
-        x: wordsBox.x + Math.floor(i / rws) * (colW + colGap),
-        y: top + (i % rws) * px * NLINE,
+        x: wordsBox.x + (i % cols) * (colW + colGap),
+        y: top + Math.floor(i / cols) * px * NLINE,
       })),
     };
   }
