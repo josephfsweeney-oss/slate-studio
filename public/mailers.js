@@ -94,11 +94,12 @@ export const MAIL_PROGRAMS = [{
          * which is why seven pledges under it is a list and not a wall, and
          * "before you vote" is the whole point of a guarantee: anybody can
          * promise after the fact. */
-        /* Broken by hand. Left to the wrapper it came out "SEVEN PROMISES. IN
-         * / WRITING. BEFORE YOU VOTE.", which breaks a phrase after a
-         * preposition. Three lines, one clause each, and each line stands on
-         * its own if it is all anybody reads. */
-        headline: 'Seven Promises.\nIn Writing.\nBefore You Vote.',
+        /* One row. Over three lines it was the same height as the names under
+         * it and competed with them for the same job; on one it is the widest
+         * thing in the column and the eye takes it in a single pass. Losing
+         * "before you vote" costs little: the block says VOTE FOR ALL FOUR and
+         * the band across the foot says NOV. 3RD. */
+        headline: 'Seven Promises. In Writing.',
         /* And the line that heads them names the thing, so the two sides of
          * the piece are one idea: the lockup on the reverse is the Granite
          * Guarantee, and this is what the Granite Guarantee actually says. */

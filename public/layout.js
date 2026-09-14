@@ -1845,7 +1845,9 @@ function solveSlateBand(spec, measure, side) {
    * carrier's corner on a foot slate, not to the column beside the slate. */
   const promiseList = footSlate && Array.isArray(copy.list)
     ? copy.list.map((t) => String(t || '').trim()).filter(Boolean) : [];
-  const faceH = footSlate ? h * 0.46 : 0;
+  /* The slate takes the bottom half of the piece exactly, so the faces begin on
+   * the halfway line rather than a little under it. */
+  const faceH = footSlate ? h * 0.50 : 0;
   const faceTop = footSlate ? h - faceH : 0;
   const stackTop = panel ? (footSlate ? inner.y : panel.y - listReserve) : 0;
   /* The names take their band out of the column before anything else is laid
@@ -2279,7 +2281,10 @@ function solveSlateBand(spec, measure, side) {
        * them, or the headline fits by its own measure and the line under it
        * lands on the district line by three pixels. */
       room = Math.max(box.h * 0.035, room - box.h * 0.034);
-      const headBlk = fitHead(panel ? wordsBox.w : inner.w, room, 3);
+      /* One row on a foot slate. The claim is the widest thing in the column
+       * and it reads as one line: stacked over three it competed with the names
+       * under it for the same job. */
+      const headBlk = fitHead(panel ? wordsBox.w : inner.w, room, footSlate ? 1 : 3);
       const bp = onDark && headBlk.lines.length ? headBlk.px * 0.30 : 0;
       const rh = !onDark && headBlk.lines.length ? Math.max(3, box.h * 0.0085) : 0;
       const hh = headBlk.h
@@ -2659,7 +2664,10 @@ function solveSlateBand(spec, measure, side) {
     const colW = (wordsBox.w - colGap * (cols - 1)) / cols;
     /* The band taken out of the column for them, from the foot of the words to
      * the top of the faces. */
-    const roomForNames = Math.max(1, faceTop - box.h * 0.024
+    /* The names stand on the slate. A quarter of an inch of clearance read as a
+     * gap between the names and the heads they name, with the ground showing
+     * through it; they sit on the line the faces start on now. */
+    const roomForNames = Math.max(1, faceTop - box.h * 0.006
       - (wordsBox.y + wordsBox.h) - box.h * 0.008);
     const sizeFor = (arr) => {
       let q = Math.min(fillTo(arr, colW), box.h * 0.085 * textScale) * headScale;
@@ -2675,7 +2683,7 @@ function solveSlateBand(spec, measure, side) {
       px = sizeFor(use);
     }
     const stackH = rws * px * NLINE;
-    const top = faceTop - box.h * 0.024 - stackH;
+    const top = faceTop - box.h * 0.006 - stackH;
     nameStack = {
       x: wordsBox.x, w: wordsBox.w, colW, colGap, cols, rws,
       px, line: NLINE, dropped: use !== lines,

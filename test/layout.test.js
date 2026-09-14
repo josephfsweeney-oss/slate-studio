@@ -1048,8 +1048,11 @@ test('the address side stands its slate on the foot, names above', () => {
       /* Half the paper, near enough. They used to stand in the top third with
        * a caption band under them. */
       const top = Math.min(...b.figures.map((f) => f.slot.y));
-      assert.ok(c.h - top >= c.h * 0.40,
-        `${where}: the slate holds ${((c.h - top) / c.h * 100).toFixed(0)}% of the piece`);
+      /* The bottom half of the piece, exactly: the faces begin on the halfway
+       * line. They used to begin a little under it, which left a strip of
+       * ground between the names and the heads they name. */
+      assert.ok(Math.abs(top - c.h * 0.50) <= 2,
+        `${where}: the slate begins at ${(top / c.h * 100).toFixed(1)}% down, not the half`);
 
       // No caption band: the names are above the row instead.
       assert.equal(b.bandRect, null, `${where}: a foot slate still drew a name band`);
@@ -1061,8 +1064,17 @@ test('the address side stands its slate on the foot, names above', () => {
       assert.ok(ns, `${where}: the names are not on the piece`);
       assert.equal(ns.rows.length, n, `${where}: ${ns.rows.length} names for ${n} candidates`);
       // Above the faces, and never printing through one another.
-      const lowest = Math.max(...ns.rows.map((r) => r.y));
-      assert.ok(lowest + ns.px <= top + 1, `${where}: the names run into the faces`);
+      /* Measured on the ink, not the em box: the painter sets each name at 0.80
+       * of its size below its own y and Anton has no descender in caps, so the
+       * baseline is the bottom of the name. The box below it is empty. */
+      const lowest = Math.max(...ns.rows.map((r) => r.y)) + ns.px * 0.80;
+      assert.ok(lowest <= top + 1,
+        `${where}: the names run ${(lowest - top).toFixed(0)}px into the faces`);
+      /* One row for the claim beside the slate. Over three lines it was the
+       * same height as the names under it and competed with them. */
+      assert.equal(b.head.block.lines.length, 1,
+        `${where}: the claim runs to ${b.head.block.lines.length} rows`);
+
       /* The grid: two columns for everything but a single name, filled across
        * and then down. One and two share a line, three sits under one, four
        * under two, and so on to eight in two columns of four. */
